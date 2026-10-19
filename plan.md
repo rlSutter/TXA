@@ -158,10 +158,44 @@ glyphs and colours on screen.
 
 **M1 is complete.**
 
-## Next: M2 (the parser)
+## M2 (the parser): under way
 
-Tokenizer, dictionary lookup, grammar tables in the image, noun
-resolution, disambiguation, orders, AGAIN/OOPS; READ becomes real.
+**Design change, for Rebecca's confirmation:** the parser is written in
+TXA as part of the standard library (lib/parser.txa), not in assembly.
+It runs identically on both VMs, so the transcript tests cover it for
+free, and a game can replace any part of it.  The engine supplies the
+low-level work: READ (line input and editing) and TOKENIZE (words and
+dictionary lookup).  A step that is slow on real hardware becomes an
+assembly opcode without changing behaviour.
+
+Done (Python side):
+- the standard library as real files: lib/stdlib.txa (Main loop),
+  lib/libdefs.txa (attributes, properties, globals, player, compass),
+  lib/parser.txa, lib/verbs.txa (enough verbs to exercise the parser;
+  the full set is M3);
+- the parser: articles; names matched on every word, a phrase ending
+  where no object fits any more; ALL with EXCEPT/BUT; lists with AND or
+  commas; IT/THEM/HIM/HER; orders ("ada, take coins"); several commands
+  on a line (full stops, THEN); AGAIN/G; OOPS; "Which do you mean ...?"
+  with replies that narrow or start a new command; "What do you want to
+  take?"; two-pass grammar matching (quiet trial of every line, then
+  questions on the chosen one); Infocom's error messages; compass words
+  alone mean GO;
+- language and compiler: 'word' dictionary literals; NAME is property 1
+  holding dictionary words; PROPLEN(o, P) and PROPWORD(o, P, i); AGET
+  and APUT (arrays passed by number); HASATTR(o, a); FRESHLINE();
+  READ(text, parse) and TOKENIZE(text, parse); LASTOBJ; the generated
+  arrays VERBTAB, GRAMTAB, ACTSUB, DICTVERB (formats in sema.py);
+- opcodes READ (new form), TOKENIZE, HASATTRV, ALOADV, ASTOREV, FRESH
+  in opcodes.py and the Python VM;
+- tests/m2_parser_test.py: a 45-command script on a test world,
+  compared with a reviewed reference transcript, plus 19 named checks.
+
+Next in M2 (the TI side): the line editor and READ, TOKENIZE, and the
+four small opcodes in assembly; then the engine must play the same
+script with the same transcript (m1_vm_test lists the five opcodes it is
+still missing).  Then: command history (FCTN E/X) and timing on real
+hardware.
 
 ## (old heading) M1 remaining
 
@@ -185,6 +219,7 @@ text output, word wrap and [MORE]; bold and underline glyph sets.
 
 ## History
 
+- 2026-10-19 M2 begun: the standard library's parser in TXA, with the compiler and Python VM support it needs.
 - 2026-10-19 M1 complete: text styles (bold, underline, reverse) through position attributes and an underlined glyph set.
 - 2026-10-19 M1: the assembly VM, cross-checked against the Python VM; the demo cartridge.
 - 2026-10-19 M1: semantic pass, opcodes, code generation and linking, Python reference VM.

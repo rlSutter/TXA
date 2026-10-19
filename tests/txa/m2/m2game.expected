@@ -1,0 +1,145 @@
+
+Kitchen
+A cramped kitchen. A trapdoor is set in the floor, and a doorway leads north.
+You can see a tin lamp, a wooden box and Ada here.
+
+>look
+Kitchen
+A cramped kitchen. A trapdoor is set in the floor, and a doorway leads north.
+You can see a tin lamp, a wooden box and Ada here.
+
+>take lamp
+Which do you mean, the brass lamp or the tin lamp?
+>brass
+Taken.
+
+>i
+You are carrying:
+  a brass lamp
+
+>x it
+A battered brass lamp.
+
+>take all
+tin lamp: Taken.
+wooden box: Taken.
+
+>drop all but brass lamp
+wooden box: Dropped.
+tin lamp: Dropped.
+
+>xyzzy
+I don't know the word "xyzzy".
+
+>take xyzzy
+I don't know the word "xyzzy".
+
+>oops tin
+Taken.
+
+>g
+You already have the tin lamp.
+
+>open box. look in box. take coins from box
+You open the wooden box.
+In the wooden box you can see some gold coins.
+Taken.
+
+>x them
+You see nothing special about the gold coins.
+
+>give ada tin lamp
+Ada takes the tin lamp and thanks you.
+
+>x her
+Ada is stirring a pot.
+
+>give brass lamp to cook
+Ada takes the brass lamp and thanks you.
+
+>ada, take coins
+"Get it yourself," says Ada.
+
+>ada, dance
+I don't know the word "dance".
+
+>cook,
+Ada looks at you expectantly.
+
+>take the
+What do you want to take?
+>coins
+You already have the gold coins.
+
+>put coins in
+What do you want to put coins in?
+>box
+You put the gold coins into the wooden box.
+
+>look in box
+In the wooden box you can see some gold coins.
+
+>take the gold
+Taken.
+
+>put brass in box
+You haven't got the brass lamp.
+
+>take lamp and box
+Which do you mean, the brass lamp or the tin lamp?
+>tin
+tin lamp: That seems to belong to Ada.
+wooden box: Taken.
+
+>take box, coins
+wooden box: You already have the wooden box.
+gold coins: You already have the gold coins.
+
+>drop all
+wooden box: Dropped.
+gold coins: Dropped.
+
+>take all but box
+Taken.
+
+>n
+Hall
+A long hall with a faded runner.
+
+>n
+You can't go that way.
+
+>s
+Kitchen
+A cramped kitchen. A trapdoor is set in the floor, and a doorway leads north.
+You can see a wooden box and Ada here.
+
+>d
+The trapdoor is shut fast.
+
+>take the
+What do you want to take?
+>look
+Kitchen
+A cramped kitchen. A trapdoor is set in the floor, and a doorway leads north.
+You can see a wooden box and Ada here.
+
+>in
+You can't go that way.
+
+>put
+What do you want to put?
+>wait
+Time passes.
+
+>x
+What do you want to x?
+>kitchen
+I don't know the word "kitchen".
+
+>hello there
+I don't know the word "hello".
+
+>take
+What do you want to take?
+>q

@@ -390,7 +390,11 @@ class Parser:
         e = self.primary()
         while True:
             if self.at_sym('.'):
-                t = self.take(); e = A.PropRef(e, self.ident('a property name'), **self.pos(t))
+                t = self.take()
+                if self.at_kw('NAME'):
+                    self.take(); e = A.PropRef(e, 'NAME', **self.pos(t))
+                else:
+                    e = A.PropRef(e, self.ident('a property name'), **self.pos(t))
             elif self.at_sym('(') and isinstance(e, (A.Name, A.PropRef)):
                 t = self.take(); args = []
                 if not self.at_sym(')'):
@@ -414,6 +418,10 @@ class Parser:
             self.take(); return A.Str(t.value, **p)
         if t.kind == 'ACT':
             self.take(); return A.ActionRef(t.value, **p)
+        if t.kind == 'DICT':
+            self.take(); return A.DictWord(t.value, **p)
+        if self.at_kw('NAME'):                       # the NAME property, as a value: PROPLEN(o, NAME)
+            self.take(); return A.Name('NAME', **p)
         if t.kind == 'ID':
             self.take(); return A.Name(t.value, **p)
         if self.at_kw('TRUE', 'FALSE', 'NOTHING', 'SELF'):

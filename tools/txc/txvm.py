@@ -41,6 +41,42 @@ class VM:
             off = self.rw(ab + 2 * i)
             self.abbrevs.append(self.cstr(ab + off) if off else '')
         self.attr_proper, self.attr_plural = self.img[HDR['attr_proper']], self.img[HDR['attr_plural']]
+        d = h('dictionary')
+        self.dict_words = {}
+        for i in range(self.rw(d)):
+            raw = bytes(self.img[d + 2 + 14 * i: d + 14 + 14 * i]).rstrip(b'\0').decode('latin-1')
+            self.dict_words[raw] = i + 1
+
+    # ---- arrays (READ and TOKENIZE write into the story's arrays)
+    def array(self, n):
+        if n >= self.rw(self.arrays):
+            raise VMError(f'array {n} does not exist')
+        return self.rw(self.arrays + 2 + 4 * n), self.rw(self.arrays + 4 + 4 * n)
+
+    def tokenize(self, tarr, parr):
+        """TOKENIZE: opcodes.py says how.  Returns the word count."""
+        ts, tl = self.array(tarr); ps, pl = self.array(parr)
+        n = min(s16(self.rw(ts)), tl - 1)
+        text = ''.join(chr(self.rw(ts + 2 * (i + 1)) & 0xFF) for i in range(max(0, n)))
+        words, i = [], 0
+        while i < len(text):
+            ch = text[i]
+            if ch == ' ':
+                i += 1; continue
+            if ch in ',.':
+                words.append((i, 1)); i += 1; continue
+            j = i
+            while j < len(text) and text[j] not in ' ,.':
+                j += 1
+            words.append((i, j - i)); i = j
+        room = (pl - 1) // 3
+        words = words[:room]
+        self.ww(ps, len(words))
+        for k, (start, ln) in enumerate(words):
+            w = text[start:start + ln][:12]
+            e = ps + 2 + 6 * k
+            self.ww(e, self.dict_words.get(w, 0)); self.ww(e + 2, start + 1); self.ww(e + 4, ln)
+        return len(words)
 
     # ---- memory
     def hw(self, field):
@@ -217,6 +253,11 @@ class VM:
         elif name == 'MOVE': d = pop(); o = pop(); self.move(o, d)
         elif name == 'REMOVE': self.detach(pop())
         elif name == 'HASATTR': a = b(); push(self.has(pop(), a))
+        elif name == 'HASATTRV':
+            a = pop(); o = pop()
+            if not 0 <= a < 48:
+                raise VMError(f'attribute {a} does not exist')
+            push(self.has(o, a))
         elif name in ('SETATTR', 'CLRATTR'): a = b(); self.setattr_(pop(), a, name == 'SETATTR')
         elif name == 'GETPROP':
             n = b(); pr = self.prop(pop(), n); push(self.rw(pr[2]) if pr else 0)
@@ -249,6 +290,16 @@ class VM:
                 pc = self.call(self.rw(pr[2]), args, pc, self_obj=o)
             else:
                 push(0)
+        elif name in ('ALOADV', 'ASTOREV'):
+            v = pop() if name == 'ASTOREV' else None
+            i = pop(); n = pop()
+            start, ln = self.array(n)
+            if not 0 <= i < ln:
+                raise VMError(f'index {i} is outside array {n} (0 to {ln - 1})')
+            if name == 'ALOADV':
+                push(self.rw(start + 2 * i))
+            else:
+                self.ww(start + 2 * i, v & 0xFFFF)
         elif name in ('ALOAD', 'ASTORE', 'ALEN'):
             n = b()
             if n >= self.rw(self.arrays):
@@ -275,6 +326,10 @@ class VM:
             o = pop(); self.write(self.short_name(o) if o else 'nothing')
         elif name == 'PRINTC': self.write(chr(pop() & 0xFF))
         elif name == 'NEWLINE': self.write('\n')
+        elif name == 'FRESH':
+            t = self.transcript()
+            if t and not t.endswith('\n'):
+                self.write('\n')
         elif name == 'STYLE': pop()                      # (styles change the screen, not the text)
         elif name == 'PRINTA':
             form = b(); o = pop(); nm = self.short_name(o)
@@ -291,12 +346,19 @@ class VM:
                 art = art if form == 2 else art.capitalize()
             self.write(art + nm)
         elif name == 'READ':
+            parr = pop(); tarr = pop()
             if not self.commands:
                 raise Quit()
-            line = self.commands.pop(0)
+            ts, tl = self.array(tarr)
+            line = self.commands.pop(0).lower()[:min(tl - 1, 160)]
             self.write(line + '\n')
-            self.last_input = line
-            push(len(line.split()))
+            self.ww(ts, len(line))
+            for i, ch in enumerate(line):
+                self.ww(ts + 2 * (i + 1), ord(ch))
+            push(self.tokenize(tarr, parr))
+        elif name == 'TOKENIZE':
+            parr = pop(); tarr = pop()
+            push(self.tokenize(tarr, parr))
         elif name == 'READKEY': push(13)
         elif name == 'RANDOM':
             n = pop()

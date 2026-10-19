@@ -48,7 +48,26 @@ BUILTINS = {
     'UNDOSAVE': ('UNDOSAVE', 0, True), 'UNDO': ('UNDO', 0, True),
     'QUIT': ('QUIT', 0, False), 'RESTART': ('RESTART', 0, False),
     'STATUS': ('STATUS', 0, False), 'SOUND': ('SOUND', 1, False), 'STYLE': ('STYLE', 1, False),
-}   # routine properties whose cases are actions
+    'READ': ('READ', 2, True), 'TOKENIZE': ('TOKENIZE', 2, True),
+    'HASATTR': ('HASATTRV', 2, True), 'FRESHLINE': ('FRESH', 0, False),
+    'AGET': ('ALOADV', 2, True), 'APUT': ('ASTOREV', 3, False),
+    # the second argument of these two is a property name, not a value
+    'PROPLEN': ('PROPLEN', 2, True), 'PROPWORD': ('GETPROPN', 3, True),
+}
+PROP_ARG = {'PROPLEN', 'PROPWORD'}
+# Arrays the compiler makes for the library's parser (their names are reserved):
+#   VERBTAB(v)  where verb v's grammar starts in GRAMTAB (v from 1)
+#   GRAMTAB     for each verb: its line count, then each line: action,
+#               flags (1 = REVERSE), token count, tokens.  A token is
+#               >1000+t a slot (t: 1 noun 2 held 3 multi 4 multiheld
+#               5 multiexcept 6 multiinside 7 creature 8 number 9 topic
+#               10 scope), +>0800 if a routine follows (noun=R, scope=R);
+#               >2000+w a literal word w; >3000+a a noun with attribute a
+#   ACTSUB(a)   action a's routine
+#   DICTVERB(w) the verb word w belongs to (0 if none), w from 1
+GEN_ARRAYS = ['VERBTAB', 'GRAMTAB', 'ACTSUB', 'DICTVERB']
+SLOT_CODE = {'noun': 1, 'held': 2, 'multi': 3, 'multiheld': 4, 'multiexcept': 5, 'multiinside': 6,
+             'creature': 7, 'number': 8, 'topic': 9, 'scope': 10}   # routine properties whose cases are actions
 
 
 class Sym:
@@ -140,6 +159,12 @@ class Sema:
 
     def declare_all(self, decls):
         p = self.p
+        here = decls[0] if decls else A.Num(0, file='<compiler>', line=0)
+        self.declare('property', 'NAME', here, 1); p.props.append('NAME')     # NAME is property 1
+        for g in GEN_ARRAYS:
+            p.arrays.append(self.declare('array', g, here, len(p.arrays)))
+        for w in (',', '.'):                                                 # always words, for the parser
+            p.dictionary.add(w)
         for d in decls:
             if isinstance(d, A.Constant):
                 self.declare('constant', d.name, d)
@@ -173,6 +198,9 @@ class Sema:
                 self.declare('routine', d.name, d); p.routines.append(d)
             elif isinstance(d, A.Verb):
                 p.verbs.append(d)
+        # LASTOBJ: the highest object number (compiler-made, reserved)
+        self.declare('constant', 'LASTOBJ', here)
+        p.constants['LASTOBJ'] = sum(1 for d in decls if isinstance(d, A.ObjDecl) and d.kind != 'CLASS')
         # constants may refer to earlier or later constants: fold on demand
         for d in decls:
             if isinstance(d, A.Constant):
@@ -283,6 +311,7 @@ class Sema:
             elif isinstance(item, A.Names):
                 for w in item.words:
                     o.names.append(self.dict_word(w, item))
+                o.props[1] = ('values', [('dict', w) for w in o.names])
             elif isinstance(item, A.InParent):
                 if inherited:
                     self.err(item, 'a class cannot say what its objects are IN')
@@ -348,9 +377,14 @@ class Sema:
     def collect_actions(self):
         p = self.p
         use = self.use_action
-        for v in p.verbs:
+        p.verb_of = {}
+        for vn, v in enumerate(p.verbs, 1):
+            v.number = vn
             for w in v.words:
-                self.dict_word(w, v)
+                w = self.dict_word(w, v)
+                if w in p.verb_of:
+                    self.err(v, f'"{w}" is already a word of another VERB')
+                p.verb_of[w] = vn
             for gl in v.lines:
                 for t in gl.tokens:
                     if t.kind == 'word':
@@ -463,6 +497,9 @@ class Sema:
                     self.err(e, 'an array element takes one index')
                 expr(e.args[0])
         def expr(e):
+            if isinstance(e, A.DictWord):
+                self.dict_word(e.word, e)
+                return
             if isinstance(e, A.ActionRef):
                 self.use_action(e.name, e)
                 return
@@ -498,11 +535,16 @@ class Sema:
                 return
             if isinstance(e, A.Call):
                 if isinstance(e.func, A.Name) and e.func.id.upper() in BUILTINS and e.func.id.upper() not in scope:
-                    n = BUILTINS[e.func.id.upper()][1]
+                    b = e.func.id.upper(); n = BUILTINS[b][1]
                     if len(e.args) != n:
-                        self.err(e, f'{e.func.id.upper()} takes {n} argument{"s" if n != 1 else ""}, not {len(e.args)}')
-                    for a in e.args:
-                        expr(a)
+                        self.err(e, f'{b} takes {n} argument{"s" if n != 1 else ""}, not {len(e.args)}')
+                    for i, a in enumerate(e.args):
+                        if b in PROP_ARG and i == 1:
+                            sy = self.p.sym(a.id) if isinstance(a, A.Name) else None
+                            if not sy or sy.kind != 'property':
+                                self.err(e, f'the second argument of {b} must be a property name')
+                        else:
+                            expr(a)
                     return
                 if isinstance(e.func, A.Name) and e.func.id.upper() not in scope:
                     sy = self.p.sym(e.func.id)
@@ -534,10 +576,47 @@ class Sema:
         self.build_objects(decls)
         self.collect_actions()
         self.check_routines()
+        self.finish_tables()
         for o in self.p.objects:
             if not o.names and o.kind == 'OBJECT':
                 self.warn(o.sym.decl, f'{o.sym.name} has no NAME words, so the player cannot refer to it')
         return self.p
+
+
+def _finish_tables(self):
+    """Number the dictionary (sorted, from 1) and fill the generated arrays."""
+    p = self.p
+    words = sorted(p.dictionary, key=lambda w: w.encode('latin-1'))
+    p.dictnum = {w: i + 1 for i, w in enumerate(words)}
+    verbtab, gram = [('num', 0)], []
+    for v in p.verbs:
+        verbtab.append(('num', len(gram)))
+        gram.append(('num', len(v.lines)))
+        for gl in v.lines:
+            act = [a.upper() for a in p.actions].index(gl.action.upper())
+            toks = []
+            for t in gl.tokens:
+                if t.kind == 'word':
+                    toks.append(('num', 0x2000 + p.dictnum[t.value.lower()[:DICT_LEN]]))
+                elif t.value.lower() in SLOT_CODE:
+                    code = 0x1000 + SLOT_CODE[t.value.lower()]
+                    if t.filter:
+                        toks += [('num', code + 0x0800), ('routine', p.sym(t.filter).name)]
+                    else:
+                        toks.append(('num', code))
+                else:
+                    toks.append(('num', 0x3000 + p.sym(t.value).number))
+            gram += [('num', act), ('num', 1 if gl.reverse else 0), ('num', len([t for t in gl.tokens]))] + toks
+    gen = {
+        'VERBTAB': verbtab,
+        'GRAMTAB': gram or [('num', 0)],
+        'ACTSUB': [('routine', p.sym(a + 'Sub').name) for a in p.actions] or [('num', 0)],
+        'DICTVERB': [('num', 0)] + [('num', p.verb_of.get(w, 0)) for w in words],
+    }
+    for name, vals in gen.items():
+        p.sym(name).gen_values = vals
+
+Sema.finish_tables = _finish_tables
 
 
 def sub_bodies(s):

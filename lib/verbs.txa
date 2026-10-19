@@ -1,0 +1,342 @@
+! verbs.txa - the standard library's verbs: grammar and action routines.
+!
+! M2 carries enough verbs to exercise the parser; M3 brings the full
+! Infocom set, light, doors, containers in depth, and the rest.
+
+VERB "look" "l"
+  -> Look
+  "at" noun -> Examine
+  "in" noun -> Search
+  "inside" noun -> Search
+END
+VERB "examine" "x" "inspect" "describe"
+  noun -> Examine
+END
+VERB "search"
+  noun -> Search
+END
+VERB "inventory" "i" "inv"
+  -> Inv
+END
+VERB "take" "get" "carry"
+  multi -> Take
+  "up" multi -> Take
+  multi "up" -> Take
+  multiinside "from" noun -> Remove
+  multiinside "off" noun -> Remove
+END
+VERB "pick"
+  "up" multi -> Take
+  multi "up" -> Take
+END
+VERB "drop" "discard"
+  multiheld -> Drop
+END
+VERB "put" "place" "insert"
+  multiheld "in" container -> Insert
+  multiheld "into" container -> Insert
+  multiheld "inside" container -> Insert
+  multiheld "on" noun -> PutOn
+  multiheld "onto" noun -> PutOn
+  "down" multiheld -> Drop
+  multiheld "down" -> Drop
+END
+VERB "give" "offer" "hand"
+  held "to" creature -> Give
+  creature held -> Give REVERSE
+END
+VERB "ask"
+  creature "about" topic -> Ask
+END
+VERB "tell"
+  creature "about" topic -> Tell
+END
+VERB "open"
+  noun -> Open
+END
+VERB "close" "shut"
+  noun -> Close
+END
+VERB "go" "walk" "run"
+  noun -> Go
+END
+VERB "wait" "z"
+  -> Wait
+END
+VERB "quit" "q"
+  -> Quit
+END
+
+! ---- listing ---------------------------------------------------------------
+! "a lamp, some coins and Ada": the children of obj that are not scenery,
+! concealed or the player.  Returns how many.
+ROUTINE ListContents obj
+  LOCAL c, n, total
+  FOR EACH c IN obj
+    IF Listable(c)
+      total = total + 1
+    END
+  END
+  FOR EACH c IN obj
+    IF Listable(c)
+      IF n > 0
+        IF n = total - 1
+          WRITE " and "
+        ELSE
+          WRITE ", "
+        END
+      END
+      WRITE (a) c
+      n = n + 1
+    END
+  END
+  RETURN total
+END
+
+ROUTINE Listable c
+  RETURN c <> player AND c HASNT scenery AND c HASNT concealed
+END
+
+! ---- actions ---------------------------------------------------------------
+ROUTINE LookSub
+  LOCAL c, o
+  STYLE(1)
+  PRINT (name) location
+  STYLE(0)
+  IF NOT IsLit()
+    PRINT "It is pitch dark, and you can't see a thing."
+    RETURN
+  END
+  IF location.DESC()
+    FRESHLINE()
+  END
+  c = 0
+  FOR EACH o IN location
+    IF Listable(o)
+      c = c + 1
+    END
+  END
+  IF c
+    WRITE "You can see "
+    ListContents(location)
+    PRINT " here."
+  END
+  GIVE location visited
+END
+
+ROUTINE ExamineSub
+  IF noun.DESC()
+    FRESHLINE()
+  ELSE
+    PRINT "You see nothing special about ", (the) noun, "."
+  END
+END
+
+ROUTINE SearchSub
+  IF noun HAS container OR noun HAS supporter
+    IF noun HAS container AND noun HASNT open AND noun HASNT transparent
+      PRINT (The) noun, " is closed."
+      RETURN
+    END
+    IF CHILD(noun)
+      WRITE "In ", (the) noun, " you can see "
+      ListContents(noun)
+      PRINT "."
+    ELSE
+      PRINT "There is nothing in ", (the) noun, "."
+    END
+    RETURN
+  END
+  PRINT "You find nothing of interest."
+END
+
+ROUTINE InvSub
+  LOCAL c
+  IF CHILD(player) = 0
+    PRINT "You are empty-handed."
+    RETURN
+  END
+  PRINT "You are carrying:"
+  FOR EACH c IN player
+    PRINT "  ", (a) c
+  END
+END
+
+ROUTINE TakeSub
+  IF noun = player
+    PRINT "You are always self-possessed."
+  ELSEIF noun IN player
+    PRINT "You already have ", (the) noun, "."
+  ELSEIF noun HAS animate
+    PRINT "I don't suppose ", (the) noun, " would care for that."
+  ELSEIF noun HAS static OR noun HAS scenery
+    PRINT "That's fixed in place."
+  ELSEIF PARENT(noun) HAS animate
+    PRINT "That seems to belong to ", (the) PARENT(noun), "."
+  ELSE
+    MOVE noun TO player
+    IF AfterRules()
+      RETURN
+    END
+    PRINT "Taken."
+  END
+END
+
+ROUTINE RemoveSub
+  IF noun NOTIN second
+    PRINT (The) noun, " isn't there."
+    RETURN
+  END
+  TakeSub()
+END
+
+ROUTINE DropSub
+  IF noun NOTIN player
+    PRINT "You haven't got ", (the) noun, "."
+    RETURN
+  END
+  MOVE noun TO location
+  IF AfterRules()
+    RETURN
+  END
+  PRINT "Dropped."
+END
+
+ROUTINE InsertSub
+  IF noun NOTIN player
+    PRINT "You haven't got ", (the) noun, "."
+  ELSEIF second HAS container AND second HASNT open
+    PRINT (The) second, " is closed."
+  ELSE
+    MOVE noun TO second
+    IF AfterRules()
+      RETURN
+    END
+    PRINT "You put ", (the) noun, " into ", (the) second, "."
+  END
+END
+
+ROUTINE PutOnSub
+  IF noun NOTIN player
+    PRINT "You haven't got ", (the) noun, "."
+  ELSEIF second HASNT supporter
+    PRINT "Putting things on ", (the) second, " would achieve nothing."
+  ELSE
+    MOVE noun TO second
+    IF AfterRules()
+      RETURN
+    END
+    PRINT "You put ", (the) noun, " on ", (the) second, "."
+  END
+END
+
+ROUTINE GiveSub
+  IF second.LIFE()
+    RETURN
+  END
+  PRINT (The) second, " doesn't seem interested."
+END
+
+ROUTINE AskSub
+  IF noun.LIFE()
+    RETURN
+  END
+  PRINT "There is no reply."
+END
+
+ROUTINE TellSub
+  IF noun.LIFE()
+    RETURN
+  END
+  PRINT "This provokes no reaction."
+END
+
+ROUTINE OpenSub
+  IF noun HASNT openable
+    PRINT "That's not something you can open."
+  ELSEIF noun HAS open
+    PRINT "It's already open."
+  ELSEIF noun HAS locked
+    PRINT "It seems to be locked."
+  ELSE
+    GIVE noun open
+    IF AfterRules()
+      RETURN
+    END
+    PRINT "You open ", (the) noun, "."
+  END
+END
+
+ROUTINE CloseSub
+  IF noun HASNT openable
+    PRINT "That's not something you can close."
+  ELSEIF noun HASNT open
+    PRINT "It's already closed."
+  ELSE
+    GIVE noun NOT open
+    IF AfterRules()
+      RETURN
+    END
+    PRINT "You close ", (the) noun, "."
+  END
+END
+
+! The exit in direction d (1-12, the compass objects' DIR) of the room:
+! run, so an exit routine decides, an exit string prints itself.
+ROUTINE ExitOf r, d
+  IF d = 1
+    RETURN r.N()
+  ELSEIF d = 2
+    RETURN r.S()
+  ELSEIF d = 3
+    RETURN r.E()
+  ELSEIF d = 4
+    RETURN r.W()
+  ELSEIF d = 5
+    RETURN r.NE()
+  ELSEIF d = 6
+    RETURN r.NW()
+  ELSEIF d = 7
+    RETURN r.SE()
+  ELSEIF d = 8
+    RETURN r.SW()
+  ELSEIF d = 9
+    RETURN r.UP()
+  ELSEIF d = 10
+    RETURN r.DOWN()
+  ELSEIF d = 11
+    RETURN r.INSIDE()
+  END
+  RETURN r.OUTSIDE()
+END
+
+! GO: the compass object's direction gives the exit.  0 means no way; 1
+! means an exit string or routine has already said why not (1 is the
+! player object, never a destination).
+ROUTINE GoSub
+  LOCAL dest
+  IF noun.DIR = 0
+    PRINT "You can't go that way."
+    RETURN
+  END
+  dest = ExitOf(location, noun.DIR)
+  IF dest = 0
+    PRINT "You can't go that way."
+    RETURN
+  END
+  IF dest = 1
+    FRESHLINE()
+    RETURN
+  END
+  MOVE player TO dest
+  location = dest
+  LookSub()
+END
+
+ROUTINE WaitSub
+  PRINT "Time passes."
+END
+
+ROUTINE QuitSub
+  deadflag = 3
+END

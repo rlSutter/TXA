@@ -29,7 +29,7 @@ kit, trap, lamp, cel = p.objects
 check('tree: Trapdoor then Lamp inside the Kitchen', kit.child == trap.number and trap.sibling == lamp.number and lamp.sibling == 0 and trap.parent == kit.number)
 A = {n: i for i, n in enumerate(p.attrs)}; P = {n: i for i, n in enumerate(p.props)}
 check('attributes numbered from 0 in declaration order', A['light'] == 0 and A['switchable'] == 17, A)
-check('properties numbered from 1', P['DESC'] == 1 and P['DOWN'] == 12, P)
+check('properties numbered from 1: NAME is 1, then the declared ones', P['NAME'] == 1 and P['DESC'] == 2 and P['DOWN'] == 13, P)
 check('class inheritance: Door gives static and openable', trap.attrs == {A['static'], A['openable'], A['scenery']}, trap.attrs)
 check('property values: string, object', kit.props[P['DESC']] == ('values', [('str', 'A cramped kitchen. A trapdoor is set in the floor.')])
       and kit.props[P['DOWN']] == ('values', [('obj', trap.number)]) and cel.props[P['UP']] == ('values', [('obj', 2)]))

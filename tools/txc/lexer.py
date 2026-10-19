@@ -14,6 +14,7 @@ compiler's contract; the Authoring Language Reference will say the same):
 - Numbers are decimal (0-32767) or TI-style hex with a leading `>`
   (>1F).  A `>` directly followed by a hex digit after an operator or at
   the start of an expression is hex; otherwise it is "greater than".
+- `'word'` (single quotes) is a dictionary word's number, for the parser.
 - `##Name` is the number of the action Name, as in Inform (`action = ##Take`).
 - Punctuation: : , ( ) . ->  and the operators + - * / = <> < > <= >=.
 
@@ -72,6 +73,11 @@ def tokenize(text, file='<source>'):
                     raise TxaError(file, ln, 'string not closed on this line')
                 s = raw[i + 1:j].replace('^', '\n').replace('~', '"')
                 emit('STR', s, raw[i:j + 1]); i = j + 1; continue
+            if c == "'":                           # 'lamp': a dictionary word
+                j = raw.find("'", i + 1)
+                if j < 0 or j == i + 1:
+                    raise TxaError(file, ln, "a dictionary word in single quotes is not closed")
+                emit('DICT', raw[i + 1:j].lower(), raw[i:j + 1]); i = j + 1; continue
             if raw.startswith('##', i):             # ##Take: an action's number
                 m = ID.match(raw, i + 2)
                 if not m:

@@ -250,6 +250,8 @@ class Gen:
             return self.push_num(v)
         if isinstance(e, A.ActionRef):
             return self.push_num([x.upper() for x in self.p.actions].index(e.name.upper()))
+        if isinstance(e, A.DictWord):
+            return self.push_num(self.p.dictnum[e.word[:12]])
         if isinstance(e, A.Str):
             c.op('PUSHW', 0); c.fixups.append((len(c.b) - 2, self.string(e.value)))
         elif isinstance(e, A.Const):
@@ -302,9 +304,14 @@ class Gen:
                     self.expr(a)
                 return c.op('CALLPROP', self.prop_number(f.prop), len(e.args))
             u = f.id.upper()
-            from .sema import BUILTINS
+            from .sema import BUILTINS, PROP_ARG
             if u in BUILTINS and u not in self.scope:
                 op, _, value = BUILTINS[u]
+                if u in PROP_ARG:                      # PROPLEN(o, P), PROPWORD(o, P, i)
+                    self.expr(e.args[0])
+                    for a in e.args[2:]:
+                        self.expr(a)
+                    return c.op(op, self.prop_number(e.args[1].id))
                 for a in e.args:
                     self.expr(a)
                 c.op(op)
@@ -343,6 +350,8 @@ class Gen:
             if isinstance(g.decl.value, A.Str):
                 self.string(g.decl.value.value)
         for a in p.arrays:
+            if hasattr(a, 'gen_values'):
+                continue
             for v in a.decl.values or []:
                 if isinstance(v, A.Str):
                     self.string(v.value)
@@ -451,6 +460,8 @@ def link(prog, gen, title='TXA GAME', release=1, date=None):
             for k, v in vals:
                 if k in ('str', 'routine'):
                     ref(k, v)
+                elif k == 'dict':
+                    img.word(p.dictnum[v])
                 else:
                     img.word(v)
         img.b.append(0); img.align(2)
@@ -471,7 +482,10 @@ def link(prog, gen, title='TXA GAME', release=1, date=None):
     img.word(len(p.arrays)); dirpos = len(img.b); img.b += bytes(4 * len(p.arrays))
     for a in p.arrays:
         d = a.decl
-        vals = [('num', 0)] * d.size if d.values is None else [sm.prop_value(v, d) for v in d.values]
+        if hasattr(a, 'gen_values'):                  # VERBTAB, GRAMTAB, ACTSUB, DICTVERB
+            vals = a.gen_values
+        else:
+            vals = [('num', 0)] * d.size if d.values is None else [sm.prop_value(v, d) for v in d.values]
         img.set_word(dirpos + 4 * a.number, len(img.b)); img.set_word(dirpos + 4 * a.number + 2, len(vals))
         for k, v in vals:
             if k in ('str', 'routine'):
@@ -483,16 +497,19 @@ def link(prog, gen, title='TXA GAME', release=1, date=None):
     if dyn > 16384:
         raise TxaError('<program>', 0, f'the dynamic area is {dyn} bytes; the limit is 16384 (too many objects or properties)')
     img.set_hdr('dynamic_len', dyn)
-    # dictionary: count, then 14-byte entries (12 characters, zero-padded, and a flags word), sorted
+    # dictionary: count, then 14-byte entries (12 characters, zero-padded; a flags byte, 1 noun,
+    # 2 verb, 4 preposition; the verb's number), sorted: a word's number is its place, from 1
     img.set_hdr('dictionary', len(img.b))
     verbs = {w.lower()[:12] for v in p.verbs for w in v.words}
     preps = {t.value.lower()[:12] for v in p.verbs for gl in v.lines for t in gl.tokens if t.kind == 'word'}
     nouns = {w for o in p.objects for w in o.names}
     words = sorted(p.dictionary, key=lambda w: w.encode('latin-1'))
+    assert all(p.dictnum[w] == i + 1 for i, w in enumerate(words))
     img.word(len(words))
     for w in words:
         img.b += w.encode('latin-1').ljust(12, b'\0')
-        img.word((1 if w in nouns else 0) | (2 if w in verbs else 0) | (4 if w in preps else 0))
+        img.b.append((1 if w in nouns else 0) | (2 if w in verbs else 0) | (4 if w in preps else 0))
+        img.b.append(p.verb_of.get(w, 0))
     # grammar: defined in M2 (the parser); an empty table for now
     img.set_hdr('grammar', len(img.b)); img.word(0)
     # actions: count, then each action's routine

@@ -1,0 +1,96 @@
+! libdefs.txa - the TXA standard library: names everything else uses.
+!
+! Attributes, properties, globals, the player, and the twelve compass
+! directions.  A game INCLUDEs "DSK1.STDLIB", which includes this file
+! first.
+
+ATTRIBUTE light lit open openable locked lockable container supporter
+ATTRIBUTE transparent scenery static worn wearable edible animate
+ATTRIBUTE concealed visited switchable on plural proper female male neuter
+
+PROPERTY DESC INITIAL N S E W NE NW SE SW UP DOWN INSIDE OUTSIDE
+PROPERTY DOOR_TO WITH_KEY CAPACITY BEFORE AFTER LIFE ORDERS
+PROPERTY DIR            ! on a compass object: its number, 1-12 (see GoSub)
+
+GLOBAL player = Yourself      ! the object the player is
+GLOBAL location               ! the room the player is in
+GLOBAL actor                  ! who is doing the action (the player, or an order's character)
+GLOBAL noun                   ! the action's first object
+GLOBAL second                 ! its second object
+GLOBAL action                 ! the action's number (##Take ...)
+GLOBAL deadflag               ! 0 playing, 1 dead, 2 won: ends the game
+GLOBAL turns                  ! commands carried out
+GLOBAL itobj                  ! what IT means
+GLOBAL themobj                ! THEM
+GLOBAL himobj                 ! HIM
+GLOBAL herobj                 ! HER
+GLOBAL lastaction             ! for AGAIN
+
+OBJECT Yourself "yourself"
+  NAME "me" "myself" "self" "yourself"
+  HAS animate proper concealed
+  DESC "As good-looking as ever."
+END
+
+! The compass: always in scope, so N, GO NORTH and so on parse.  DIR is
+! the direction's number, which GoSub turns into the exit property.
+OBJECT CompassN "north"
+  NAME "n" "north"
+  HAS scenery proper
+  DIR 1
+END
+OBJECT CompassS "south"
+  NAME "s" "south"
+  HAS scenery proper
+  DIR 2
+END
+OBJECT CompassE "east"
+  NAME "e" "east"
+  HAS scenery proper
+  DIR 3
+END
+OBJECT CompassW "west"
+  NAME "w" "west"
+  HAS scenery proper
+  DIR 4
+END
+OBJECT CompassNE "northeast"
+  NAME "ne" "northeast"
+  HAS scenery proper
+  DIR 5
+END
+OBJECT CompassNW "northwest"
+  NAME "nw" "northwest"
+  HAS scenery proper
+  DIR 6
+END
+OBJECT CompassSE "southeast"
+  NAME "se" "southeast"
+  HAS scenery proper
+  DIR 7
+END
+OBJECT CompassSW "southwest"
+  NAME "sw" "southwest"
+  HAS scenery proper
+  DIR 8
+END
+OBJECT CompassU "up"
+  NAME "u" "up" "upward" "upwards"
+  HAS scenery proper
+  DIR 9
+END
+OBJECT CompassD "down"
+  NAME "d" "down" "downward" "downwards"
+  HAS scenery proper
+  DIR 10
+END
+OBJECT CompassIn "inside"
+  NAME "in" "inside"
+  HAS scenery proper
+  DIR 11
+END
+OBJECT CompassOut "outside"
+  NAME "out" "outside"
+  HAS scenery proper
+  DIR 12
+END

@@ -1,0 +1,27 @@
+! stdlib.txa - the TXA standard library.  A game starts with
+!   INCLUDE "DSK1.STDLIB"
+! and supplies ROUTINE Initialise, which sets location (and anything
+! else the game needs before the first look).
+
+INCLUDE "DSK1.LIBDEFS"
+INCLUDE "DSK1.PARSER"
+INCLUDE "DSK1.VERBS"
+
+ROUTINE Main
+  Initialise()
+  MOVE player TO location
+  PRINT
+  LookSub()
+  WHILE deadflag = 0
+    IF ReadLine()
+      RunLine()
+    END
+  END
+  IF deadflag = 1
+    PRINT
+    PRINT "*** You have died ***"
+  ELSEIF deadflag = 2
+    PRINT
+    PRINT "*** You have won ***"
+  END
+END

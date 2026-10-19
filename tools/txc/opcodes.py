@@ -80,10 +80,13 @@ OPS = [
     (0x3C, 'RUNPROP',  'b', 'o -> r',     "Property b of o: a routine is called with SELF = o and its result pushed; a string is printed and 1 pushed; a value is pushed; none pushes 0."),
     (0x3D, 'CALLPROP', 'bb', 'o args -> r', 'Call the routine in property b1 of o with b2 arguments and SELF = o; 0 if o has no such routine.'),
     (0x3E, 'GETPROPN', 'b', 'o i -> v',   'Word i (from 0) of property b of o; 0 past the end.'),
+    (0x3F, 'HASATTRV', '',  'o a -> f',   '1 if o has attribute a (a number on the stack: the grammar holds attributes as numbers).'),
     # ---- arrays
     (0x40, 'ALOAD',    'b', 'i -> v',     'Element i of array b; a run-time error outside it.'),
     (0x41, 'ASTORE',   'b', 'i v ->',     'Set element i of array b.'),
     (0x42, 'ALEN',     'b', '-> n',       'Number of elements in array b.'),
+    (0x43, 'ALOADV',   '',  'a i -> v',   'Element i of the array whose number is a (an array named as a value gives its number).'),
+    (0x44, 'ASTOREV',  '',  'a i v ->',   'Set element i of array a.'),
     # ---- text
     (0x48, 'PRINTS',   'p', '',           'Print the packed string p.'),
     (0x49, 'PRINTV',   '',  'p ->',       'Print the packed string on the stack (0 prints nothing).'),
@@ -94,8 +97,10 @@ OPS = [
     (0x4E, 'STYLE',    '',  'n ->',       'Text style from now on: 0 roman, 1 bold, 2 underline, 4 reverse, added together to combine.'),
     (0x4F, 'PRINTA',   'b', 'o ->',       "Print o's name with an article: 0 'the', 1 'The', 2 'a', 3 'A' (plural, proper and vowel rules)."),
     # ---- input
-    (0x50, 'READ',     '',  '-> n',       'Read a command line, tokenize and parse it (M2); push the word count.'),
+    (0x50, 'READ',     '',  't p -> n',   'Read a command line into text array t (t(0) = length, then one character per element, lower case) and TOKENIZE it into parse array p; push the word count.'),
     (0x51, 'READKEY',  '',  '-> c',       'Wait for a key; push its code.'),
+    (0x53, 'FRESH',    '',  '',           'End the line if anything has been printed on it since the last new line.'),
+    (0x52, 'TOKENIZE', '',  't p -> n',   'Split the text in array t into words: p(0) = count, then for each word its dictionary number (0 if unknown), its first character (index into t) and its length. Words are runs of characters other than space, comma and period; a comma or period is a word by itself. Matched on 12 characters. Words past the space in p are dropped.'),
     # ---- system
     (0x58, 'RANDOM',   '',  'n -> r',     'A random number from 1 to n; n <= 0 reseeds (0 at random, -s with s) and pushes 0.'),
     (0x59, 'QUIT',     '',  '',           'End the game: back to the title screen.'),

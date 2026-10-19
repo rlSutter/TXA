@@ -355,7 +355,9 @@ class Machine:
         if 3 <= bit <= 10:
             col = self.keycol
             row = bit - 3
-            if self.held is not None:
+            if self.held is not None:              # TXA: a set of keys may be held (FCTN + S)
+                if isinstance(self.held, (set, frozenset)):
+                    return 0 if (col, row) in self.held else 1
                 return 0 if self.held == (col, row) else 1
             i = (self.insns - KEY_AT) // KEY_PERIOD
             if 0 <= i < len(self.keys) and (self.insns - KEY_AT) % KEY_PERIOD < KEY_HOLD:

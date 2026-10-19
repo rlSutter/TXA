@@ -1,0 +1,1101 @@
+! parser.txa - the TXA standard library's parser.
+!
+! Written in TXA, so it runs the same on the Python VM and the TI engine
+! and a game can replace any routine in it.  The engine does the
+! low-level work: READ reads and edits the line, TOKENIZE splits it into
+! words and finds each in the dictionary (parse array: count, then for
+! each word its dictionary number, first character and length).
+!
+! How a command is understood:
+!  1. The line is cut into commands at full stops and THEN.  AGAIN (G)
+!     repeats the last line; OOPS word replaces the last unknown word.
+!  2. "Name, command" gives an order to a character in scope.
+!  3. The verb word chooses the VERB's grammar lines.  A compass word on
+!     its own (N, UP, OUT) means GO that way.
+!  4. First pass, quietly: every grammar line is tried.  A line that
+!     takes every word wins; one that runs out of words where an object
+!     is wanted comes next ("What do you want to take?"); if none fits,
+!     the failure that got furthest is reported.
+!  5. Second pass, on the chosen line only: each object is settled,
+!     asking "Which do you mean ...?" when the words fit several.
+!  6. The action runs: for ALL or a list, once per object.
+!
+! Noun phrases: articles are skipped; every word must be a NAME word of
+! the object; ALL (EVERYTHING) with EXCEPT (BUT); lists with AND or a
+! comma; IT, THEM, HIM and HER.
+
+ARRAY text 161          ! the command line: text(0) = length, then characters
+ARRAY parse 73          ! its words: parse(0) = count, then 3 entries a word
+ARRAY text2 161         ! a reply to a question, and scratch for building lines
+ARRAY parse2 73
+ARRAY lasttext 161      ! the last line read, for AGAIN and OOPS
+ARRAY scopes 96         ! the objects in scope
+ARRAY cands 48          ! candidates for the noun phrase being read
+ARRAY phrase 12         ! the name words of that phrase
+ARRAY multis 48         ! the objects of ALL or a list
+ARRAY slotobj 3         ! the settled object of slot 1 and slot 2
+
+GLOBAL nwords           ! words in the line
+GLOBAL cmdend           ! the word after the current command
+GLOBAL wn               ! the word being read
+GLOBAL verbwn           ! the verb's word
+GLOBAL nscope
+GLOBAL ncands
+GLOBAL nphrase
+GLOBAL nmulti
+GLOBAL etype            ! why a line failed: see the E_ constants
+GLOBAL upto             ! how far it got
+GLOBAL oopswn = -1      ! the unknown word OOPS would replace
+GLOBAL asking           ! 1 in the second pass: questions may be asked
+GLOBAL newcmd           ! a reply to a question was a new command
+GLOBAL multislot        ! the slot (1 or 2) holding ALL or a list, or 0
+GLOBAL parsednum        ! the value of a number slot
+GLOBAL topicwn          ! a topic slot: its first word ...
+GLOBAL topiclen         ! ... and how many
+GLOBAL missingslot      ! the slot a line ran out of words at
+GLOBAL missingtype
+GLOBAL allflag          ! the phrase was ALL
+
+CONSTANT E_STUCK = 1    ! "I didn't understand that sentence."
+CONSTANT E_UPTO = 2     ! "I only understood you as far as ..."
+CONSTANT E_CANTSEE = 3  ! "You can't see any such thing."
+CONSTANT E_MULTI = 4    ! "You can't use multiple objects with that verb."
+CONSTANT E_PRONOUN = 5  ! "I'm not sure what 'it' refers to."
+CONSTANT E_NONE = 6     ! "There are none at all available!"
+CONSTANT E_UNKNOWN = 7  ! "I don't know the word ..."
+
+! ---- words ---------------------------------------------------------------
+ROUTINE WordAt i
+  IF i >= nwords
+    RETURN -1
+  END
+  RETURN parse(1 + 3 * i)
+END
+
+ROUTINE PrintWord i
+  LOCAL k, start, len
+  start = parse(2 + 3 * i)
+  len = parse(3 + 3 * i)
+  WHILE k < len
+    WRITE (char) text(start + k)
+    k = k + 1
+  END
+END
+
+! the value of word i if it is all digits (up to 9999), else -1
+ROUTINE NumberAt i
+  LOCAL k, start, len, v, c
+  IF WordAt(i) <> 0
+    RETURN -1
+  END
+  start = parse(2 + 3 * i)
+  len = parse(3 + 3 * i)
+  IF len > 4
+    RETURN -1
+  END
+  WHILE k < len
+    c = text(start + k)
+    IF c < 48 OR c > 57
+      RETURN -1
+    END
+    v = v * 10 + c - 48
+    k = k + 1
+  END
+  RETURN v
+END
+
+ROUTINE IsName w, obj
+  LOCAL k, n
+  n = PROPLEN(obj, NAME)
+  WHILE k < n
+    IF PROPWORD(obj, NAME, k) = w
+      RETURN TRUE
+    END
+    k = k + 1
+  END
+  RETURN FALSE
+END
+
+ROUTINE IsArticle w
+  RETURN w = 'the' OR w = 'a' OR w = 'an' OR w = 'some'
+END
+
+! ---- scope ---------------------------------------------------------------
+ROUTINE AddScope obj
+  IF nscope < 96
+    scopes(nscope) = obj
+    nscope = nscope + 1
+  END
+END
+
+ROUTINE ScopeTree obj
+  LOCAL c
+  FOR EACH c IN obj
+    IF c <> player
+      AddScope(c)
+      IF c HAS supporter OR c HAS transparent OR (c HAS container AND c HAS open) OR c HAS animate
+        ScopeTree(c)
+      END
+    END
+  END
+END
+
+ROUTINE IsLit
+  LOCAL k
+  IF location HAS light
+    RETURN TRUE
+  END
+  WHILE k < nscope
+    IF scopes(k) HAS light
+      RETURN TRUE
+    END
+    k = k + 1
+  END
+  RETURN FALSE
+END
+
+! What the player can refer to: the room's contents (into supporters and
+! open or transparent containers), what the player carries, the player,
+! and the compass.  In the dark: only what is carried.
+ROUTINE BuildScope
+  nscope = 0
+  ScopeTree(location)
+  ScopeTree(player)
+  IF NOT IsLit()
+    nscope = 0
+    ScopeTree(player)
+  END
+  AddScope(player)
+  AddScope(CompassN)
+  AddScope(CompassS)
+  AddScope(CompassE)
+  AddScope(CompassW)
+  AddScope(CompassNE)
+  AddScope(CompassNW)
+  AddScope(CompassSE)
+  AddScope(CompassSW)
+  AddScope(CompassU)
+  AddScope(CompassD)
+  AddScope(CompassIn)
+  AddScope(CompassOut)
+END
+
+ROUTINE InScope obj
+  LOCAL k
+  WHILE k < nscope
+    IF scopes(k) = obj
+      RETURN TRUE
+    END
+    k = k + 1
+  END
+  RETURN FALSE
+END
+
+ROUTINE NameInScope w
+  LOCAL k
+  WHILE k < nscope
+    IF IsName(w, scopes(k))
+      RETURN TRUE
+    END
+    k = k + 1
+  END
+  RETURN FALSE
+END
+
+! ---- reading a line ------------------------------------------------------
+! (src and dst are arrays passed by number: AGET and APUT reach them)
+ROUTINE CopyText src, dst
+  LOCAL k
+  WHILE k <= AGET(src, 0)
+    APUT(dst, k, AGET(src, k))
+    k = k + 1
+  END
+END
+
+! Append characters from text array src (from start, len of them) to text2.
+ROUTINE AppendTo src, start, len
+  LOCAL k
+  WHILE k < len AND text2(0) < 160
+    text2(0) = text2(0) + 1
+    text2(text2(0)) = AGET(src, start + k)
+    k = k + 1
+  END
+END
+
+! Read a command line; handle an empty line, AGAIN and OOPS.  Returns
+! TRUE when there is a line to carry out.
+ROUTINE ReadLine
+  LOCAL w, start, len
+  PRINT
+  WRITE ">"
+  nwords = READ(text, parse)
+  IF nwords = 0
+    PRINT "I beg your pardon?"
+    RETURN FALSE
+  END
+  w = WordAt(0)
+  IF (w = 'again' OR w = 'g') AND nwords = 1
+    IF lasttext(0) = 0
+      PRINT "You can hardly repeat that."
+      RETURN FALSE
+    END
+    CopyText(lasttext, text)
+    nwords = TOKENIZE(text, parse)
+    RETURN TRUE
+  END
+  IF w = 'oops' OR w = 'o'
+    IF oopswn < 0 OR nwords < 2
+      PRINT "Sorry, that can't be corrected."
+      RETURN FALSE
+    END
+    ! the last line, with its unknown word replaced by this line's second word
+    TOKENIZE(lasttext, parse2)
+    start = parse2(2 + 3 * oopswn)
+    len = parse2(3 + 3 * oopswn)
+    text2(0) = 0
+    AppendTo(lasttext, 1, start - 1)
+    AppendTo(text, parse(5), parse(6))
+    AppendTo(lasttext, start + len, lasttext(0) + 1 - start - len)
+    CopyText(text2, text)
+    nwords = TOKENIZE(text, parse)
+  END
+  oopswn = -1
+  CopyText(text, lasttext)
+  RETURN TRUE
+END
+
+! Carry out every command on the line, one after another.
+ROUTINE RunLine
+  LOCAL start, k
+  newcmd = 0
+  WHILE start < nwords AND deadflag = 0
+    k = start
+    WHILE k < nwords AND WordAt(k) <> '.' AND WordAt(k) <> 'then'
+      k = k + 1
+    END
+    cmdend = k
+    IF cmdend > start
+      ParseCommand(start)
+      IF newcmd
+        newcmd = 0
+        start = 0          ! a reply turned out to be a new line: start on it
+      ELSE
+        start = cmdend + 1
+      END
+    ELSE
+      start = cmdend + 1
+    END
+  END
+END
+
+! ---- understanding one command -------------------------------------------
+ROUTINE ParseCommand start
+  LOCAL w, k, v, best, bestres, res, li, nlines
+  cmdstart0 = start
+  BuildScope()
+  actor = player
+  ! an order: "name, command"
+  k = start
+  WHILE k < cmdend AND WordAt(k) <> ','
+    k = k + 1
+  END
+  IF k < cmdend AND k > start AND DICTVERB(WordAt(start)) = 0
+    asking = 1
+    wn = start
+    cmdend_save_k = cmdend
+    cmdend = k
+    ncands = 0
+    IF NounPhrase(7, 0, 0, -1, 1) = 0 OR ncands = 0
+      cmdend = cmdend_save_k
+      PRINT "You seem to want to talk to someone, but I can't see whom."
+      RETURN
+    END
+    cmdend = cmdend_save_k
+    IF newcmd
+      RETURN
+    END
+    actor = slotobj(1)
+    start = k + 1
+    IF start >= cmdend
+      PRINT (The) actor, " looks at you expectantly."
+      RETURN
+    END
+  END
+  verbwn = start
+  w = WordAt(start)
+  ! an unknown word anywhere (but numbers) stops here, so OOPS can fix it
+  k = start
+  WHILE k < cmdend
+    IF WordAt(k) = 0 AND NumberAt(k) < 0 AND NOT VerbHasTopic(w)
+      oopswn = k
+      WRITE "I don't know the word ~"
+      PrintWord(k)
+      PRINT "~."
+      RETURN
+    END
+    k = k + 1
+  END
+  v = 0
+  IF w > 0
+    v = DICTVERB(w)
+  END
+  IF v = 0
+    ! a direction on its own means GO that way
+    IF IsCompassWord(w) AND start + 1 = cmdend
+      noun = CompassObj(w)
+      second = 0
+      action = ##Go
+      multislot = 0
+      RunAction()
+      RETURN
+    END
+    PRINT "That's not a verb I recognise."
+    RETURN
+  END
+  ! first pass: try every line quietly
+  li = VERBTAB(v)
+  nlines = GRAMTAB(li)
+  li = li + 1
+  best = -1
+  bestres = -1
+  k = 0
+  etype_best = 0
+  upto_best = -1
+  WHILE k < nlines
+    asking = 0
+    res = MatchLine(li, start)
+    IF res = 2 AND bestres < 2
+      best = li
+      bestres = 2
+    ELSEIF res = 1 AND bestres < 1
+      best = li
+      bestres = 1
+    ELSEIF res = 0
+      IF upto > upto_best OR (upto = upto_best AND etype > etype_best)
+        upto_best = upto
+        etype_best = etype
+      END
+    END
+    li = NextLine(li)
+    k = k + 1
+  END
+  IF bestres < 0
+    ParserError(etype_best, upto_best)
+    RETURN
+  END
+  ! second pass: settle the objects on the chosen line, asking if need be
+  asking = 1
+  res = MatchLine(best, start)
+  IF newcmd
+    RETURN
+  END
+  IF res = 1
+    AskMissing(best, start)
+    RETURN
+  END
+  IF res <> 2
+    ParserError(etype, upto)
+    RETURN
+  END
+  action = GRAMTAB(best)
+  noun = slotobj(1)
+  second = slotobj(2)
+  IF GRAMTAB(best + 1) = 1 AND multislot = 0
+    noun = slotobj(2)
+    second = slotobj(1)
+  END
+  RunAction()
+END
+
+GLOBAL cmdend_save_k
+GLOBAL etype_best
+GLOBAL upto_best
+
+! the index of the line after line li in GRAMTAB
+ROUTINE NextLine li
+  LOCAL n, k, t
+  n = GRAMTAB(li + 2)
+  li = li + 3
+  WHILE k < n
+    t = GRAMTAB(li)
+    li = li + 1
+    IF t >= >1800 AND t < >2000
+      li = li + 1               ! a slot with a routine after it
+    END
+    k = k + 1
+  END
+  RETURN li
+END
+
+ROUTINE VerbHasTopic w
+  LOCAL v, li, nlines, k, j, n, t
+  IF w <= 0
+    RETURN FALSE
+  END
+  v = DICTVERB(w)
+  IF v = 0
+    RETURN FALSE
+  END
+  li = VERBTAB(v)
+  nlines = GRAMTAB(li)
+  li = li + 1
+  WHILE k < nlines
+    n = GRAMTAB(li + 2)
+    j = 0
+    WHILE j < n
+      t = GRAMTAB(li + 3 + j)
+      IF t = >1009
+        RETURN TRUE
+      END
+      j = j + 1
+    END
+    li = NextLine(li)
+    k = k + 1
+  END
+  RETURN FALSE
+END
+
+ROUTINE IsCompassWord w
+  RETURN CompassObj(w) <> 0
+END
+
+ROUTINE CompassObj w
+  LOCAL k
+  k = nscope - 12
+  WHILE k < nscope
+    IF IsName(w, scopes(k))
+      RETURN scopes(k)
+    END
+    k = k + 1
+  END
+  RETURN 0
+END
+
+! Try grammar line li on the words from start.  Returns 2 if it takes
+! every word, 1 if the words run out where an object is wanted (slot and
+! type in missingslot, missingtype), 0 if it fails (etype, upto).
+ROUTINE MatchLine li, start
+  LOCAL n, k, t, filter, slot, stopw, typ
+  n = GRAMTAB(li + 2)
+  wn = start + 1
+  slot = 0
+  multislot = 0
+  slotobj(1) = 0
+  slotobj(2) = 0
+  nmulti = 0
+  li = li + 3
+  WHILE k < n
+    t = GRAMTAB(li)
+    li = li + 1
+    filter = 0
+    IF t >= >1800 AND t < >2000
+      filter = GRAMTAB(li)
+      li = li + 1
+      t = t - >0800
+    END
+    IF t >= >2000 AND t < >3000
+      IF WordAt(wn) <> t - >2000 OR wn >= cmdend
+        etype = E_UPTO
+        upto = wn
+        RETURN 0
+      END
+      wn = wn + 1
+    ELSE
+      slot = slot + 1
+      WHILE wn < cmdend AND IsArticle(WordAt(wn))
+        wn = wn + 1             ! TAKE THE: still a missing object
+      END
+      IF wn >= cmdend
+        missingslot = slot
+        missingtype = t
+        RETURN 1
+      END
+      ! the word that ends this phrase: the next token, if it is a word
+      stopw = -1
+      IF k + 1 < n
+        IF GRAMTAB(li) >= >2000 AND GRAMTAB(li) < >3000
+          stopw = GRAMTAB(li) - >2000
+        END
+      END
+      typ = t - >1000
+      IF t >= >3000
+        typ = 1
+      END
+      IF typ = 8
+        parsednum = NumberAt(wn)
+        IF parsednum < 0
+          etype = E_UPTO
+          upto = wn
+          RETURN 0
+        END
+        wn = wn + 1
+      ELSEIF typ = 9
+        topicwn = wn
+        WHILE wn < cmdend AND WordAt(wn) <> stopw
+          wn = wn + 1
+        END
+        topiclen = wn - topicwn
+      ELSE
+        IF NOT NounPhrase(typ, filter, t, stopw, slot)
+          RETURN 0
+        END
+        IF newcmd
+          RETURN 0
+        END
+      END
+    END
+    k = k + 1
+  END
+  IF wn < cmdend
+    etype = E_UPTO
+    upto = wn
+    RETURN 0
+  END
+  RETURN 2
+END
+
+! Does obj suit a slot of type typ (with an attribute token t and a
+! filter routine)?
+ROUTINE Suits obj, typ, t, filter
+  LOCAL f
+  IF typ = 7 AND obj HASNT animate
+    RETURN FALSE
+  END
+  IF t >= >3000
+    IF NOT HASATTR(obj, t - >3000)
+      RETURN FALSE
+    END
+  END
+  IF filter
+    f = filter
+    IF NOT f(obj)
+      RETURN FALSE
+    END
+  END
+  RETURN TRUE
+END
+
+
+! Read one noun phrase (or a list, or ALL) for a slot.  Fills cands
+! (one phrase) or multis (ALL, lists); in the second pass, settles the
+! object into slotobj(slot).  Returns TRUE if it found something.
+ROUTINE NounPhrase typ, filter, t, stopw, slot
+  LOCAL w, ismulti, k, more
+  ismulti = typ >= 3 AND typ <= 6
+  more = TRUE
+  WHILE more
+    more = FALSE
+    allflag = FALSE
+    w = WordAt(wn)
+    WHILE IsArticle(w) AND wn < cmdend
+      wn = wn + 1
+      w = WordAt(wn)
+    END
+    IF w = 'all' OR w = 'everything'
+      IF NOT ismulti
+        etype = E_MULTI
+        upto = wn
+        RETURN FALSE
+      END
+      wn = wn + 1
+      IF NOT AllObjects(typ)
+        RETURN FALSE
+      END
+      multislot = slot
+    ELSE
+      IF NOT OnePhrase(typ, filter, t, stopw)
+        RETURN FALSE
+      END
+      IF asking
+        IF NOT Settle(typ)
+          RETURN FALSE
+        END
+        IF ismulti
+          AddMulti(slotobj(0))
+        END
+        slotobj(slot) = slotobj(0)
+      END
+      IF wn < cmdend AND ismulti
+        w = WordAt(wn)
+        IF (w = 'and' OR w = ',') AND w <> stopw
+          wn = wn + 1
+          more = TRUE
+          multislot = slot
+        END
+      END
+    END
+  END
+  IF ismulti AND asking AND multislot = 0 AND nmulti = 1
+    nmulti = 0                ! a single object: not a list
+  END
+  IF ismulti AND multislot
+    slotobj(slot) = 0
+  END
+  RETURN TRUE
+END
+
+ROUTINE AddMulti obj
+  LOCAL k
+  WHILE k < nmulti
+    IF multis(k) = obj
+      RETURN
+    END
+    k = k + 1
+  END
+  IF nmulti < 48
+    multis(nmulti) = obj
+    nmulti = nmulti + 1
+  END
+END
+
+! ALL: everything in scope that suits the verb and no other character
+! holds, then EXCEPT ...
+ROUTINE AllObjects typ
+  LOCAL k, o, w
+  nmulti = 0
+  WHILE k < nscope
+    o = scopes(k)
+    IF o <> player AND o HASNT scenery AND o HASNT concealed AND o HASNT static AND o HASNT animate AND (PARENT(o) HASNT animate OR PARENT(o) = player)
+      IF typ = 4
+        IF o IN player
+          AddMulti(o)
+        END
+      ELSEIF o NOTIN player
+        AddMulti(o)
+      END
+    END
+    k = k + 1
+  END
+  w = WordAt(wn)
+  IF wn < cmdend AND (w = 'except' OR w = 'but')
+    wn = wn + 1
+    k = TRUE
+    WHILE k
+      k = FALSE
+      IF NOT OnePhrase(0, 0, 0, -1)
+        RETURN FALSE
+      END
+      o = 0
+      WHILE o < ncands
+        DropMulti(cands(o))
+        o = o + 1
+      END
+      w = WordAt(wn)
+      IF wn < cmdend AND (w = 'and' OR w = ',')
+        wn = wn + 1
+        k = TRUE
+      END
+    END
+  END
+  IF nmulti = 0
+    etype = E_NONE
+    upto = wn
+    RETURN FALSE
+  END
+  RETURN TRUE
+END
+
+ROUTINE DropMulti obj
+  LOCAL k, j
+  WHILE k < nmulti
+    IF multis(k) = obj
+      j = k
+      WHILE j < nmulti - 1
+        multis(j) = multis(j + 1)
+        j = j + 1
+      END
+      nmulti = nmulti - 1
+      RETURN
+    END
+    k = k + 1
+  END
+END
+
+! One phrase: a pronoun, or name words.  cands = the objects in scope
+! that have every word and suit the slot.
+ROUTINE OnePhrase typ, filter, t, stopw
+  LOCAL w, k, j, o, ok
+  w = WordAt(wn)
+  WHILE IsArticle(w) AND wn < cmdend
+    wn = wn + 1
+    w = WordAt(wn)
+  END
+  ncands = 0
+  o = 0
+  IF w = 'it'
+    o = itobj
+  ELSEIF w = 'them'
+    o = themobj
+  ELSEIF w = 'him'
+    o = himobj
+  ELSEIF w = 'her'
+    o = herobj
+  END
+  IF w = 'it' OR w = 'them' OR w = 'him' OR w = 'her'
+    IF o = 0
+      etype = E_PRONOUN
+      upto = wn
+      RETURN FALSE
+    END
+    IF NOT InScope(o)
+      etype = E_CANTSEE
+      upto = wn
+      RETURN FALSE
+    END
+    wn = wn + 1
+    cands(0) = o
+    ncands = 1
+    RETURN TRUE
+  END
+  ! name words: take each word only while some object in scope still has
+  ! every word so far (so GIVE ADA TIN LAMP reads "ada", then "tin lamp")
+  k = 0
+  WHILE k < nscope
+    cands(k) = scopes(k)
+    k = k + 1
+  END
+  ncands = nscope
+  nphrase = 0
+  WHILE wn < cmdend AND w <> stopw AND w > 0 AND nphrase < 12
+    j = 0
+    k = 0
+    WHILE k < ncands
+      IF IsName(w, cands(k))
+        j = j + 1
+      END
+      k = k + 1
+    END
+    IF j = 0
+      w = stopw                 ! no object has this word too: the phrase ends
+    ELSE
+      j = 0
+      k = 0
+      WHILE k < ncands
+        IF IsName(w, cands(k))
+          cands(j) = cands(k)
+          j = j + 1
+        END
+        k = k + 1
+      END
+      ncands = j
+      phrase(nphrase) = w
+      nphrase = nphrase + 1
+      wn = wn + 1
+      w = WordAt(wn)
+    END
+  END
+  IF nphrase = 0
+    ncands = 0
+    w = WordAt(wn)
+    IF w > 0 AND NOT NameInScope(w) AND IsNoun(w)
+      etype = E_CANTSEE
+    ELSE
+      etype = E_UPTO
+    END
+    upto = wn
+    RETURN FALSE
+  END
+  IF typ > 0                    ! keep those that suit the slot
+    j = 0
+    k = 0
+    WHILE k < ncands
+      IF Suits(cands(k), typ, t, filter)
+        cands(j) = cands(k)
+        j = j + 1
+      END
+      k = k + 1
+    END
+    ncands = j
+  END
+  IF ncands = 0
+    etype = E_CANTSEE
+    upto = wn
+    RETURN FALSE
+  END
+  RETURN TRUE
+END
+
+! is word w a NAME word of any object at all (in scope or not)?
+ROUTINE IsNoun w
+  LOCAL o
+  o = 1
+  WHILE o <= LASTOBJ
+    IF IsName(w, o)
+      RETURN TRUE
+    END
+    o = o + 1
+  END
+  RETURN FALSE
+END
+
+! Choose one of cands for slotobj(0): prefer what suits the slot best;
+! if still several, ask.  Returns FALSE if the reply was a new command.
+ROUTINE Settle typ
+  LOCAL k, n, best
+  IF ncands > 1 AND (typ = 2 OR typ = 4)
+    n = 0                       ! HELD: prefer what is carried
+    k = 0
+    WHILE k < ncands
+      IF cands(k) IN player
+        cands(n) = cands(k)
+        n = n + 1
+      END
+      k = k + 1
+    END
+    IF n > 0
+      ncands = n
+    END
+  END
+  IF ncands > 1
+    n = 0                       ! prefer what is not part of the scenery
+    k = 0
+    WHILE k < ncands
+      IF cands(k) HASNT scenery AND cands(k) HASNT concealed
+        cands(n) = cands(k)
+        n = n + 1
+      END
+      k = k + 1
+    END
+    IF n > 0
+      ncands = n
+    END
+  END
+  WHILE ncands > 1
+    IF NOT AskWhich()
+      RETURN FALSE
+    END
+  END
+  slotobj(0) = cands(0)
+  RETURN TRUE
+END
+
+! "Which do you mean, the brass lamp or the tin lamp?"  A reply of name
+! words narrows the choice; anything else is a new command.
+ROUTINE AskWhich
+  LOCAL k, j, n, w, ok
+  WRITE "Which do you mean, "
+  k = 0
+  WHILE k < ncands
+    IF k > 0
+      IF k = ncands - 1
+        WRITE " or "
+      ELSE
+        WRITE ", "
+      END
+    END
+    WRITE (the) cands(k)
+    k = k + 1
+  END
+  PRINT "?"
+  WRITE ">"
+  n = READ(text2, parse2)
+  IF n = 0
+    RETURN AskWhich()
+  END
+  ! are all the reply's words (but articles) names of the candidates?
+  k = 0
+  ok = TRUE
+  WHILE k < n AND ok
+    w = parse2(1 + 3 * k)
+    IF NOT IsArticle(w)
+      ok = FALSE
+      j = 0
+      WHILE j < ncands
+        IF IsName(w, cands(j))
+          ok = TRUE
+        END
+        j = j + 1
+      END
+    END
+    k = k + 1
+  END
+  IF NOT ok
+    CopyText(text2, text)          ! a new command
+    nwords = TOKENIZE(text, parse)
+    CopyText(text, lasttext)
+    newcmd = 1
+    RETURN FALSE
+  END
+  j = 0
+  n = 0
+  WHILE j < ncands
+    ok = TRUE
+    k = 0
+    WHILE k < parse2(0)
+      w = parse2(1 + 3 * k)
+      IF NOT IsArticle(w) AND NOT IsName(w, cands(j))
+        ok = FALSE
+      END
+      k = k + 1
+    END
+    IF ok
+      cands(n) = cands(j)
+      n = n + 1
+    END
+    j = j + 1
+  END
+  IF n > 0
+    ncands = n
+  END
+  RETURN TRUE
+END
+
+! "What do you want to take?"  The reply is added to the command, which
+! is understood again; a reply that starts with a verb is a new command.
+ROUTINE AskMissing li, start
+  LOCAL k, n, w
+  WRITE "What do you want "
+  IF actor <> player
+    WRITE (the) actor, " "
+  END
+  WRITE "to"
+  k = start
+  WHILE k < cmdend
+    IF NOT IsArticle(WordAt(k)) OR k < cmdend - 1
+      WRITE " "
+      PrintWord(k)
+    END
+    k = k + 1
+  END
+  PRINT "?"
+  WRITE ">"
+  n = READ(text2, parse2)
+  IF n = 0
+    RETURN
+  END
+  w = parse2(1)
+  IF w > 0
+    IF DICTVERB(w) AND NOT NameInScope(w)
+      CopyText(text2, text)
+      nwords = TOKENIZE(text, parse)
+      CopyText(text, lasttext)
+      newcmd = 1
+      RETURN
+    END
+  END
+  ! the command's own words, a space, then the reply
+  CopyText(text2, lasttext)
+  text2(0) = 0
+  AppendTo(text, parse(2 + 3 * cmdstart0), parse(2 + 3 * (cmdend - 1)) + parse(3 + 3 * (cmdend - 1)) - parse(2 + 3 * cmdstart0))
+  AppendTo(spacearr, 1, 1)
+  AppendTo(lasttext, 1, lasttext(0))
+  CopyText(text2, text)
+  nwords = TOKENIZE(text, parse)
+  CopyText(text, lasttext)
+  newcmd = 1
+END
+
+GLOBAL cmdstart0        ! the command's first word (an order's name included)
+ARRAY spacearr = 1, 32
+
+! ---- messages --------------------------------------------------------------
+ROUTINE ParserError e, at
+  IF e = E_CANTSEE
+    PRINT "You can't see any such thing."
+  ELSEIF e = E_MULTI
+    PRINT "You can't use multiple objects with that verb."
+  ELSEIF e = E_PRONOUN
+    PRINT "I'm not sure what that refers to."
+  ELSEIF e = E_NONE
+    PRINT "There are none at all available!"
+  ELSEIF e = E_UPTO AND at > verbwn + 1
+    WRITE "I only understood you as far as wanting to "
+    LOCAL k
+    k = verbwn
+    WHILE k < at
+      PrintWord(k)
+      IF k < at - 1
+        WRITE " "
+      END
+      k = k + 1
+    END
+    PRINT "."
+  ELSE
+    PRINT "I didn't understand that sentence."
+  END
+END
+
+! ---- carrying out the action ----------------------------------------------
+ROUTINE RunAction
+  LOCAL k
+  IF multislot AND nmulti > 0
+    k = 0
+    WHILE k < nmulti AND deadflag = 0
+      IF multislot = 1
+        noun = multis(k)
+      ELSE
+        second = multis(k)
+      END
+      IF noun <> second
+        IF nmulti > 1
+          WRITE (name) multis(k), ": "
+        END
+        Perform()
+      END
+      k = k + 1
+    END
+  ELSE
+    Perform()
+  END
+  turns = turns + 1
+END
+
+! One action: an order goes to the character's ORDERS; otherwise the
+! room's and the object's BEFORE rules, then the action routine (which
+! calls AfterRules once it has done its work).
+ROUTINE Perform
+  LOCAL f
+  SetPronoun(noun)
+  SetPronoun(second)
+  IF actor <> player
+    IF actor.ORDERS() = FALSE
+      PRINT (The) actor, " has better things to do."
+    END
+    RETURN
+  END
+  IF location.BEFORE()
+    RETURN
+  END
+  IF noun > 0 AND noun <= LASTOBJ
+    IF noun.BEFORE()
+      RETURN
+    END
+  END
+  f = ACTSUB(action)
+  f()
+END
+
+! IT, THEM, HIM, HER: set from the objects a command names.
+ROUTINE SetPronoun o
+  IF o > 0 AND o <= LASTOBJ AND o <> player
+    IF o.DIR
+      RETURN
+    END
+    IF o HAS animate
+      IF o HAS female
+        herobj = o
+      ELSE
+        himobj = o
+      END
+    ELSEIF o HAS plural
+      themobj = o
+    ELSE
+      itobj = o
+    END
+  END
+END
+
+! Called by an action routine once the action has happened: the room's
+! and the object's AFTER rules.  TRUE means one of them said so, and the
+! action routine prints nothing more.
+ROUTINE AfterRules
+  IF location.AFTER()
+    RETURN TRUE
+  END
+  IF noun > 0 AND noun <= LASTOBJ
+    IF noun.AFTER()
+      RETURN TRUE
+    END
+  END
+  RETURN FALSE
+END
