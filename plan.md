@@ -258,7 +258,52 @@ it (the GPU route cannot be tested in the simulator).  The dispatch
 loop could shed more with compiler-side changes (short forms of the
 commonest instructions).
 
+## M3 (world model and standard library): under way
+
+Parts: 1 the turn and the room; 2 doors and containers in depth; 3 the
+verb set; 4 the sample game.
+
+Part 1 done (19 October 2026):
+- the action sequence: an order goes to ORDERS; otherwise the game's
+  beforehook (a global the game sets to a routine), the room's BEFORE,
+  the object's BEFORE, the action routine; action routines call
+  AfterRules: the room's AFTER, the object's AFTER, the game's
+  afterhook.  (Hooks are globals holding routines, so they are optional:
+  TXA has no "optional routine" otherwise.)
+- the end of a turn (lib/turn.txa): turns counted (meta commands
+  SCORE, VERBOSE, BRIEF, SUPERBRIEF, NOTIFY, QUIT take none; nor does a
+  command that did not parse); daemons (StartDaemon/StopDaemon, DAEMON
+  property); timers (StartTimer(o, t), StopTimer, TIME_LEFT and TIME_OUT;
+  the turn a timer starts counts); the room's EACH_TURN; the game's
+  endturnhook; score notification ([Your score has just gone up by 5
+  points.]; NOTIFY ON/OFF); the status line.
+- light: IsLit; darkness ("Darkness" / "It is pitch dark, and you can't
+  see a thing."); in the dark only what is carried is in scope; EXAMINE
+  and SEARCH need light.
+- room descriptions: BRIEF (default), VERBOSE, SUPERBRIEF; INITIAL
+  paragraphs until an object is moved (the moved attribute, given by
+  TAKE); "You can (also) see ... here."; "On the oak table is a brass
+  lamp." for supporters and open containers, scenery included; CANT_GO.
+- verbs: SCORE, VERBOSE, BRIEF, SUPERBRIEF, NOTIFY, SWITCH/TURN ON/OFF.
+- STATUS now takes the room, score (-1: none) and moves; the engine
+  draws them straight into row 0 (not into the transcript).
+- tests: tests/m3_world_test.py (world1: reviewed reference + 12 named
+  checks), tests/m3_engine_test.py (the engine plays each M3 world:
+  same transcript, and the status line checked).
+
+Library names that collide with built-ins (names ignore case): the
+status routine is ShowStatus, not Status.
+
 ## Next
+
+1. M3 part 2: doors (an object in two rooms: FOUND_IN, DOOR_TO, locked
+   doors and keys: LOCK, UNLOCK, WITH_KEY), containers in depth
+   (capacity, PUT IN checks, nested containers in scope and listing),
+   EMPTY, inventory showing contents.
+2. M3 part 3: the verb set.  Part 4: the sample game.
+3. Rebecca's timing of txa-m2demo8.bin when she can.
+
+## (was) Next before M3
 
 1. Rebecca's js99er (and console) check of txa-m2demo8.bin, and timing.
 2. M3: the world model and full standard library (light, doors,
@@ -290,6 +335,7 @@ text output, word wrap and [MORE]; bold and underline glyph sets.
 
 ## History
 
+- 2026-10-19 M3 part 1: action sequence and hooks, end of turn (daemons, timers, EACH_TURN, score notification), light, room descriptions and modes, status line in the engine.
 - 2026-10-19 Engine speed work: scratchpad block, globals in RAM, unrolled VDP reads, LOAD/STORE paths: 8.13M -> 5.50M instructions on the script.
 - 2026-10-19 M2: the TI side (line editor, READ, TOKENIZE, ISNAME, FILTERN), engine plays the parser script identically; checkpoint-m2.
 - 2026-10-19 M2 begun: the standard library's parser in TXA, with the compiler and Python VM support it needs.

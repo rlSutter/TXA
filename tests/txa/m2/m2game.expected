@@ -2,11 +2,13 @@
 Kitchen
 A cramped kitchen. A trapdoor is set in the floor, and a doorway leads north.
 You can see a tin lamp, a wooden box and Ada here.
+On the oak table is a brass lamp.
 
 >look
 Kitchen
 A cramped kitchen. A trapdoor is set in the floor, and a doorway leads north.
 You can see a tin lamp, a wooden box and Ada here.
+On the oak table is a brass lamp.
 
 >take lamp
 Which do you mean, the brass lamp or the tin lamp?
@@ -111,7 +113,6 @@ You can't go that way.
 
 >s
 Kitchen
-A cramped kitchen. A trapdoor is set in the floor, and a doorway leads north.
 You can see a wooden box and Ada here.
 
 >d

@@ -1,0 +1,34 @@
+look
+w
+n
+take key
+look
+verbose
+look
+brief
+s
+d
+look
+x barrel
+u
+take lamp
+turn lamp on
+d
+look
+wait
+z
+turn off lamp
+look
+u
+jump
+take candle
+light candle
+wait
+wait
+score
+superbrief
+n
+s
+notify off
+score
+q

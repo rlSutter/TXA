@@ -66,6 +66,29 @@ END
 VERB "quit" "q"
   -> Quit
 END
+VERB "score"
+  -> Score
+END
+VERB "verbose" "long"
+  -> Verbose
+END
+VERB "brief" "normal"
+  -> Brief
+END
+VERB "superbrief" "short"
+  -> Superbrief
+END
+VERB "notify"
+  -> Notify
+  "on" -> Notify
+  "off" -> Notify
+END
+VERB "turn" "switch"
+  "on" noun -> SwitchOn
+  noun "on" -> SwitchOn
+  "off" noun -> SwitchOff
+  noun "off" -> SwitchOff
+END
 
 ! ---- listing ---------------------------------------------------------------
 ! "a lamp, some coins and Ada": the children of obj that are not scenery,
@@ -99,32 +122,133 @@ END
 
 ! ---- actions ---------------------------------------------------------------
 ROUTINE LookSub
-  LOCAL c, o
+  DescribeRoom(TRUE)
+END
+
+! The room: its name in bold, its description (always for LOOK; on the
+! first visit, or every time in VERBOSE; never in SUPERBRIEF), then what
+! is in it: first the INITIAL paragraph of each object that has one and
+! has never been moved, then "You can see ... here." for the rest, then
+! what is on each supporter and in each open container.
+ROUTINE DescribeRoom full
+  LOCAL o, n, initials
   STYLE(1)
-  PRINT (name) location
-  STYLE(0)
   IF NOT IsLit()
+    PRINT "Darkness"
+    STYLE(0)
     PRINT "It is pitch dark, and you can't see a thing."
     RETURN
   END
-  IF location.DESC()
-    FRESHLINE()
-  END
-  c = 0
-  FOR EACH o IN location
-    IF Listable(o)
-      c = c + 1
+  PRINT (name) location
+  STYLE(0)
+  IF full OR lookmode = 2 OR (lookmode = 1 AND location HASNT visited)
+    IF location.DESC()
+      FRESHLINE()
     END
   END
-  IF c
-    WRITE "You can see "
-    ListContents(location)
+  FOR EACH o IN location
+    IF Listable(o) AND ShowsInitial(o)
+      o.INITIAL()
+      FRESHLINE()
+      initials = initials + 1
+    END
+  END
+  n = 0
+  FOR EACH o IN location
+    IF Listable(o) AND NOT ShowsInitial(o)
+      n = n + 1
+    END
+  END
+  IF n
+    IF initials
+      WRITE "You can also see "
+    ELSE
+      WRITE "You can see "
+    END
+    ListWhere(location, FALSE)
     PRINT " here."
+  END
+  FOR EACH o IN location          ! (scenery too: what is on a fixed table shows)
+    IF o <> player AND o HASNT concealed
+      DescribeContents(o)
+    END
   END
   GIVE location visited
 END
 
+ROUTINE ShowsInitial o
+  RETURN PROPLEN(o, INITIAL) > 0 AND o HASNT moved
+END
+
+! "On the oak table is a brass lamp." / "In the box are some coins."
+ROUTINE DescribeContents o
+  LOCAL n, c
+  IF o HASNT supporter AND (o HASNT container OR (o HASNT open AND o HASNT transparent))
+    RETURN
+  END
+  FOR EACH c IN o
+    IF Listable(c)
+      n = n + 1
+    END
+  END
+  IF n = 0
+    RETURN
+  END
+  IF o HAS supporter
+    WRITE "On "
+  ELSE
+    WRITE "In "
+  END
+  WRITE (the) o
+  IF n = 1 AND OnlyChildSingular(o)
+    WRITE " is "
+  ELSE
+    WRITE " are "
+  END
+  ListWhere(o, TRUE)
+  PRINT "."
+END
+
+ROUTINE OnlyChildSingular o
+  LOCAL c
+  FOR EACH c IN o
+    IF Listable(c)
+      RETURN c HASNT plural
+    END
+  END
+  RETURN TRUE
+END
+
+! "a lamp, some coins and Ada": the listable children of obj (all of
+! them, or with all = FALSE those not shown by an INITIAL paragraph)
+ROUTINE ListWhere obj, all
+  LOCAL c, n, total
+  FOR EACH c IN obj
+    IF Listable(c) AND (all OR NOT ShowsInitial(c))
+      total = total + 1
+    END
+  END
+  FOR EACH c IN obj
+    IF Listable(c) AND (all OR NOT ShowsInitial(c))
+      IF n > 0
+        IF n = total - 1
+          WRITE " and "
+        ELSE
+          WRITE ", "
+        END
+      END
+      WRITE (a) c
+      n = n + 1
+    END
+  END
+  RETURN total
+END
+
 ROUTINE ExamineSub
+  IF NOT IsLit()
+    PRINT "It is too dark to see."
+    RETURN
+  END
   IF noun.DESC()
     FRESHLINE()
   ELSE
@@ -133,6 +257,10 @@ ROUTINE ExamineSub
 END
 
 ROUTINE SearchSub
+  IF NOT IsLit()
+    PRINT "It is too dark to see."
+    RETURN
+  END
   IF noun HAS container OR noun HAS supporter
     IF noun HAS container AND noun HASNT open AND noun HASNT transparent
       PRINT (The) noun, " is closed."
@@ -175,6 +303,7 @@ ROUTINE TakeSub
     PRINT "That seems to belong to ", (the) PARENT(noun), "."
   ELSE
     MOVE noun TO player
+    GIVE noun moved
     IF AfterRules()
       RETURN
     END
@@ -321,7 +450,11 @@ ROUTINE GoSub
   END
   dest = ExitOf(location, noun.DIR)
   IF dest = 0
-    PRINT "You can't go that way."
+    IF location.CANT_GO()
+      FRESHLINE()
+    ELSE
+      PRINT "You can't go that way."
+    END
     RETURN
   END
   IF dest = 1
@@ -330,7 +463,8 @@ ROUTINE GoSub
   END
   MOVE player TO dest
   location = dest
-  LookSub()
+  BuildScope()
+  DescribeRoom(FALSE)
 END
 
 ROUTINE WaitSub
@@ -339,4 +473,74 @@ END
 
 ROUTINE QuitSub
   deadflag = 3
+END
+
+ROUTINE ScoreSub
+  IF max_score = 0
+    PRINT "There is no score in this story."
+    RETURN
+  END
+  WRITE "You have scored ", score, " out of a possible ", max_score, ", in ", turns, " turn"
+  IF turns <> 1
+    WRITE "s"
+  END
+  PRINT "."
+END
+
+ROUTINE VerboseSub
+  lookmode = 2
+  PRINT (name) location, " is now in its ~verbose~ mode, which always gives long descriptions of locations (even if you've been there before)."
+END
+
+ROUTINE BriefSub
+  lookmode = 1
+  PRINT (name) location, " is now in its normal ~brief~ printing mode, which gives long descriptions of places never before visited and short descriptions otherwise."
+END
+
+ROUTINE SuperbriefSub
+  lookmode = 3
+  PRINT (name) location, " is now in its ~superbrief~ mode, which always gives short descriptions of locations (even if you haven't been there before)."
+END
+
+ROUTINE NotifySub
+  IF WordAt(verbwn + 1) = 'off'
+    notify_on = 0
+  ELSEIF WordAt(verbwn + 1) = 'on'
+    notify_on = 1
+  ELSE
+    notify_on = 1 - notify_on
+  END
+  IF notify_on
+    PRINT "Score notification on."
+  ELSE
+    PRINT "Score notification off."
+  END
+END
+
+ROUTINE SwitchOnSub
+  IF noun HASNT switchable
+    PRINT "That's not something you can switch."
+  ELSEIF noun HAS on
+    PRINT "That's already on."
+  ELSE
+    GIVE noun on
+    IF AfterRules()
+      RETURN
+    END
+    PRINT "You switch ", (the) noun, " on."
+  END
+END
+
+ROUTINE SwitchOffSub
+  IF noun HASNT switchable
+    PRINT "That's not something you can switch."
+  ELSEIF noun HASNT on
+    PRINT "That's already off."
+  ELSE
+    GIVE noun NOT on
+    IF AfterRules()
+      RETURN
+    END
+    PRINT "You switch ", (the) noun, " off."
+  END
 END

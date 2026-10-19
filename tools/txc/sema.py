@@ -47,7 +47,7 @@ BUILTINS = {
     'SAVE': ('SAVE', 0, True), 'RESTORE': ('RESTORE', 0, True),
     'UNDOSAVE': ('UNDOSAVE', 0, True), 'UNDO': ('UNDO', 0, True),
     'QUIT': ('QUIT', 0, False), 'RESTART': ('RESTART', 0, False),
-    'STATUS': ('STATUS', 0, False), 'SOUND': ('SOUND', 1, False), 'STYLE': ('STYLE', 1, False),
+    'STATUS': ('STATUS', 3, False), 'SOUND': ('SOUND', 1, False), 'STYLE': ('STYLE', 1, False),
     'READ': ('READ', 2, True), 'TOKENIZE': ('TOKENIZE', 2, True),
     'HASATTR': ('HASATTRV', 2, True), 'FRESHLINE': ('FRESH', 0, False),
     'AGET': ('ALOADV', 2, True), 'APUT': ('ASTOREV', 3, False),

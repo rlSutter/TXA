@@ -347,3 +347,131 @@ PRN3   DEC  @TMP1
        .leave
        RT
 NUMDP  DATA NUMDIG
+
+* DRAWST - draw the status line from STROOM, STSCR and STMOV.
+DRAWST .enter
+       CLR  R0                 row 0: spaces
+       LI   R1,>2000
+       LI   R2,COLS
+       BL   @VFILL
+       LI   R0,STBUF           the room's name into STBUF ...
+       MOV  R0,@STPTR
+       MOV  @STROOM,R14
+       JNE  DST1
+       LI   R1,SDARK           ... "Darkness" for 0
+       BL   @STCAT
+       JMP  DST2
+DST1   BL   @SHORTN            R0 = its name's packed address
+       MOV  R0,R1
+       JEQ  DST2
+       BL   @STSTR
+DST2   LI   R0,1               ... and onto the screen from column 1
+       LI   R1,STBUF
+       MOV  @STPTR,R2
+       AI   R2,-STBUF
+       JEQ  DST3
+       BL   @VMBW
+DST3   LI   R0,STBUF           the right-hand side
+       MOV  R0,@STPTR
+       MOV  @STSCR,R1
+       CI   R1,-1
+       JEQ  DST4
+       LI   R1,SSCORE
+       BL   @STCAT
+       MOV  @STSCR,R1
+       BL   @STNUM
+       LI   R1,SSPACE
+       BL   @STCAT
+DST4   LI   R1,SMOVES
+       BL   @STCAT
+       MOV  @STMOV,R1
+       BL   @STNUM
+       MOV  @STPTR,R2          length; it ends at column 78
+       AI   R2,-STBUF
+       LI   R0,79
+       S    R2,R0
+       LI   R1,STBUF
+       BL   @VMBW
+       .leave
+       RT
+SDARK  BYTE 8
+       TEXT 'Darkness'
+SSCORE BYTE 7
+       TEXT 'Score: '
+SSPACE BYTE 2
+       TEXT '  '
+SMOVES BYTE 7
+       TEXT 'Moves: '
+       EVEN
+
+* STCAT - append the length-prefixed string at R1 to STBUF.  Uses R0-R2.
+STCAT  MOVB *R1+,R2
+       SRL  R2,8
+       JEQ  STC9
+       MOV  @STPTR,R0
+STC1   MOVB *R1+,*R0+
+       DEC  R2
+       JNE  STC1
+       MOV  R0,@STPTR
+STC9   RT
+
+* STSTR - append the story string at packed address R1 (substitutions
+* expanded) to STBUF, at most 48 characters.
+STSTR  .enter
+       BL   @TXSET
+STS1   BL   @TXNEXT
+       MOV  R0,R0
+       JEQ  STS9
+       CI   R0,>80
+       JHE  STS2
+       BL   @STPUT
+       JMP  STS1
+STS2   AI   R0,->80            a substitution
+       SLA  R0,1
+       MOV  @H.ABBR,R1
+       A    R0,R1
+       BL   @RDW
+       A    @H.ABBR,R0
+       MOV  R0,@ABPTR
+STS3   MOV  @ABPTR,R1
+       BL   @RDB
+       MOV  R0,R0
+       JEQ  STS1
+       INC  @ABPTR
+       BL   @STPUT
+       JMP  STS3
+STS9   .leave
+       RT
+* STPUT - append the character in R0's low byte, if there is room.
+STPUT  MOV  @STPTR,R1
+       CI   R1,STBUF+48
+       JHE  STP9
+       SWPB R0
+       MOVB R0,*R1+
+       MOV  R1,@STPTR
+STP9   RT
+
+* STNUM - append R1 as a signed decimal number.  Uses R0-R3.
+STNUM  MOV  R1,R1
+       JGT  STN1
+       JEQ  STN1
+       MOV  @STPTR,R0          a minus sign
+       LI   R2,'-'*256
+       MOVB R2,*R0+
+       MOV  R0,@STPTR
+       NEG  R1
+STN1   LI   R3,NUMDIG          digits, last first
+STN2   CLR  R0
+       DIV  @D10,R0
+       AI   R1,'0'
+       SWPB R1
+       MOVB R1,*R3+
+       MOV  R0,R1
+       JNE  STN2
+       MOV  @STPTR,R0
+STN3   DEC  R3
+       MOVB *R3,*R0+
+       CI   R3,NUMDIG
+       JNE  STN3
+       MOV  R0,@STPTR
+       RT

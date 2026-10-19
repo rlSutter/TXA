@@ -6,12 +6,16 @@
 INCLUDE "DSK1.LIBDEFS"
 INCLUDE "DSK1.PARSER"
 INCLUDE "DSK1.VERBS"
+INCLUDE "DSK1.TURN"
 
 ROUTINE Main
   Initialise()
   MOVE player TO location
   PRINT
+  BuildScope()
   LookSub()
+  lastscore = score
+  ShowStatus()
   WHILE deadflag = 0
     IF ReadLine()
       RunLine()

@@ -1,0 +1,95 @@
+! world1.txa - M3 part 1: light, descriptions, daemons, timers, scoring, hooks.
+INCLUDE "DSK1.STDLIB"
+
+ROOM Porch "Porch"
+  DESC "A sagging porch. The front door is north; steps lead down to a cellar."
+  HAS light
+  N Parlour
+  DOWN Cellar
+  CANT_GO "The garden is overgrown past walking."
+END
+ROOM Parlour "Parlour"
+  DESC "Dust sheets cover everything. A clock ticks somewhere."
+  HAS light
+  S Porch
+  EACH_TURN
+    IF RANDOM(4) = 1
+      PRINT "The clock ticks louder for a moment."
+    END
+  END
+END
+ROOM Cellar "Cellar"
+  DESC "A low cellar that smells of earth and old apples."
+  UP Porch
+END
+OBJECT Lamp "brass lamp" IN Porch
+  NAME "brass" "lamp"
+  HAS switchable
+  AFTER
+    SwitchOn: GIVE self light
+    SwitchOff: GIVE self NOT light
+  END
+END
+OBJECT Key "iron key" IN Parlour
+  NAME "iron" "key"
+  INITIAL "An iron key lies forgotten on the mantelpiece."
+  AFTER
+    Take: IF self HASNT general
+            GIVE self general
+            score = score + 5
+          END
+  END
+END
+OBJECT Barrel "rain barrel" IN Cellar
+  NAME "rain" "barrel"
+  HAS static
+  DAEMON
+    IF location = Cellar
+      PRINT "Water drips into the barrel."
+    END
+  END
+END
+OBJECT Candle "candle" IN Porch
+  NAME "candle"
+  TIME_LEFT 0
+  TIME_OUT
+    IF Candle IN player OR PARENT(Candle) = location
+      PRINT "The candle gutters and goes out."
+    END
+    GIVE Candle NOT light
+  END
+END
+
+GLOBAL hooked
+ROUTINE WatchActions
+  IF action = ##Jump
+    PRINT "(The game's before hook saw that.)"
+    RETURN TRUE
+  END
+  RETURN FALSE
+END
+ROUTINE JumpSub
+  PRINT "You jump."
+END
+VERB "jump" "hop"
+  -> Jump
+END
+VERB "light"
+  noun -> Kindle
+END
+ROUTINE KindleSub
+  IF noun = Candle
+    GIVE Candle light
+    StartTimer(Candle, 3)
+    PRINT "The candle catches."
+    RETURN
+  END
+  PRINT "You can't light that."
+END
+
+ROUTINE Initialise
+  location = Porch
+  max_score = 10
+  beforehook = WatchActions
+  StartDaemon(Barrel)
+END

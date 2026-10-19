@@ -1012,7 +1012,9 @@ ROUTINE RunAction
   ELSE
     Perform()
   END
-  turns = turns + 1
+  IF NOT IsMeta(action) AND deadflag = 0
+    EndTurn()
+  END
 END
 
 ! One action: an order goes to the character's ORDERS; otherwise the
@@ -1027,6 +1029,12 @@ ROUTINE Perform
       PRINT (The) actor, " has better things to do."
     END
     RETURN
+  END
+  IF beforehook                ! the game's own look at every action
+    f = beforehook
+    IF f()
+      RETURN
+    END
   END
   IF location.BEFORE()
     RETURN
@@ -1064,11 +1072,18 @@ END
 ! and the object's AFTER rules.  TRUE means one of them said so, and the
 ! action routine prints nothing more.
 ROUTINE AfterRules
+  LOCAL f
   IF location.AFTER()
     RETURN TRUE
   END
   IF noun > 0 AND noun <= LASTOBJ
     IF noun.AFTER()
+      RETURN TRUE
+    END
+  END
+  IF afterhook
+    f = afterhook
+    IF f()
       RETURN TRUE
     END
   END

@@ -203,3 +203,8 @@ GLOBRM EQU  RAMVAR+>400        480 bytes: the 240 globals, kept here for speed
 *                              only up to date after GSYNC: SAVE, undo and
 *                              anything else that copies the dynamic area
 *                              must call GSYNC first and GLOAD after.
+STROOM EQU  RAMVAR+>320        STATUS: the room (0 = darkness)
+STSCR  EQU  RAMVAR+>322        STATUS: the score (-1 = none)
+STMOV  EQU  RAMVAR+>324        STATUS: the moves
+STPTR  EQU  RAMVAR+>326        STATUS: the next free byte of STBUF
+STBUF  EQU  RAMVAR+>330        48 bytes: "Score: n  Moves: m", or a room name

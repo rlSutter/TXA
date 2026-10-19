@@ -7,10 +7,16 @@
 ATTRIBUTE light lit open openable locked lockable container supporter
 ATTRIBUTE transparent scenery static worn wearable edible animate
 ATTRIBUTE concealed visited switchable on plural proper female male neuter
+ATTRIBUTE moved general     ! moved: has been carried (INITIAL no longer shows); general: the game's own
 
 PROPERTY DESC INITIAL N S E W NE NW SE SW UP DOWN INSIDE OUTSIDE
 PROPERTY DOOR_TO WITH_KEY CAPACITY BEFORE AFTER LIFE ORDERS
 PROPERTY DIR            ! on a compass object: its number, 1-12 (see GoSub)
+PROPERTY CANT_GO        ! a room: said instead of "You can't go that way."
+PROPERTY EACH_TURN      ! a room: run (or printed) at the end of every turn there
+PROPERTY DAEMON         ! a routine run every turn while StartDaemon is in force
+PROPERTY TIME_LEFT      ! a timer's turns to go (give the object TIME_LEFT 0)
+PROPERTY TIME_OUT       ! run when the timer reaches 0
 
 GLOBAL player = Yourself      ! the object the player is
 GLOBAL location               ! the room the player is in
@@ -25,6 +31,14 @@ GLOBAL themobj                ! THEM
 GLOBAL himobj                 ! HIM
 GLOBAL herobj                 ! HER
 GLOBAL lastaction             ! for AGAIN
+GLOBAL score                  ! points scored
+GLOBAL max_score              ! the most there are (0: the game keeps no score)
+GLOBAL lastscore              ! score at the last notification
+GLOBAL notify_on = 1          ! say when the score changes (NOTIFY turns it off)
+GLOBAL lookmode = 1           ! 1 brief, 2 verbose, 3 superbrief
+GLOBAL beforehook             ! a routine the game sets to see every action first
+GLOBAL afterhook              ! one that sees every action that has happened
+GLOBAL endturnhook            ! one run at the end of every turn
 
 OBJECT Yourself "yourself"
   NAME "me" "myself" "self" "yourself"

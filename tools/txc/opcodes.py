@@ -112,7 +112,7 @@ OPS = [
     (0x5D, 'UNDOSAVE', '',  '-> f',       'Take an undo snapshot; 1, or 2 when continuing after an UNDO.'),
     (0x5E, 'UNDO',     '',  '-> f',       'Go back to the last snapshot; 0 if there is none.'),
     (0x5F, 'PICTURE',  '',  'n ->',       'Show picture n (0 hides the pane).'),
-    (0x60, 'STATUS',   '',  '',           'Redraw the status line.'),
+    (0x60, 'STATUS',   '',  'r s m ->',   'Draw the status line: room r\'s short name (0: "Darkness") on the left; on the right "Score: s  Moves: m", or "Moves: m" when s is -1. An engine without a status line ignores it.'),
     (0x61, 'SOUND',    '',  'n ->',       'Play sound effect n.'),
 ]
 

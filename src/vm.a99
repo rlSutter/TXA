@@ -1000,7 +1000,18 @@ OPPS1  BL   @CHSTR
        LI   R0,']'
        BL   @CHOUT
        B    @NEXT
-OPSTAT B    @NEXT
+* STATUS r s m: the status line, drawn straight into row 0 (it is not
+* part of the transcript): the room's name from column 1, "Score: s
+* Moves: m" (or "Moves: m" when s is -1) ending at column 78.  The row's
+* colours are already reverse video.
+OPSTAT DECT R6
+       MOV  *R6,@STMOV
+       DECT R6
+       MOV  *R6,@STSCR
+       DECT R6
+       MOV  *R6,@STROOM
+       BL   @DRAWST
+       B    @NEXT
 
 * ---- text for the handlers ------------------------------------------------------------
 SNOTHG BYTE 7

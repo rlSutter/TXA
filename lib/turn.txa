@@ -1,0 +1,126 @@
+! turn.txa - the end of a turn: daemons, timers, scoring, the status line.
+!
+! A turn is a command that is not a "meta" command (SCORE, VERBOSE, QUIT
+! and the like take no time).  At its end: every daemon runs, every
+! timer counts down (running TIME_OUT at 0), the room's EACH_TURN runs,
+! then the game's endturnhook, then a note if the score changed, and the
+! status line is redrawn.
+
+ARRAY daemons 32        ! objects whose DAEMON runs every turn
+ARRAY timers 32         ! objects counting down TIME_LEFT
+GLOBAL ndaemons
+GLOBAL ntimers
+
+ROUTINE StartDaemon o
+  LOCAL k
+  WHILE k < ndaemons
+    IF daemons(k) = o
+      RETURN
+    END
+    k = k + 1
+  END
+  IF ndaemons < 32
+    daemons(ndaemons) = o
+    ndaemons = ndaemons + 1
+  END
+END
+
+ROUTINE StopDaemon o
+  ndaemons = DropFrom(daemons, ndaemons, o)
+END
+
+! StartTimer(o, t): o.TIME_OUT runs t turns from now (o needs TIME_LEFT).
+ROUTINE StartTimer o, t
+  LOCAL k
+  o.TIME_LEFT = t
+  WHILE k < ntimers
+    IF timers(k) = o
+      RETURN
+    END
+    k = k + 1
+  END
+  IF ntimers < 32
+    timers(ntimers) = o
+    ntimers = ntimers + 1
+  END
+END
+
+ROUTINE StopTimer o
+  ntimers = DropFrom(timers, ntimers, o)
+END
+
+! remove o from the first n elements of array arr (by number); the new n
+ROUTINE DropFrom arr, n, o
+  LOCAL k, j
+  WHILE k < n
+    IF AGET(arr, k) = o
+      j = k
+      WHILE j < n - 1
+        APUT(arr, j, AGET(arr, j + 1))
+        j = j + 1
+      END
+      RETURN n - 1
+    END
+    k = k + 1
+  END
+  RETURN n
+END
+
+ROUTINE IsMeta a
+  RETURN a = ##Score OR a = ##Verbose OR a = ##Brief OR a = ##Superbrief OR a = ##Quit OR a = ##Notify
+END
+
+ROUTINE EndTurn
+  LOCAL k, o, f
+  turns = turns + 1
+  k = 0
+  WHILE k < ndaemons
+    o = daemons(k)
+    o.DAEMON()
+    k = k + 1
+  END
+  k = 0
+  WHILE k < ntimers
+    o = timers(k)
+    o.TIME_LEFT = o.TIME_LEFT - 1
+    IF o.TIME_LEFT <= 0
+      StopTimer(o)
+      o.TIME_OUT()
+    ELSE
+      k = k + 1
+    END
+  END
+  location.EACH_TURN()
+  IF endturnhook
+    f = endturnhook
+    f()
+  END
+  IF score <> lastscore AND notify_on
+    FRESHLINE()
+    PRINT
+    IF score > lastscore
+      WRITE "[Your score has just gone up by ", score - lastscore, " point"
+    ELSE
+      WRITE "[Your score has just gone down by ", lastscore - score, " point"
+    END
+    IF score - lastscore <> 1 AND lastscore - score <> 1
+      WRITE "s"
+    END
+    PRINT ".]"
+  END
+  lastscore = score
+  ShowStatus()
+END
+
+ROUTINE ShowStatus
+  LOCAL r, s
+  r = location
+  IF NOT IsLit()
+    r = 0
+  END
+  s = -1
+  IF max_score > 0
+    s = score
+  END
+  STATUS(r, s, turns)
+END

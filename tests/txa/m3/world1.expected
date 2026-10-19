@@ -1,0 +1,133 @@
+
+Porch
+A sagging porch. The front door is north; steps lead down to a cellar.
+You can see a brass lamp and a candle here.
+
+>look
+Porch
+A sagging porch. The front door is north; steps lead down to a cellar.
+You can see a brass lamp and a candle here.
+
+>w
+The garden is overgrown past walking.
+
+>n
+Parlour
+Dust sheets cover everything. A clock ticks somewhere.
+An iron key lies forgotten on the mantelpiece.
+
+>take key
+Taken.
+
+[Your score has just gone up by 5 points.]
+
+>look
+Parlour
+Dust sheets cover everything. A clock ticks somewhere.
+
+>verbose
+Parlour is now in its "verbose" mode, which always gives long descriptions of locations (even if you've been there before).
+
+>look
+Parlour
+Dust sheets cover everything. A clock ticks somewhere.
+The clock ticks louder for a moment.
+
+>brief
+Parlour is now in its normal "brief" printing mode, which gives long descriptions of places never before visited and short descriptions otherwise.
+
+>s
+Porch
+You can see a brass lamp and a candle here.
+
+>d
+Darkness
+It is pitch dark, and you can't see a thing.
+Water drips into the barrel.
+
+>look
+Darkness
+It is pitch dark, and you can't see a thing.
+Water drips into the barrel.
+
+>x barrel
+You can't see any such thing.
+
+>u
+Porch
+You can see a brass lamp and a candle here.
+
+>take lamp
+Taken.
+
+>turn lamp on
+You switch the brass lamp on.
+
+>d
+Cellar
+A low cellar that smells of earth and old apples.
+You can see a rain barrel here.
+Water drips into the barrel.
+
+>look
+Cellar
+A low cellar that smells of earth and old apples.
+You can see a rain barrel here.
+Water drips into the barrel.
+
+>wait
+Time passes.
+Water drips into the barrel.
+
+>z
+Time passes.
+Water drips into the barrel.
+
+>turn off lamp
+You switch the brass lamp off.
+Water drips into the barrel.
+
+>look
+Darkness
+It is pitch dark, and you can't see a thing.
+Water drips into the barrel.
+
+>u
+Porch
+You can see a candle here.
+
+>jump
+(The game's before hook saw that.)
+
+>take candle
+Taken.
+
+>light candle
+The candle catches.
+
+>wait
+Time passes.
+
+>wait
+Time passes.
+The candle gutters and goes out.
+
+>score
+You have scored 5 out of a possible 10, in 24 turns.
+
+>superbrief
+Porch is now in its "superbrief" mode, which always gives short descriptions of locations (even if you haven't been there before).
+
+>n
+Parlour
+
+>s
+Porch
+
+>notify off
+Score notification off.
+
+>score
+You have scored 5 out of a possible 10, in 26 turns.
+
+>q

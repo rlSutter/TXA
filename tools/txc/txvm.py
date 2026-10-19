@@ -32,6 +32,7 @@ class VM:
         self.stack, self.frames = [], []
         self.self_ = 0
         self.steps = 0
+        self.status = None
         h = self.hw
         self.objects, self.nobj = h('objects'), h('object_count')
         self.globals, self.arrays = h('globals'), h('arrays')
@@ -391,7 +392,9 @@ class VM:
             pc = self.call(self.hw('entry'), [], None)
         elif name in ('SAVE', 'RESTORE', 'UNDOSAVE', 'UNDO'): push(0)    # M4
         elif name in ('PICTURE', 'SOUND'): self.write(f'[{name.lower()} {pop()}]')
-        elif name == 'STATUS': pass
+        elif name == 'STATUS':
+            mv = pop(); sc = pop(); r = pop()
+            self.status = ('Darkness' if r == 0 else self.short_name(r), sc, mv)
         else:
             raise VMError(f'{name} is not implemented')
         return pc
