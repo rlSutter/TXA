@@ -156,7 +156,8 @@ glyph set in patterns 160-254.  VRAM moved to make room for the
 [MORE] and the end message use reverse colours.  Tests check the
 glyphs and colours on screen.
 
-**M1 is complete.**
+**M1 is complete.**  Rebecca ran the rebuilt demo (with text styles) in
+js99er and it worked (2026-10-19).
 
 ## M2 (the parser): under way
 
