@@ -87,6 +87,7 @@ OPS = [
     (0x42, 'ALEN',     'b', '-> n',       'Number of elements in array b.'),
     (0x43, 'ALOADV',   '',  'a i -> v',   'Element i of the array whose number is a (an array named as a value gives its number).'),
     (0x44, 'ASTOREV',  '',  'a i v ->',   'Set element i of array a.'),
+    (0x47, 'ACOPY',    '',  's d n ->',   'Copy elements 0 to n-1 of array s into array d (a run-time error if either is too short).'),
     (0x46, 'FILTERN',  '',  'w s n d -> c', 'Count the objects among the first n elements of array s that have w as a NAME word; if any, write them in order to array d from element 0 (s and d may be the same array); push the count. The parser\'s phrase filter, done by the engine for speed.'),
     (0x45, 'ISNAME',   '',  'w o -> f',   "1 if dictionary word w is one of object o's NAME words (property 1). The parser's inner loop, done by the engine for speed."),
     # ---- text

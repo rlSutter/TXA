@@ -564,3 +564,45 @@ FLH7   LI   R0,1               yes: EQ clear
        MOV  @FLRET,R11
        MOV  R0,R0
        RT
+
+* ACOPY s d n: elements 0 to n-1 of array s into array d.
+OPACPY DECT R6
+       MOV  *R6,@FLN           n
+       DECT R6
+       MOV  *R6,@FLD           d
+       DECT R6
+       MOV  *R6,R14            s
+       MOV  R14,@FLC           (s's number, for an error message)
+       BL   @ARRAY
+       MOV  @VT1,@FLS
+       C    @FLN,@VT2
+       JH   ACP8
+       MOV  @FLD,R14
+       BL   @ARRAY
+       MOV  @VT1,@FLDA
+       MOV  @VT2,@FLDL
+       C    @FLN,@VT2
+       JH   ACP7
+       MOV  @FLN,@FLK
+       JLT  ACP9
+       JEQ  ACP9
+ACP1   MOV  @FLS,R1
+       BL   @RDW
+       MOV  @FLDA,R1
+       BL   @WRW
+       INCT @FLS
+       INCT @FLDA
+       DEC  @FLK
+       JNE  ACP1
+ACP9   B    @NEXT
+ACP7   MOV  @FLD,@FLC          d is too short
+       MOV  @FLDL,@VT2
+ACP8   MOV  @FLN,R0            index n-1 outside array (0 to length-1)
+       DEC  R0
+       MOV  R0,@ERRN1
+       MOV  @FLC,@ERRN2
+       MOV  @VT2,R0
+       DEC  R0
+       MOV  R0,@ERRN3
+       LI   R1,EINDEX
+       B    @VMERR

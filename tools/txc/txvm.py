@@ -294,6 +294,14 @@ class VM:
         elif name == 'ISNAME':
             o = pop(); w = pop(); pr = self.prop(o, 1)
             push(pr is not None and any(self.rw(pr[2] + 2 * k) == (w & 0xFFFF) for k in range(pr[1])))
+        elif name == 'ACOPY':
+            n = pop(); d = pop(); sa = pop()
+            ss, sl = self.array(sa); ds, dl = self.array(d)
+            if n > sl or n > dl:
+                bad, ln = (sa, sl) if n > sl else (d, dl)
+                raise VMError(f'index {n - 1} is outside array {bad} (0 to {ln - 1})')
+            for k in range(max(0, n)):
+                self.ww(ds + 2 * k, self.rw(ss + 2 * k))
         elif name == 'FILTERN':
             d = pop(); n = pop(); sa = pop(); w = pop() & 0xFFFF
             ss, sl = self.array(sa); ds, dl = self.array(d)

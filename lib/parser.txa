@@ -199,11 +199,7 @@ END
 ! ---- reading a line ------------------------------------------------------
 ! (src and dst are arrays passed by number: AGET and APUT reach them)
 ROUTINE CopyText src, dst
-  LOCAL k
-  WHILE k <= AGET(src, 0)
-    APUT(dst, k, AGET(src, k))
-    k = k + 1
-  END
+  ACOPY(src, dst, AGET(src, 0) + 1)
 END
 
 ! Append characters from text array src (from start, len of them) to text2.
@@ -357,7 +353,21 @@ ROUTINE ParseCommand start
   upto_best = -1
   WHILE k < nlines
     asking = 0
-    res = MatchLine(li, start)
+    ! a line starting with a fixed word that is not the next word fails at
+    ! once, as MatchLine would, without trying it
+    res = -1
+    IF GRAMTAB(li + 3) > 0
+      IF GRAMTAB(li + 4) >= >2000 AND GRAMTAB(li + 4) < >3000
+        IF start + 1 >= cmdend OR WordAt(start + 1) <> GRAMTAB(li + 4) - >2000
+          res = 0
+          etype = E_UPTO
+          upto = start + 1
+        END
+      END
+    END
+    IF res < 0
+      res = MatchLine(li, start)
+    END
     IF res = 2 AND bestres < 2
       best = li
       bestres = 2
@@ -391,10 +401,10 @@ ROUTINE ParseCommand start
     ParserError(etype, upto)
     RETURN
   END
-  action = GRAMTAB(best)
+  action = GRAMTAB(best + 1)
   noun = slotobj(1)
   second = slotobj(2)
-  IF GRAMTAB(best + 1) = 1 AND multislot = 0
+  IF GRAMTAB(best + 2) = 1 AND multislot = 0
     noun = slotobj(2)
     second = slotobj(1)
   END
@@ -405,20 +415,9 @@ GLOBAL cmdend_save_k
 GLOBAL etype_best
 GLOBAL upto_best
 
-! the index of the line after line li in GRAMTAB
+! the index of the line after line li in GRAMTAB (each line records it)
 ROUTINE NextLine li
-  LOCAL n, k, t
-  n = GRAMTAB(li + 2)
-  li = li + 3
-  WHILE k < n
-    t = GRAMTAB(li)
-    li = li + 1
-    IF t >= >1800 AND t < >2000
-      li = li + 1               ! a slot with a routine after it
-    END
-    k = k + 1
-  END
-  RETURN li
+  RETURN GRAMTAB(li)
 END
 
 ROUTINE VerbHasTopic w
@@ -434,10 +433,10 @@ ROUTINE VerbHasTopic w
   nlines = GRAMTAB(li)
   li = li + 1
   WHILE k < nlines
-    n = GRAMTAB(li + 2)
+    n = GRAMTAB(li + 3)
     j = 0
     WHILE j < n
-      t = GRAMTAB(li + 3 + j)
+      t = GRAMTAB(li + 4 + j)
       IF t = >1009
         RETURN TRUE
       END
@@ -470,14 +469,14 @@ END
 ! type in missingslot, missingtype), 0 if it fails (etype, upto).
 ROUTINE MatchLine li, start
   LOCAL n, k, t, filter, slot, stopw, typ
-  n = GRAMTAB(li + 2)
+  n = GRAMTAB(li + 3)
   wn = start + 1
   slot = 0
   multislot = 0
   slotobj(1) = 0
   slotobj(2) = 0
   nmulti = 0
-  li = li + 3
+  li = li + 4
   WHILE k < n
     t = GRAMTAB(li)
     li = li + 1

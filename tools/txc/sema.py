@@ -51,15 +51,16 @@ BUILTINS = {
     'READ': ('READ', 2, True), 'TOKENIZE': ('TOKENIZE', 2, True),
     'HASATTR': ('HASATTRV', 2, True), 'FRESHLINE': ('FRESH', 0, False),
     'AGET': ('ALOADV', 2, True), 'APUT': ('ASTOREV', 3, False),
-    'ISNAME': ('ISNAME', 2, True), 'FILTERN': ('FILTERN', 4, True),
+    'ISNAME': ('ISNAME', 2, True), 'FILTERN': ('FILTERN', 4, True), 'ACOPY': ('ACOPY', 3, False),
     # the second argument of these two is a property name, not a value
     'PROPLEN': ('PROPLEN', 2, True), 'PROPWORD': ('GETPROPN', 3, True),
 }
 PROP_ARG = {'PROPLEN', 'PROPWORD'}
 # Arrays the compiler makes for the library's parser (their names are reserved):
 #   VERBTAB(v)  where verb v's grammar starts in GRAMTAB (v from 1)
-#   GRAMTAB     for each verb: its line count, then each line: action,
-#               flags (1 = REVERSE), token count, tokens.  A token is
+#   GRAMTAB     for each verb: its line count, then each line: the index
+#               of the next line, action, flags (1 = REVERSE), token
+#               count, tokens.  A token is
 #               >1000+t a slot (t: 1 noun 2 held 3 multi 4 multiheld
 #               5 multiexcept 6 multiinside 7 creature 8 number 9 topic
 #               10 scope), +>0800 if a routine follows (noun=R, scope=R);
@@ -623,6 +624,7 @@ def _finish_tables(self):
         verbtab.append(('num', len(gram)))
         gram.append(('num', len(v.lines)))
         for gl in v.lines:
+            here = len(gram)
             act = [a.upper() for a in p.actions].index(gl.action.upper())
             toks = []
             for t in gl.tokens:
@@ -636,7 +638,8 @@ def _finish_tables(self):
                         toks.append(('num', code))
                 else:
                     toks.append(('num', 0x3000 + p.sym(t.value).number))
-            gram += [('num', act), ('num', 1 if gl.reverse else 0), ('num', len([t for t in gl.tokens]))] + toks
+            gram += [('num', 0), ('num', act), ('num', 1 if gl.reverse else 0), ('num', len([t for t in gl.tokens]))] + toks
+            gram[here] = ('num', len(gram))           # where the next line starts
     gen = {
         'VERBTAB': verbtab,
         'GRAMTAB': gram or [('num', 0)],

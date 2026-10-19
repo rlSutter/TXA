@@ -334,12 +334,20 @@ Part 3 done (19 October 2026):
   M3 worlds identically, status lines checked.  The parser script now
   ends with "y" for the quit question.
 - size: world3 compiles to 24K with 5K of dynamic state.
-- speed: the bigger library raised the parser script's estimate from
-  0.8 s to 1.0 s median (worst 3.7 -> 4.3 s); to look into.
+- speed: the bigger library (more grammar lines for TAKE/GET) slowed
+  the parser 19% (162K -> 193K bytecode instructions on the script).
+  Fixed: each GRAMTAB line now starts with the index of the next line
+  (NextLine is one read); lines starting with a fixed word are rejected
+  without a full match; ACOPY (a new built-in) copies arrays.  Now 169K;
+  engine benchmark median 0.74 s, worst 3.32 s (before M3: 0.68 s,
+  2.98 s with a library half the size).
 
 ## Next
 
-1. M3 part 3: the verb set.  Part 4: the sample game.
+1. M3 part 4: the sample game (about 15 rooms), later the tutorial.
+2. Rebecca's timing of the demos when she can.
+
+## (done) M3 part 3: the verb set.  Part 4: the sample game.
 3. Rebecca's timing of txa-m2demo8.bin when she can.
 
 ## (was) Next before M3
