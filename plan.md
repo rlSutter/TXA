@@ -117,7 +117,7 @@ Also done (the engine):
   `opcodes.py`, and a damaged story refused.
 - `demos/m1demo.txa` and its cartridge `txa-m1demo8.bin` for js99er.
 
-More language additions (for Rebecca's review):
+More language additions (approved by Rebecca, 2026-10-19):
 - built-in functions with reserved names: PARENT, CHILD, SIBLING,
   RANDOM, READKEY, SAVE, RESTORE, UNDOSAVE, UNDO, QUIT, RESTART, STATUS,
   SOUND (save/undo are placeholders returning 0 until M4);
@@ -154,6 +154,7 @@ text output, word wrap and [MORE]; bold and underline glyph sets.
 | 2026-10-18 | Full spec as a Claude Doc before coding |
 | 2026-10-19 | M0 started from The Lantern Coast 1.13 bundle |
 | 2026-10-19 | Authoring language approved as proposed: uppercase keywords, terse property names, BEFORE ... END rule blocks, name TXA |
+| 2026-10-19 | Approved: the built-in functions (reserved names) and -32768 only with its minus sign |
 | 2026-10-19 | Approved: `(string) x`; `obj.prop()` as print-or-run; `##Name` for action numbers; Inform's return defaults (ROUTINE TRUE, property routines and rule cases FALSE); INSIDE and OUTSIDE as the in/out direction properties |
 
 ## History
