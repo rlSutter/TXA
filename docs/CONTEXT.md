@@ -23,7 +23,7 @@ owns it; Claude builds it. The engine comes first; the story later.
 | Assembler | xdt99 at `/home/claude/xdt99` (commit a77bd31); `git clone https://github.com/endlos99/xdt99` |
 | Kernel origin | The Lantern Coast 1.13 (`TheLanternCoast-1_13.bundle`, Rebecca's upload) |
 | Build | `python3 tools/build.py` |
-| Tests | `python3 tests/m0_test.py [--png]` |
+| Tests | `tests/m0_test.py`, `txc_parse_test.py`, `txc_sema_test.py`, `txc_run_test.py`, `m1_vm_test.py` (each prints PASS/FAIL lines and ALL PASS) |
 | Outputs | `/mnt/user-data/outputs/txa/` |
 
 ## Source map
@@ -38,9 +38,17 @@ owns it; Claude builds it. The engine comes first; the story later.
 | `src/text80.a99` | 80-column text: mode, font + reverse set, strings, numbers, scrolling |
 | `src/rle.a99` | the picture run-length decoder (format in `tools/rlepack.py`) |
 | `src/probe.a99` | M0's probe program |
+| `src/engine.a99` | the engine: boot, story load into SAMS, checksum, pristine copy, errors, end |
+| `src/vm.a99` | VM dispatch (OPTAB) and every opcode handler |
+| `src/vmmem.a99` | story memory through SAMS windows A (code), B (data), D (text) |
+| `src/output.a99` | CHOUT (the only text path; tests watch it), wrap, scroll, [MORE], strings, numbers |
+| `src/txaeng.a99` | the engine build file (engine >A000 must end below >D000) |
+| `tools/txc/` | the TXA compiler: lexer, ast, parser, sema, opcodes (THE instruction set), codegen (+linker), txvm (Python reference VM) |
+| `tests/txa/` | test programs and `lib/stdlib.txa`, a stand-in standard library |
+| `demos/m1demo.txa` | the M1 demonstration story |
 | `src/txaprobe.a99` | the M0 build file: probe at >A000, kernel at >2000 (KENTRY first) |
 | `src/cartldr.a99` | cartridge loader: copies the E/A 5 image into RAM |
-| `tools/build.py` | generators, assembly, disk image, cartridge, memory-map checks |
+| `tools/build.py` | generators, assembly, disk image, cartridge, memory-map checks; `engine_cart(image)` builds an engine cartridge carrying a story; `symbols()` reads xas99 -E output |
 | `tools/mkfont.py`, `tools/mkpics.py`, `tools/rlepack.py` | font, test pictures, RLE |
 | `tools/sim9900.py`, `tools/render.py` | the skill's simulator (1M SAMS, reset state extended) |
 | `tools/render80.py` | T80 and bitmap-layer screen dumps and PNGs |
