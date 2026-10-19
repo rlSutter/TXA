@@ -44,10 +44,10 @@ OPTAB  DATA OPNOP,OPPSHB,OPPSHW,OPPSH0,OPPSH1,OPPOP,OPDUP,OPSELF  >00
        DATA OPJMP,OPJZ,OPJNZ,OPCALL,OPCLLV,OPRET,OPRTRU,OPRFAL
        DATA BADOP,BADOP,BADOP,BADOP,BADOP,BADOP,BADOP,BADOP
        DATA OPPAR,OPCHLD,OPSIB,OPMOVE,OPREM,OPIN,OPHAS,OPSETA
-       DATA OPCLRA,OPGETP,OPPUTP,OPPLEN,OPRUNP,OPCLLP,OPGTPN,BADOP
-       DATA OPALD,OPAST,OPALEN,BADOP,BADOP,BADOP,BADOP,BADOP
+       DATA OPCLRA,OPGETP,OPPUTP,OPPLEN,OPRUNP,OPCLLP,OPGTPN,OPHASV
+       DATA OPALD,OPAST,OPALEN,OPALDV,OPASTV,OPISNM,OPFLTN,BADOP
        DATA OPPRS,OPPRV,OPPRN,OPPRO,OPPRC,OPNL,OPSTYL,OPPRA
-       DATA OPREAD,OPRKEY,BADOP,BADOP,BADOP,BADOP,BADOP,BADOP
+       DATA OPREAD,OPRKEY,OPTOKN,OPFRSH,BADOP,BADOP,BADOP,BADOP
        DATA OPRAND,OPQUIT,OPRST,OPSAVE,OPREST,OPUSAV,OPUNDO,OPPIC
        DATA OPSTAT,OPSND
 OPLAST EQU  >61
@@ -394,15 +394,17 @@ MOV1   MOV  @VT3,R1            never into itself: walk up from the
        MOV  @VT4,R15
        MOV  R0,@VT3
        JMP  MOV1
-MOV2   MOV  R15,@VT4
-       BL   @DETACH
+* The destination stays in R15 from here: DETACH uses VT1-VT5 (it once
+* sat in VT4, which DETACH overwrites when o has an earlier sibling).
+* DETACH, OBJE, RDW and WRW all leave R15 alone.
+MOV2   BL   @DETACH
        MOV  R14,R1             o's entry: parent = d
        BL   @OBJE
        MOV  R1,@VT1
-       MOV  @VT4,R1            d's entry
+       MOV  R15,R1             d's entry
        BL   @OBJE
        MOV  R1,@VT2
-       MOV  @VT4,R0
+       MOV  R15,R0
        MOV  @VT1,R1
        BL   @WRW               parent(o) = d
        MOV  @VT2,R1
@@ -904,9 +906,7 @@ VOWEND BYTE 0
        EVEN
 
 * ---- input and system ------------------------------------------------------------------
-* READ: the parser arrives in M2.  For now a READ ends the game, which
-* is what the Python VM does when its command script runs out.
-OPREAD B    @VMEND
+* READ and TOKENIZE are in input.a99.
 OPRKEY BL   @FLUSH
        BL   @WAITKY
        SRL  R0,8

@@ -128,6 +128,7 @@ H.NOBJ EQU  HDRCPY+18          object count
 H.GLOB EQU  HDRCPY+22          globals offset
 H.ARRS EQU  HDRCPY+24          array directory offset
 H.ABBR EQU  HDRCPY+32          substitution table offset
+H.DICT EQU  HDRCPY+26          dictionary offset
 H.ENTR EQU  HDRCPY+34          Main's packed address
 H.CSUM EQU  HDRCPY+36          checksum
 H.DYN  EQU  HDRCPY+14          dynamic area length
@@ -165,3 +166,35 @@ STBANK EQU  RAMVAR+>1CA        (unused; the story source is in storysrc.a99)
 CURAT  EQU  RAMVAR+>1CC        the current style's attribute byte (STYLE)
 CURUL  EQU  RAMVAR+>1CE        >0080 when underlining, else 0 (STYLE)
 ABUF   EQU  RAMVAR+>1D0        80 bytes: the attribute of each LBUF character
+
+* ---- input and TOKENIZE (input.a99) ----------------------------------
+RDTARR EQU  RAMVAR+>220        READ: the text array's number
+RDPARR EQU  RAMVAR+>222        READ: the parse array's number
+ILEN   EQU  RAMVAR+>224        characters typed
+IMAX   EQU  RAMVAR+>226        the most that fit
+ICOL   EQU  RAMVAR+>228        screen column of the first typed character
+KEYLS2 EQU  RAMVAR+>22A        the line editor's last key (edge detection)
+TKT    EQU  RAMVAR+>22C        TOKENIZE: text array's first element (story address)
+TKN    EQU  RAMVAR+>22E        TOKENIZE: characters in the text
+TKP    EQU  RAMVAR+>230        TOKENIZE: parse array's first element
+TKROOM EQU  RAMVAR+>232        TOKENIZE: words the parse array can hold
+TKI    EQU  RAMVAR+>234        TOKENIZE: character index (0-based)
+TKCNT  EQU  RAMVAR+>236        TOKENIZE: words so far
+TKS    EQU  RAMVAR+>238        TOKENIZE: this word's first character (0-based)
+TKL    EQU  RAMVAR+>23A        TOKENIZE: this word's length
+DLO    EQU  RAMVAR+>23C        LOOKUP: binary search bounds
+DHI    EQU  RAMVAR+>23E
+DMID   EQU  RAMVAR+>240
+KEYBUF EQU  RAMVAR+>250        12 bytes: the word being looked up
+IBUF   EQU  RAMVAR+>260        160 bytes: the line being typed
+FLW    EQU  RAMVAR+>300        FILTERN: the word
+FLS    EQU  RAMVAR+>302        FILTERN: s's first element (story address)
+FLN    EQU  RAMVAR+>304        FILTERN: elements to look at
+FLD    EQU  RAMVAR+>306        FILTERN: d's number
+FLDA   EQU  RAMVAR+>308        FILTERN: d's first element
+FLDL   EQU  RAMVAR+>30A        FILTERN: d's length
+FLDP   EQU  RAMVAR+>30C        FILTERN: where the next kept object goes
+FLC    EQU  RAMVAR+>30E        FILTERN: the count
+FLK    EQU  RAMVAR+>310        FILTERN: element index
+FLO    EQU  RAMVAR+>312        FILTERN: the element's object
+FLRET  EQU  RAMVAR+>314        FLHAS's return address

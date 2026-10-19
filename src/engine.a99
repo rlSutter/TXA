@@ -387,6 +387,11 @@ ENOARR BYTE ENOARRX-ENOARR-1
        BYTE 1
        TEXT ' does not exist'
 ENOARRX
+EATTR  BYTE EATTRX-EATTR-1
+       TEXT 'attribute '
+       BYTE 1
+       TEXT ' does not exist'
+EATTRX
 ENEST  BYTE ENESTX-ENEST-1
        TEXT 'routines nested too deeply'
 ENESTX

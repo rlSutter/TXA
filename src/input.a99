@@ -1,0 +1,566 @@
+*======================================================================
+* input.a99 - reading commands: the line editor, READ and TOKENIZE.
+*
+* READ t p: the text so far on the line (the prompt, in LBUF) is shown,
+* the player types after it, and ENTER ends the line.  The typed text
+* then goes through CHOUT like anything printed, so the transcript has
+* it (txvm.py echoes it the same way), is stored in array t (t(0) =
+* length, then one character per element, lower case), and TOKENIZE
+* splits it into array p.
+*
+* Editing keys: letters, digits, space and punctuation type; FCTN S
+* (left arrow) rubs out; ENTER ends.  The line holds what fits on the
+* screen row after the prompt.  A reverse-video cell is the cursor.
+*
+* TOKENIZE t p follows opcodes.py exactly: words are runs of characters
+* other than space, comma and full stop; a comma or full stop is a word
+* by itself; each is looked up in the dictionary on 12 characters.
+*======================================================================
+
+* ---- keys ---------------------------------------------------------------
+* KEYGT2 - like KEYGET, but it understands FCTN and SHIFT, which KEYGET
+* reads as "nothing": R0 = the character (low byte) of a newly pressed
+* key, or 0.  FCTN S = 8 (rub out); FCTN I ? ; FCTN O ' ; FCTN P " ;
+* SHIFT / - ; SHIFT 1 !.  Letters come back in lower case.  Keyboard
+* column 0 holds = SPACE ENTER (rows 0-2) and FCTN SHIFT CTRL (rows
+* 4-6); KSCAN stores row r as bit >0100 << r of each column's byte, 0
+* meaning pressed.  Uses R0-R5 (KSCAN: R1-R4, R12).
+KEYGT2 .enter
+       BL   @KSCAN
+       MOVB @KEYMAP,R5         column 0
+       INV  R5                 1 = pressed
+       ANDI R5,>7000           FCTN >1000, SHIFT >2000, CTRL >4000
+       LI   R1,KEYMAP
+       LI   R2,KTAB
+       LI   R3,6
+       CLR  R4
+KG21   MOVB *R1+,R4
+       INV  R4
+       ANDI R4,>FF00
+       C    R3,@D6             column 0: modifiers are not keys
+       JNE  KG22
+       ANDI R4,>0700
+KG22   MOV  R4,R4
+       JNE  KG23
+       AI   R2,8
+       DEC  R3
+       JNE  KG21
+       CLR  @KEYLS2            nothing pressed
+       CLR  R0
+       JMP  KG29
+KG23   SRL  R4,8               the first pressed row
+       CLR  R0
+KG24   SRL  R4,1
+       JOC  KG25
+       INC  R0
+       JMP  KG24
+KG25   A    R0,R2
+       MOVB *R2,R0
+       SRL  R0,8               the key's character (upper case letters)
+       MOV  R5,R5
+       JEQ  KG27
+       LI   R1,MODTAB          a modifier: look the pair up
+KG26   MOV  *R1+,R2
+       JEQ  KG26B              not in the table
+       MOV  *R1+,R3            the key
+       MOV  *R1+,R4            the result
+       C    R2,R5
+       JNE  KG26
+       C    R3,R0
+       JNE  KG26
+       MOV  R4,R0
+       JMP  KG27
+KG26B  CI   R5,>2000           SHIFT alone types the key itself (a capital,
+       JEQ  KG27               made lower case below); anything else: no
+       JMP  KG28
+KG27   CI   R0,'A'             lower case for letters
+       JL   KG27A
+       CI   R0,'Z'
+       JH   KG27A
+       AI   R0,32
+KG27A  C    R0,@KEYLS2         the same key still down?
+       JEQ  KG28
+       MOV  R0,@KEYLS2
+       JMP  KG29
+KG28   CLR  R0
+KG29   .leave
+       RT
+D6     DATA 6
+* modifier, key, result
+MODTAB DATA >1000,'S',8
+       DATA >1000,'I','?'
+       DATA >1000,'O',>27
+       DATA >1000,'P','"'
+       DATA >2000,'/','-'
+       DATA >2000,'1','!'
+       DATA 0
+
+* ---- READ ----------------------------------------------------------------
+OPREAD DECT R6
+       MOV  *R6,@RDPARR
+       DECT R6
+       MOV  *R6,@RDTARR
+       BL   @RDLINE
+       MOV  @RDTARR,R14        the text into array t
+       BL   @ARRAY
+       MOV  @VT1,R1
+       MOV  @ILEN,R0
+       BL   @WRW
+       CLR  R15
+RDA1   C    R15,@ILEN
+       JHE  RDA2
+       MOV  R15,R1
+       INC  R1
+       SLA  R1,1
+       A    @VT1,R1
+       MOVB @IBUF(R15),R0
+       SRL  R0,8
+       BL   @WRW
+       INC  R15
+       JMP  RDA1
+RDA2   MOV  @RDTARR,R14
+       MOV  @RDPARR,R15
+       BL   @TOKZ
+       MOV  R0,*R6+
+       B    @NEXT
+
+* RDLINE - show the line so far, take the player's typing into IBUF
+* (ILEN), then echo it through CHOUT and end the line.
+RDLINE .enter
+       CLR  @MORECT            the player is reading: no [MORE] soon
+       BL   @ROWFIT
+       MOV  @CROW,R0           the prompt, shown where the line will go
+       MPY  @D80,R0
+       MOV  R1,R14
+       MOV  R14,R0
+       LI   R1,LBUF
+       MOV  @LLEN,R2
+       JEQ  RDL0
+       BL   @VMBW
+       MOV  R14,R0
+       AI   R0,ATRTAB
+       LI   R1,ABUF
+       MOV  @LLEN,R2
+       BL   @VMBW
+RDL0   MOV  @LLEN,R0           typing starts after it
+       A    R14,R0
+       MOV  R0,@ICOL
+       LI   R0,COLS-1          the most that fits: the row, less a cell
+       S    @LLEN,R0           for the cursor ...
+       MOV  @RDTARR,R14        ... and no more than the array holds
+       BL   @ARRAY
+       MOV  @VT2,R1
+       DEC  R1
+       C    R0,R1
+       JLE  RDL1
+       MOV  R1,R0
+RDL1   CI   R0,160
+       JLE  RDL1A
+       LI   R0,160
+RDL1A  MOV  R0,@IMAX
+       CLR  @ILEN
+       BL   @CURSON
+RDL2   BL   @WAITK2
+       CI   R0,13
+       JEQ  RDL6
+       CI   R0,8
+       JNE  RDL3
+       MOV  @ILEN,R0           rub out
+       JEQ  RDL2
+       BL   @CURSOF
+       DEC  @ILEN
+       BL   @CURSON
+       JMP  RDL2
+RDL3   CI   R0,' '
+       JL   RDL2
+       CI   R0,126
+       JH   RDL2
+       C    @ILEN,@IMAX
+       JHE  RDL2               the line is full
+       MOV  @ILEN,R1
+       SWPB R0
+       MOVB R0,@IBUF(R1)
+       MOV  R0,R1              the character on the screen, in place of
+       MOV  @ICOL,R0           the cursor
+       A    @ILEN,R0
+       BL   @VSBW
+       INC  @ILEN
+       BL   @CURSON
+       JMP  RDL2
+RDL6   BL   @CURSOF
+       CLR  @VT3               the line through CHOUT, then a new line
+RDL7   MOV  @VT3,R1
+       C    R1,@ILEN
+       JHE  RDL8
+       MOVB @IBUF(R1),R0
+       SRL  R0,8
+       BL   @CHOUT
+       INC  @VT3
+       JMP  RDL7
+RDL8   LI   R0,10
+       BL   @CHOUT
+       .leave
+       RT
+
+* CURSON - a reverse-video space at the typing position.  CURSOF - the
+* cell back to a normal space.  Use R0-R2.
+CURSON .enter
+       LI   R1,ATREV*256
+       JMP  CRS1
+CURSOF .enter
+       LI   R1,ATNORM*256
+CRS1   MOV  R1,R2              (VSBW changes R0: work it out each time)
+       MOV  @ICOL,R0
+       A    @ILEN,R0
+       LI   R1,>2000
+       BL   @VSBW
+       MOV  @ICOL,R0
+       A    @ILEN,R0
+       AI   R0,ATRTAB
+       MOV  R2,R1
+       BL   @VSBW
+       .leave
+       RT
+
+* WAITK2 - wait for a key through KEYGT2; R0 = its character.  Saves R4
+* and R5 (the PC), which the keyboard routines use.
+WAITK2 .enter
+       DECT R10
+       MOV  R4,*R10
+       DECT R10
+       MOV  R5,*R10
+WK21   BL   @KEYGT2
+       MOV  R0,R0
+       JEQ  WK21
+       MOV  *R10+,R5
+       MOV  *R10+,R4
+       .leave
+       RT
+
+* ---- TOKENIZE ---------------------------------------------------------------
+OPTOKN DECT R6
+       MOV  *R6,R15
+       DECT R6
+       MOV  *R6,R14
+       BL   @TOKZ
+       MOV  R0,*R6+
+       B    @NEXT
+
+* TOKZ - tokenize text array R14 into parse array R15; R0 = word count.
+TOKZ   .enter
+       MOV  R15,@TKP           (the parse array's number, until it is looked up)
+       BL   @ARRAY             the text array
+       MOV  @VT1,@TKT
+       MOV  @VT1,R1
+       BL   @RDW
+       MOV  @VT2,R1
+       DEC  R1
+       C    R0,R1              n = min(t(0), length - 1)
+       JLE  TKZ1
+       MOV  R1,R0
+TKZ1   MOV  R0,@TKN
+       MOV  @TKP,R14           the parse array
+       BL   @ARRAY
+       MOV  @VT1,@TKP
+       MOV  @VT2,R1            room = (length - 1) / 3
+       DEC  R1
+       CLR  R0
+       LI   R2,3
+       DIV  R2,R0
+       MOV  R0,@TKROOM
+       CLR  @TKI
+       CLR  @TKCNT
+TKZ2   C    @TKI,@TKN          (a negative n reads as large: JLT is signed)
+       JLT  TKZ3
+       B    @TKZ9
+TKZ3   BL   @TCHAR             R0 = character TKI
+       CI   R0,' '
+       JNE  TKZ4
+       INC  @TKI
+       JMP  TKZ2
+TKZ4   MOV  @TKI,@TKS
+       CI   R0,','
+       JEQ  TKZ5
+       CI   R0,'.'
+       JNE  TKZ6
+TKZ5   LI   R0,1               a comma or full stop: a word by itself
+       MOV  R0,@TKL
+       INC  @TKI
+       JMP  TKZ8
+TKZ6   INC  @TKI               a word: up to a space, comma or full stop
+       C    @TKI,@TKN
+       JHE  TKZ7
+       BL   @TCHAR
+       CI   R0,' '
+       JEQ  TKZ7
+       CI   R0,','
+       JEQ  TKZ7
+       CI   R0,'.'
+       JNE  TKZ6
+TKZ7   MOV  @TKI,R0
+       S    @TKS,R0
+       MOV  R0,@TKL
+TKZ8   C    @TKCNT,@TKROOM     room for it?
+       JHE  TKZ2
+       BL   @LOOKUP            R0 = its dictionary number
+       MOV  @TKCNT,R1          entry: p(1 + 3c) = number, then start, length
+       MOV  R1,R2
+       SLA  R1,1
+       A    R2,R1              3c
+       INC  R1
+       SLA  R1,1
+       A    @TKP,R1
+       MOV  R1,@VT4
+       BL   @WRW
+       MOV  @VT4,R1
+       INCT R1
+       MOV  @TKS,R0
+       INC  R0                 (1-based: an index into t)
+       BL   @WRW
+       MOV  @VT4,R1
+       AI   R1,4
+       MOV  @TKL,R0
+       BL   @WRW
+       INC  @TKCNT
+       B    @TKZ2
+TKZ9   MOV  @TKP,R1            p(0) = count
+       MOV  @TKCNT,R0
+       BL   @WRW
+       MOV  @TKCNT,R0
+       .leave
+       RT
+
+* TCHAR - R0 = character TKI (0-based) of the text: element TKI + 1.
+* TCHARI - the same for the character whose index is in R1.
+TCHAR  MOV  @TKI,R1
+TCHARI MOV  R11,@VT3
+       INC  R1
+       SLA  R1,1
+       A    @TKT,R1
+       BL   @RDW
+       ANDI R0,>FF
+       MOV  @VT3,R11
+       RT
+
+* LOOKUP - R0 = the dictionary number of the word TKS (TKL characters),
+* or 0.  The word goes into KEYBUF, cut to 12 characters and padded with
+* zeros; the dictionary (count, then 14-byte entries: 12 characters,
+* zero-padded, then flags and verb) is sorted by those 12 bytes, so a
+* binary search finds it.  Numbers count from 1.
+LOOKUP .enter
+       LI   R1,KEYBUF          clear the key
+       LI   R2,6
+LKU1   CLR  *R1+
+       DEC  R2
+       JNE  LKU1
+       CLR  @VT4               copy min(TKL, 12) characters
+LKU2   MOV  @VT4,R2
+       C    R2,@TKL
+       JHE  LKU3
+       CI   R2,12
+       JHE  LKU3
+       MOV  @TKS,R1
+       A    R2,R1
+       BL   @TCHARI
+       MOV  @VT4,R2
+       SWPB R0
+       MOVB R0,@KEYBUF(R2)
+       INC  @VT4
+       JMP  LKU2
+LKU3   CLR  @DLO               search [DLO, DHI)
+       MOV  @H.DICT,R1
+       BL   @RDW
+       MOV  R0,@DHI
+LKU4   C    @DLO,@DHI
+       JHE  LKU8               not found
+       MOV  @DLO,R0
+       A    @DHI,R0
+       SRL  R0,1
+       MOV  R0,@DMID
+       LI   R1,14              entry address: dict + 2 + 14 * mid
+       MPY  R0,R1              R1:R2 = 14 * mid
+       MOV  R2,R1
+       A    @H.DICT,R1
+       INCT R1
+       MOV  R1,@VT4
+       CLR  @VT5               byte index
+LKU5   MOV  @VT4,R1
+       A    @VT5,R1
+       BL   @RDB
+       MOV  @VT5,R2
+       MOVB @KEYBUF(R2),R3
+       SRL  R3,8
+       C    R3,R0              key byte against entry byte
+       JL   LKU6               key smaller: search below
+       JH   LKU7               key larger: search above
+       INC  @VT5
+       MOV  @VT5,R2
+       CI   R2,12
+       JL   LKU5
+       MOV  @DMID,R0           all 12 equal: found
+       INC  R0
+       JMP  LKU9
+LKU6   MOV  @DMID,@DHI
+       JMP  LKU4
+LKU7   MOV  @DMID,R0
+       INC  R0
+       MOV  R0,@DLO
+       JMP  LKU4
+LKU8   CLR  R0
+LKU9   .leave
+       RT
+
+* ---- the small M2 opcodes ---------------------------------------------------
+OPALDV DECT R6                 ALOADV: a i -> v
+       MOV  *R6,R15
+       MOV  @-2(R6),R14
+       BL   @ARRAY
+       BL   @AINDEX
+       BL   @RDW
+       MOV  R0,@-2(R6)
+       B    @NEXT
+OPASTV DECT R6                 ASTOREV: a i v ->
+       MOV  *R6,@VT4
+       DECT R6
+       MOV  *R6,R15
+       DECT R6
+       MOV  *R6,R14
+       BL   @ARRAY
+       BL   @AINDEX
+       MOV  @VT4,R0
+       BL   @WRW
+       B    @NEXT
+OPHASV DECT R6                 HASATTRV: o a -> f
+       MOV  *R6,R14
+       MOV  R14,R14
+       JLT  OPHV9
+       CI   R14,48
+       JHE  OPHV9
+       MOV  @-2(R6),R1
+       BL   @ATTRB
+       BL   @RDB
+       CLR  @-2(R6)
+       CZC  R15,R0
+       JEQ  OPHV8
+       INC  @-2(R6)
+OPHV8  B    @NEXT
+OPHV9  MOV  R14,@ERRN1
+       LI   R1,EATTR
+       B    @VMERR
+OPFRSH MOV  @LLEN,R0           FRESH: end the line if anything is on it
+       JEQ  OPFR9
+       LI   R0,10
+       BL   @CHOUT
+OPFR9  B    @NEXT
+
+* ISNAME w o: is dictionary word w among object o's NAME words (property
+* 1, the first entry of its property table when it has one)?
+OPISNM DECT R6
+       MOV  *R6,R14            o
+       MOV  @-2(R6),@VT5       w (PROPF keeps R14 and R15 only)
+       CLR  @-2(R6)
+       LI   R15,1
+       BL   @PROPF
+       MOV  R1,R1
+       JEQ  OPIN9X             no NAME property
+       MOV  @VT3,R14           words to look at
+       JEQ  OPIN9X
+OPIN1X BL   @RDW
+       C    R0,@VT5
+       JEQ  OPIN8X
+       INCT R1                 (RDW leaves R1 alone)
+       DEC  R14
+       JNE  OPIN1X
+       JMP  OPIN9X
+OPIN8X INC  @-2(R6)
+OPIN9X B    @NEXT
+
+* FILTERN w s n d: the objects among the first n of array s having NAME
+* word w, written to array d from element 0 if there are any; the count.
+* Two passes (count, then copy) so that a word no object has leaves d
+* alone; copying forward is safe when s and d are the same array.
+OPFLTN DECT R6
+       MOV  *R6,@FLD           d
+       DECT R6
+       MOV  *R6,@FLN           n
+       DECT R6
+       MOV  *R6,R14            s
+       MOV  @-2(R6),@FLW       w
+       BL   @ARRAY
+       MOV  @VT1,@FLS          s's first element
+       C    @FLN,@VT2          n no more than s holds
+       JLE  FLT0
+       MOV  @VT2,@FLN
+FLT0   MOV  @FLD,R14
+       BL   @ARRAY
+       MOV  @VT1,@FLDA
+       MOV  @VT2,@FLDL
+       CLR  @FLC               pass 1: count
+       CLR  @FLK
+FLT1   C    @FLK,@FLN
+       JHE  FLT3
+       BL   @FLHAS
+       JEQ  FLT2
+       INC  @FLC
+FLT2   INC  @FLK
+       JMP  FLT1
+FLT3   MOV  @FLC,R0
+       JEQ  FLT9               none: d untouched
+       C    R0,@FLDL
+       JH   FLT8               more than d holds
+       CLR  @FLK               pass 2: copy
+       MOV  @FLDA,@FLDP
+FLT4   C    @FLK,@FLN
+       JHE  FLT9
+       BL   @FLHAS
+       JEQ  FLT5
+       MOV  @FLO,R0
+       MOV  @FLDP,R1
+       BL   @WRW
+       INCT @FLDP
+FLT5   INC  @FLK
+       JMP  FLT4
+FLT8   DEC  R0
+       MOV  R0,@ERRN1
+       MOV  @FLD,@ERRN2
+       MOV  @FLDL,R0
+       DEC  R0
+       MOV  R0,@ERRN3
+       LI   R1,EINDEX
+       B    @VMERR
+FLT9   MOV  @FLC,@-2(R6)
+       B    @NEXT
+
+* FLHAS - does element FLK of s (kept in FLO) have NAME word FLW?
+* EQ status clear (JNE taken) if it does.
+FLHAS  MOV  R11,@FLRET
+       MOV  @FLK,R1
+       SLA  R1,1
+       A    @FLS,R1
+       BL   @RDW
+       MOV  R0,@FLO
+       MOV  R0,R14             (not an object: no names)
+       JLT  FLH8
+       JEQ  FLH8
+       C    R14,@H.NOBJ
+       JH   FLH8
+       LI   R15,1
+       BL   @PROPF
+       MOV  R1,R1
+       JEQ  FLH8
+       MOV  @VT3,R14
+       JEQ  FLH8
+FLH1   BL   @RDW
+       C    R0,@FLW
+       JEQ  FLH7
+       INCT R1
+       DEC  R14
+       JNE  FLH1
+FLH8   CLR  R0                 no: EQ set
+       MOV  @FLRET,R11
+       MOV  R0,R0
+       RT
+FLH7   LI   R0,1               yes: EQ clear
+       MOV  @FLRET,R11
+       MOV  R0,R0
+       RT

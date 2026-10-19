@@ -290,6 +290,23 @@ class VM:
                 pc = self.call(self.rw(pr[2]), args, pc, self_obj=o)
             else:
                 push(0)
+        elif name == 'ISNAME':
+            o = pop(); w = pop(); pr = self.prop(o, 1)
+            push(pr is not None and any(self.rw(pr[2] + 2 * k) == (w & 0xFFFF) for k in range(pr[1])))
+        elif name == 'FILTERN':
+            d = pop(); n = pop(); sa = pop(); w = pop() & 0xFFFF
+            ss, sl = self.array(sa); ds, dl = self.array(d)
+            keep = []
+            for k in range(min(n, sl)):
+                o = self.rw(ss + 2 * k); pr = self.prop(o, 1) if 1 <= o <= self.nobj else None
+                if pr and any(self.rw(pr[2] + 2 * j) == w for j in range(pr[1])):
+                    keep.append(o)
+            if keep:
+                if len(keep) > dl:
+                    raise VMError(f'index {len(keep) - 1} is outside array {d} (0 to {dl - 1})')
+                for k, o in enumerate(keep):
+                    self.ww(ds + 2 * k, o)
+            push(len(keep))
         elif name in ('ALOADV', 'ASTOREV'):
             v = pop() if name == 'ASTOREV' else None
             i = pop(); n = pop()

@@ -104,17 +104,8 @@ ROUTINE NumberAt i
   RETURN v
 END
 
-ROUTINE IsName w, obj
-  LOCAL k, n
-  n = PROPLEN(obj, NAME)
-  WHILE k < n
-    IF PROPWORD(obj, NAME, k) = w
-      RETURN TRUE
-    END
-    k = k + 1
-  END
-  RETURN FALSE
-END
+! ISNAME(w, obj), a built-in, says whether w is one of obj's NAME words.
+! The engine does it in assembly: it is the parser's innermost loop.
 
 ROUTINE IsArticle w
   RETURN w = 'the' OR w = 'a' OR w = 'an' OR w = 'some'
@@ -194,7 +185,7 @@ END
 ROUTINE NameInScope w
   LOCAL k
   WHILE k < nscope
-    IF IsName(w, scopes(k))
+    IF ISNAME(w, scopes(k))
       RETURN TRUE
     END
     k = k + 1
@@ -463,7 +454,7 @@ ROUTINE CompassObj w
   LOCAL k
   k = nscope - 12
   WHILE k < nscope
-    IF IsName(w, scopes(k))
+    IF ISNAME(w, scopes(k))
       RETURN scopes(k)
     END
     k = k + 1
@@ -748,35 +739,19 @@ ROUTINE OnePhrase typ, filter, t, stopw
     RETURN TRUE
   END
   ! name words: take each word only while some object in scope still has
-  ! every word so far (so GIVE ADA TIN LAMP reads "ada", then "tin lamp")
-  k = 0
-  WHILE k < nscope
-    cands(k) = scopes(k)
-    k = k + 1
-  END
-  ncands = nscope
+  ! every word so far (so GIVE ADA TIN LAMP reads "ada", then "tin lamp").
+  ! FILTERN (in the engine) keeps the objects that have the word, and
+  ! leaves the list alone when none has it: then the phrase has ended.
   nphrase = 0
   WHILE wn < cmdend AND w <> stopw AND w > 0 AND nphrase < 12
-    j = 0
-    k = 0
-    WHILE k < ncands
-      IF IsName(w, cands(k))
-        j = j + 1
-      END
-      k = k + 1
+    IF nphrase = 0
+      j = FILTERN(w, scopes, nscope, cands)
+    ELSE
+      j = FILTERN(w, cands, ncands, cands)
     END
     IF j = 0
       w = stopw                 ! no object has this word too: the phrase ends
     ELSE
-      j = 0
-      k = 0
-      WHILE k < ncands
-        IF IsName(w, cands(k))
-          cands(j) = cands(k)
-          j = j + 1
-        END
-        k = k + 1
-      END
       ncands = j
       phrase(nphrase) = w
       nphrase = nphrase + 1
@@ -820,7 +795,7 @@ ROUTINE IsNoun w
   LOCAL o
   o = 1
   WHILE o <= LASTOBJ
-    IF IsName(w, o)
+    IF ISNAME(w, o)
       RETURN TRUE
     END
     o = o + 1
@@ -901,7 +876,7 @@ ROUTINE AskWhich
       ok = FALSE
       j = 0
       WHILE j < ncands
-        IF IsName(w, cands(j))
+        IF ISNAME(w, cands(j))
           ok = TRUE
         END
         j = j + 1
@@ -923,7 +898,7 @@ ROUTINE AskWhich
     k = 0
     WHILE k < parse2(0)
       w = parse2(1 + 3 * k)
-      IF NOT IsArticle(w) AND NOT IsName(w, cands(j))
+      IF NOT IsArticle(w) AND NOT ISNAME(w, cands(j))
         ok = FALSE
       END
       k = k + 1
