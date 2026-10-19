@@ -137,7 +137,7 @@ H.LENL EQU  HDRCPY+12          image length, low word
 H.TITL EQU  HDRCPY+46          16-byte title
 H.PROP EQU  HDRCPY+62          proper attribute (byte), then plural
 
-CURB   EQU  RAMVAR+>140        story page mapped in window B (-1 = none)
+CURBH  EQU  RAMVAR+>140        base (>p000) of the story page in window B (>FFFF = none)
 FREND  EQU  RAMVAR+>142        end of the current frame (next frame's start)
 TPAGE  EQU  RAMVAR+>144        text reader: story page in window D
 TPTR   EQU  RAMVAR+>146        text reader: address in window D
@@ -198,3 +198,8 @@ FLC    EQU  RAMVAR+>30E        FILTERN: the count
 FLK    EQU  RAMVAR+>310        FILTERN: element index
 FLO    EQU  RAMVAR+>312        FILTERN: the element's object
 FLRET  EQU  RAMVAR+>314        FLHAS's return address
+GLOBRM EQU  RAMVAR+>400        480 bytes: the 240 globals, kept here for speed
+*                              (>3C00->3DDF).  The story's copy in SAMS is
+*                              only up to date after GSYNC: SAVE, undo and
+*                              anything else that copies the dynamic area
+*                              must call GSYNC first and GLOAD after.

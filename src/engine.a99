@@ -15,6 +15,12 @@
 START  LIMI 0
        LWPI WS
        LI   R10,STACKT
+       LI   R1,FSTSRC          the fast block into the scratchpad
+       LI   R2,NEXT
+       LI   R3,(FASTND-NEXT)/2
+STR0   MOV  *R1+,*R2+
+       DEC  R3
+       JNE  STR0
        LI   R1,RAMVAR          clear the variables (>3800->3EFF)
        LI   R2,>700/2
 STR1   CLR  *R1+
@@ -64,6 +70,7 @@ STR3   LI   R0,30              the screen
 STR4   BL   @LOADST            the story into SAMS
        BL   @CHKST             header and checksum
        BL   @KEEPDY            the pristine dynamic area
+       BL   @GLOAD             the globals into RAM
        CLR  R0                 the status line: the title, in reverse
        LI   R1,1
        BL   @TXAT
@@ -89,7 +96,7 @@ VMRUN  LI   R6,VSTK
        MOV  R0,R7
        CLR  R8
        SETO @NEWSLF
-       SETO @CURB
+       SETO @CURBH
        SETO R5                 "return" page: the end
        CLR  R4
        MOV  @H.ENTR,R15
@@ -134,7 +141,7 @@ LDS2   MOV  *R0+,*R1+
        INC  @VT2
        C    @VT2,@VT1
        JL   LDS1
-       SETO @CURB
+       SETO @CURBH
        .leave
        RT
 
@@ -187,7 +194,7 @@ CHK5   MOVB *R1+,R0
        INC  @VT2
        C    @VT2,@VT1
        JLE  CHK2
-CHK6   SETO @CURB
+CHK6   SETO @CURBH
        C    R14,@H.CSUM
        JNE  CHK9
        .leave
@@ -230,7 +237,36 @@ KPD3   MOV  *R0+,*R1+
        MOV  @VT2,R0
        CI   R0,4
        JL   KPD1
-       SETO @CURB
+       SETO @CURBH
+       .leave
+       RT
+
+* GLOAD - copy the 240 globals from the story (SAMS) into GLOBRM.
+* GSYNC - copy them back, before anything copies the dynamic area.
+GLOAD  .enter
+       CLR  @VT1
+       MOV  @H.GLOB,R1
+GLD1   BL   @RDW
+       MOV  @VT1,R2
+       MOV  R0,@GLOBRM(R2)
+       INCT R1
+       INCT @VT1
+       MOV  @VT1,R2
+       CI   R2,480
+       JL   GLD1
+       .leave
+       RT
+GSYNC  .enter
+       CLR  @VT1
+       MOV  @H.GLOB,R1
+GSY1   MOV  @VT1,R2
+       MOV  @GLOBRM(R2),R0
+       BL   @WRW
+       INCT R1
+       INCT @VT1
+       MOV  @VT1,R2
+       CI   R2,480
+       JL   GSY1
        .leave
        RT
 

@@ -14,25 +14,17 @@
 * Pushing is MOV x,*R6+; popping is DECT R6, MOV *R6,x.
 *======================================================================
 
-* NEXT - fetch the next opcode and jump to its handler.
-NEXT   MOVB *R4+,R0
-       SRL  R0,8
-       CI   R4,WINB            the opcode was the page's last byte
-       JL   NEXT1
-       INC  R5
+* NEXT (the dispatch loop) is in fast.a99, in the scratchpad.
+* NEXTWS - its slow path: the opcode was a page's last byte.
+NEXTWS INC  R5
        LI   R4,WINA
        MOV  R5,R2
        LI   R3,MAPRGA
-       MOV  R0,R14
-       BL   @MAPWIN
-       MOV  R14,R0
-NEXT1  CI   R0,OPLAST
-       JH   BADOP
-       MOV  R0,R1
-       SLA  R1,1
-       MOV  @OPTAB(R1),R1      (R0 cannot index: copy to R1)
-       B    *R1
-BADOP  MOV  R0,@ERRN1
+       BL   @MAPWIN            (keeps R1, the opcode)
+       B    @NEXT1
+BADOP  MOV  R1,R0              R1 = opcode * 2 (NEXT)
+       SRL  R0,1
+       MOV  R0,@ERRN1
        LI   R1,EBADOP
        B    @VMERR
 
@@ -49,7 +41,11 @@ OPTAB  DATA OPNOP,OPPSHB,OPPSHW,OPPSH0,OPPSH1,OPPOP,OPDUP,OPSELF  >00
        DATA OPPRS,OPPRV,OPPRN,OPPRO,OPPRC,OPNL,OPSTYL,OPPRA
        DATA OPREAD,OPRKEY,OPTOKN,OPFRSH,BADOP,BADOP,BADOP,BADOP
        DATA OPRAND,OPQUIT,OPRST,OPSAVE,OPREST,OPUSAV,OPUNDO,OPPIC
-       DATA OPSTAT,OPSND
+       DATA OPSTAT,OPSND,BADOP,BADOP,BADOP,BADOP,BADOP,BADOP
+* >68->FF: no opcodes.  A full table lets NEXT skip the range check.
+       BSS  0
+OPTPAD EQU  >100-(>68)
+       COPY "gen/badops.a99"
 OPLAST EQU  >61
 
 * ---- constants, stack, variables -----------------------------------------
@@ -73,14 +69,47 @@ OPDUP  MOV  @-2(R6),*R6+
        B    @NEXT
 OPSELF MOV  R8,*R6+
        B    @NEXT
-OPLOAD BL   @FB
+* LOAD and STORE are the commonest instructions, and most name a local:
+* the operand byte is fetched inline and a local reached directly; the
+* general routines (GETV, PUTV) take globals and the page-end case.
+OPLOAD MOVB *R4+,R14           the variable number, inline FB ...
+       SRL  R14,8
+       CI   R4,WINB
+       JHE  OPLD8              (... at a page end, the slow way)
+       CI   R14,16
+       JHE  OPLD7
+       SLA  R14,1              a local: R7 + 2n
+       A    R7,R14
+       MOV  *R14,*R6+
+       B    @NEXT
+OPLD7  SLA  R14,1              a global: in RAM, GLOBRM + 2(n-16)
+       MOV  @GLOBRM-32(R14),*R6+
+       B    @NEXT
+OPLD8  DEC  R4                 back up and fetch it with FB
+       BL   @FB
        MOV  R0,R14
        BL   @GETV
        MOV  R0,*R6+
        B    @NEXT
-OPSTOR BL   @FB
-       MOV  R0,R14
+OPSTOR MOVB *R4+,R14
+       SRL  R14,8
+       CI   R4,WINB
+       JHE  OPST8
+       CI   R14,16
+       JHE  OPST8              globals and checks: the general routine
+       C    R14,@-4(R7)        a local past the routine's count: error
+       JHE  OPST8
+       SLA  R14,1
+       A    R7,R14
        DECT R6
+       MOV  *R6,*R14
+       B    @NEXT
+OPST8  CI   R4,WINB            (fetched at a page end? back up, refetch)
+       JL   OPST9
+       DEC  R4
+       BL   @FB
+       MOV  R0,R14
+OPST9  DECT R6
        MOV  *R6,R15
        BL   @PUTV
        B    @NEXT
@@ -99,7 +128,8 @@ OPDEC  BL   @FB
        BL   @PUTV
        B    @NEXT
 
-* GETV - R0 = variable R14 (0-15 a local, 16-255 a global).
+* GETV - R0 = variable R14 (0-15 a local, 16-255 a global).  Globals
+* live in RAM (GLOBRM) while the story runs: see GLOAD and GSYNC.
 * Clobbers R1-R3, R9, R12, R13.
 GETV   CI   R14,16
        JHE  GTV1
@@ -108,11 +138,10 @@ GETV   CI   R14,16
        A    R7,R1
        MOV  *R1,R0
        RT
-GTV1   MOV  R14,R1             global n is at globals + 2(n-16)
-       AI   R1,-16
+GTV1   MOV  R14,R1             global n: GLOBRM + 2(n-16), in RAM
        SLA  R1,1
-       A    @H.GLOB,R1
-       B    @RDW               (RDW returns to our caller)
+       MOV  @GLOBRM-32(R1),R0
+       RT
 
 * PUTV - variable R14 = R15.  A local past the routine's count is a
 * run-time error.  Clobbers R0-R3, R9, R12, R13.
@@ -126,11 +155,9 @@ PUTV   CI   R14,16
        MOV  R15,*R1
        RT
 PTV1   MOV  R14,R1
-       AI   R1,-16
        SLA  R1,1
-       A    @H.GLOB,R1
-       MOV  R15,R0
-       B    @WRW
+       MOV  R15,@GLOBRM-32(R1)
+       RT
 PTV2   MOV  R14,@ERRN1
        LI   R1,ELOCAL
        B    @VMERR
@@ -951,6 +978,7 @@ OPQUIT B    @VMEND
 * RESTART: the dynamic area back from the pristine copy (SAMS pages
 * PRPAGE on), the stacks emptied, Main called again.
 OPRST  BL   @PRISTN
+       BL   @GLOAD             the globals again, from the restored area
        B    @VMRUN
 OPSAVE CLR  *R6+               (saving and undo come in M4)
        B    @NEXT

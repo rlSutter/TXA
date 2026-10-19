@@ -15,6 +15,7 @@
        COPY "vmmem.a99"
        COPY "output.a99"
        COPY "input.a99"
+       COPY "fast.a99"
        COPY "gen/storysrc.a99"
 * ENGND: first free byte of the resident window
 ENGND

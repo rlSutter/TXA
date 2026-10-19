@@ -223,12 +223,45 @@ Done (the TI side):
 two follow-ups: command history (FCTN E/X) and a 160-character, two-row
 input line (now: what fits on the row after the prompt).
 
+## Engine speed work (19 October 2026)
+
+Measured with `tests/bench_engine.py` (the 45-command parser script;
+results kept in build/bench.txt).  Instruction counts are exact; seconds
+are an estimate (9 us an instruction from the 32K expansion, 5 us from
+the scratchpad):
+
+| Step | Instructions | Median | 90% | Worst |
+| --- | --- | --- | --- | --- |
+| Baseline (after ISNAME/FILTERN) | 8.13M | 1.16 s | 3.31 s | 5.09 s |
+| Globals kept in RAM | 7.95M | 1.14 s | 3.24 s | 4.97 s |
+| Scratchpad block, 256-entry table | 6.78M | 0.93 s | 2.24 s | 3.49 s |
+| VMBR and VFILL unrolled | 5.84M | 0.70 s | 2.02 s | 3.13 s |
+| LOAD/STORE direct paths for locals | 5.50M | 0.68 s | 1.92 s | 2.98 s |
+
+What changed:
+- src/fast.a99: the dispatch loop (NEXT), code fetches (FB, FW) and the
+  story-memory accessors (RDW, WRW, RDB, WRB) run from the scratchpad
+  (>8320->83DD), the TI's only wait-state-free RAM; slow paths (page
+  ends, remaps) stay in expansion RAM.  OPTAB has 256 entries, so no
+  range check.  The data window's cache is now a page base (CURBH).
+- Globals live in RAM (GLOBRM, >3C00).  Rule: anything that copies the
+  dynamic area (SAVE, UNDO in M4) calls GSYNC first and GLOAD after.
+- VMBR and VFILL unrolled like VMBW.
+- LOAD and STORE reach locals directly.
+- A page-crossing test (a 23K story) makes every slow path run at least
+  once (checked by counting).
+
+Still possible, if the console says so: scrolling is about a fifth of
+command time; a RAM copy of the text window (scrolling without reading
+video memory), or the F18A/PICO9918 GPU's DMA copy, would cut most of
+it (the GPU route cannot be tested in the simulator).  The dispatch
+loop could shed more with compiler-side changes (short forms of the
+commonest instructions).
+
 ## Next
 
 1. Rebecca's js99er (and console) check of txa-m2demo8.bin, and timing.
-2. Engine speed work if the timing says so: a faster fetch/dispatch
-   path and cheaper story-memory access.
-3. M3: the world model and full standard library (light, doors,
+2. M3: the world model and full standard library (light, doors,
    containers in depth, characters, daemons and timers, scoring, the
    Infocom verb set, the sample game).
 
@@ -257,6 +290,7 @@ text output, word wrap and [MORE]; bold and underline glyph sets.
 
 ## History
 
+- 2026-10-19 Engine speed work: scratchpad block, globals in RAM, unrolled VDP reads, LOAD/STORE paths: 8.13M -> 5.50M instructions on the script.
 - 2026-10-19 M2: the TI side (line editor, READ, TOKENIZE, ISNAME, FILTERN), engine plays the parser script identically; checkpoint-m2.
 - 2026-10-19 M2 begun: the standard library's parser in TXA, with the compiler and Python VM support it needs.
 - 2026-10-19 M1 complete: text styles (bold, underline, reverse) through position attributes and an underlined glyph set.

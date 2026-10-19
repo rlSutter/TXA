@@ -74,7 +74,7 @@ def same(name, image, max_steps=40_000_000):
 
 # the opcode table in vm.a99 matches opcodes.py
 src = open(os.path.join(ROOT, 'src/vm.a99')).read()
-tab = re.findall(r'DATA ((?:\w+,?)+)', src[src.index('OPTAB  DATA'):src.index('OPLAST EQU')])
+tab = re.findall(r'DATA ((?:\w+,?)+)', src[src.index('OPTAB  DATA'):src.index('OPTPAD EQU')])
 entries = [e for line in tab for e in line.split(',') if e]
 names = {code: name for code, name, *_ in OPS}
 handler_for = {'NOP': 'OPNOP', 'PUSHB': 'OPPSHB', 'PUSHW': 'OPPSHW', 'PUSH0': 'OPPSH0', 'PUSH1': 'OPPSH1', 'POP': 'OPPOP',
@@ -91,7 +91,7 @@ handler_for = {'NOP': 'OPNOP', 'PUSHB': 'OPPSHB', 'PUSHW': 'OPPSHW', 'PUSH0': 'O
     'SOUND': 'OPSND', 'HASATTRV': 'OPHASV', 'ALOADV': 'OPALDV', 'ASTOREV': 'OPASTV', 'TOKENIZE': 'OPTOKN',
     'FRESH': 'OPFRSH', 'ISNAME': 'OPISNM', 'FILTERN': 'OPFLTN'}
 bad = [(hex(i), e, names.get(i)) for i, e in enumerate(entries) if (names.get(i) and handler_for[names[i]] != e) or (not names.get(i) and e != 'BADOP')]
-check(f'OPTAB matches opcodes.py ({len(names)} opcodes)', not bad and len(entries) == max(names) + 1, bad)
+check(f'OPTAB matches opcodes.py ({len(names)} opcodes)', not bad and len(entries) >= max(names) + 1, bad)
 
 # programs
 img = compile_file(os.path.join(T, 'run1.txa'), LIB, date=DATE)[0]
@@ -188,6 +188,18 @@ check('screen: the last lines, wrapped as the model says', [s.rstrip() for s in 
       '\n'.join(f'{a!r}\n{b!r}' for a, b in zip(screen, tail) if a.rstrip() != b.rstrip())[:2000])
 if PNG:
     R.render(m, os.path.join(ROOT, 'build/shots/m1-wrap.png'))
+
+# page crossings: a long routine (about 16K of bytecode) whose LOAD and
+# STORE operands, jumps and words fall on every alignment, including the
+# last byte of a 4K page (the fast paths' special case)
+body = []
+for i in range(1400):
+    body.append(f'  a = a + b * {i % 7 + 1} - c + {i * 37 % 900 + 200} - {i * 37 % 900 + 200}' if i % 3 else f'  c = c + 1')
+    if i % 50 == 0:
+        body.append(f'  IF a > 1000\n    a = a - 1000\n    g = g + 1\n  END')
+src = 'INCLUDE "DSK1.STDLIB"\nGLOBAL g\nROUTINE Main\n  LOCAL a, b, c\n  b = 3\n' + '\n'.join(body) + '\n  PRINT a, " ", b, " ", c, " ", g\nEND\n'
+img = compile_src(src)
+same(f'page crossings: a {len(img) // 1024}K story, LOAD/STORE/jumps at every alignment', img, 80_000_000)
 
 # text styles: bold and reverse are colours (position attributes), underline a glyph set
 img = compile_src('''INCLUDE "DSK1.STDLIB"

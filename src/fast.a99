@@ -1,0 +1,116 @@
+*======================================================================
+* fast.a99 - the hottest code, run from the console's scratchpad RAM.
+*
+* The scratchpad (>8300->83FF) is the TI's only 16-bit, wait-state-free
+* RAM: code there runs much faster than from the 32K expansion.  START
+* copies this block (stored after the engine, at FSTSRC) to >8320, just
+* past the workspace.  It holds the dispatch loop and the fetches and
+* story-memory accesses every instruction uses; their rare slow paths
+* (a page end, a remap) are in vmmem.a99 and vm.a99.
+*
+* The block must end below >83E0: the console's GPL workspace, which
+* disk access (DSRLNK, M4) needs.  DSRLNK also uses >8354->8370, inside
+* this block, so M4 must copy the block again after each disk call.
+* build.py checks the end.
+*
+* Contracts (unchanged from before the move):
+*   NEXT   dispatch the next opcode (handlers end with B @NEXT)
+*   FB     R0 = next code byte.  Clobbers R0 (+ R2, R3, R12 at a page end)
+*   FW     R1 = next code word.  Clobbers R0-R3, R12, R13
+*   RDW    R0 = word at story address R1 (first 64K); RDB the byte.
+*   WRW    word R0 to story address R1; WRB R0's low byte.
+*          All four keep R1; clobber R2, R3 (+ R9, R12 on a remap).
+*======================================================================
+
+* FSTSRC: where the block is stored; XORG: where it runs
+FSTSRC
+       XORG >8320
+
+* NEXT - fetch an opcode and jump to its handler.  OPTAB has all 256
+* entries, so no range check: SRL 7 of the byte in the high half of a
+* cleared R1 gives opcode * 2, the table offset.
+NEXT   CLR  R1
+       MOVB *R4+,R1
+       CI   R4,WINB            the opcode was the page's last byte?
+       JHE  NEXTW
+NEXT1  SRL  R1,7
+       MOV  @OPTAB(R1),R2
+       B    *R2
+NEXTW  B    @NEXTWS
+
+FB     MOVB *R4+,R0
+       SRL  R0,8
+       CI   R4,WINB
+       JHE  FBW
+       RT
+FBW    B    @FBWS
+
+* FW: both bytes in this page (R4 below >EFFE): two byte moves, the
+* second into R1's low byte (WS+3).
+FW     CI   R4,WINB-2
+       JHE  FWS
+       MOVB *R4+,R1
+       MOVB *R4+,@WS+3
+       RT
+FWS    B    @FWSLOW
+
+* The story-memory accessors: window B shows page CURBH; the address in
+* the window is the story address with its top nibble made >F.
+RDW    MOV  R1,R2
+       ANDI R2,>F000
+       C    R2,@CURBH
+       JNE  RDWM
+       MOV  R1,R2
+       ORI  R2,>F000
+       MOV  *R2,R0
+       RT
+RDWM   MOV  R11,R9
+       BL   @BREMAP
+       MOV  R9,R11
+       JMP  RDW
+
+WRW    MOV  R1,R2
+       ANDI R2,>F000
+       C    R2,@CURBH
+       JNE  WRWM
+       MOV  R1,R2
+       ORI  R2,>F000
+       MOV  R0,*R2
+       RT
+WRWM   MOV  R11,R9
+       BL   @BREMAP
+       MOV  R9,R11
+       JMP  WRW
+
+RDB    MOV  R1,R2
+       ANDI R2,>F000
+       C    R2,@CURBH
+       JNE  RDBM
+       MOV  R1,R2
+       ORI  R2,>F000
+       MOVB *R2,R0
+       SRL  R0,8
+       RT
+RDBM   MOV  R11,R9
+       BL   @BREMAP
+       MOV  R9,R11
+       JMP  RDB
+
+WRB    MOV  R1,R2
+       ANDI R2,>F000
+       C    R2,@CURBH
+       JNE  WRBM
+       MOV  R1,R2
+       ORI  R2,>F000
+       SWPB R0
+       MOVB R0,*R2
+       SWPB R0
+       RT
+WRBM   MOV  R11,R9
+       BL   @BREMAP
+       MOV  R9,R11
+       JMP  WRB
+FASTND
+* back to storing code where it runs
+       AORG
+FSTEND

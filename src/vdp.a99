@@ -62,26 +62,65 @@ VMBW3  MOVB *R1+,@VDPWD
        JNE  VMBW3
 VMBW2  RT
 
-* VMBR - block read.  R0 = VRAM address, R1 = dest, R2 = byte count
+* VMBR - block read.  R0 = VRAM address, R1 = dest, R2 = byte count.
+* Unrolled 16 to a pass like VMBW: scrolling reads every byte it moves,
+* and the loop's DEC/JNE had cost two instructions a byte.
 VMBR   SWPB R0
        MOVB R0,@VDPWA
        SWPB R0
        MOVB R0,@VDPWA
-VMBR1  MOVB @VDPRD,*R1+        read side auto-increments too
+VMBR0  CI   R2,16
+       JL   VMBR1
+       MOVB @VDPRD,*R1+        read side auto-increments too
+       MOVB @VDPRD,*R1+
+       MOVB @VDPRD,*R1+
+       MOVB @VDPRD,*R1+
+       MOVB @VDPRD,*R1+
+       MOVB @VDPRD,*R1+
+       MOVB @VDPRD,*R1+
+       MOVB @VDPRD,*R1+
+       MOVB @VDPRD,*R1+
+       MOVB @VDPRD,*R1+
+       MOVB @VDPRD,*R1+
+       MOVB @VDPRD,*R1+
+       MOVB @VDPRD,*R1+
+       MOVB @VDPRD,*R1+
+       MOVB @VDPRD,*R1+
+       MOVB @VDPRD,*R1+
+       AI   R2,-16
+       JMP  VMBR0
+VMBR1  MOV  R2,R2
+       JEQ  VMBR2
+VMBR3  MOVB @VDPRD,*R1+
        DEC  R2
-       JNE  VMBR1
-       RT
+       JNE  VMBR3
+VMBR2  RT
 
-* VFILL - fill.  R0 = VRAM address, R1 = byte (high), R2 = count
+* VFILL - fill.  R0 = VRAM address, R1 = byte (high), R2 = count.
+* Unrolled 8 to a pass.
 VFILL  SWPB R0
        MOVB R0,@VDPWA
        SWPB R0
        ORI  R0,>4000
        MOVB R0,@VDPWA
-VFILL1 MOVB R1,@VDPWD          same byte R2 times
+VFILL0 CI   R2,8
+       JL   VFILL1
+       MOVB R1,@VDPWD
+       MOVB R1,@VDPWD
+       MOVB R1,@VDPWD
+       MOVB R1,@VDPWD
+       MOVB R1,@VDPWD
+       MOVB R1,@VDPWD
+       MOVB R1,@VDPWD
+       MOVB R1,@VDPWD
+       AI   R2,-8
+       JMP  VFILL0
+VFILL1 MOV  R2,R2
+       JEQ  VFILL2
+VFILL3 MOVB R1,@VDPWD          the last few, one at a time
        DEC  R2
-       JNE  VFILL1
-       RT
+       JNE  VFILL3
+VFILL2 RT
 
 * VSBW - single byte write.  R0 = VRAM address, R1 = byte (high)
 VSBW   SWPB R0

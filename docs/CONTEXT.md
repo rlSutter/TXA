@@ -46,6 +46,8 @@ owns it; Claude builds it. The engine comes first; the story later.
 | `src/txaeng.a99` | the engine build file (engine >A000 must end below >D000) |
 | `tools/txc/` | the TXA compiler: lexer, ast, parser, sema, opcodes (THE instruction set), codegen (+linker), txvm (Python reference VM) |
 | `tests/txa/` | test programs and `lib/stdlib.txa`, a stand-in standard library |
+| `src/fast.a99` | the scratchpad block (copied to >8320 at START): NEXT, FB, FW, RDW, WRW, RDB, WRB |
+| `tests/bench_engine.py` | instruction counts and time estimates per command (appends to build/bench.txt) |
 | `src/input.a99` | line editor, KEYGT2, READ, TOKENIZE (+LOOKUP), ALOADV/ASTOREV/HASATTRV/FRESH, ISNAME, FILTERN |
 | `demos/m1demo.txa`, `demos/m2demo.txa` | the demonstration stories |
 | `lib/` | the standard library in TXA; the parser is lib/parser.txa |
@@ -96,6 +98,14 @@ owns it; Claude builds it. The engine comes first; the story later.
   (WK21, WKY1), not at a routine's entry.
 - TXA names ignore case: a routine IsName collides with the built-in
   ISNAME, a parameter "room" with the keyword ROOM.
+
+- The scratchpad block must end below >83E0 (build.py checks; it ends
+  at >83DD with almost no room left).  DSRLNK (M4) uses >8354->8370 and
+  >83E0 on: copy the block back after every disk call.
+- Globals live in RAM (GLOBRM) while the story runs: GSYNC before
+  anything copies the dynamic area, GLOAD after.
+- xas99 reads a comment on a bare label line, or after an AORG with no
+  operand, as code: put such comments on their own lines.
 
 ## Hardware facts learned (with sources in the spec)
 

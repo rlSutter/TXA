@@ -9,7 +9,8 @@
 *             reaches >F000.
 *   B  >F000  data: the object table, properties, globals, arrays,
 *             dictionary and substitutions, all in the first 64K, so a
-*             16-bit story address names them.  CURB caches the page.
+*             16-bit story address names them.  CURBH holds the base
+*             address (>p000) of the page mapped there; >FFFF = none.
 *   D  >D000  text being printed: a string can be anywhere in 256K.
 *
 * A word never straddles two pages: words are on even addresses and
@@ -48,22 +49,19 @@ PACKPC MOV  R1,R5
        SLA  R1,2
        JMP  SETPC
 
-* FB - fetch the byte at the PC into R0 (0-255), advancing the PC.
-* Clobbers R0 and, at a page end, R2, R3, R12.  Leaf.
-FB     MOVB *R4+,R0
-       SRL  R0,8
-       CI   R4,WINB            past the window's end?
-       JL   FB9
-       INC  R5                 next story page, from its start
+* FB, FW, RDW, WRW, RDB, WRB and the dispatch loop NEXT are in fast.a99:
+* they run from the scratchpad.  These are their slow paths.
+
+* FBWS - FB's slow path: the byte fetched was a page's last; move the
+* PC to the next page's start.  Returns to FB's caller.
+FBWS   INC  R5
        LI   R4,WINA
        MOV  R5,R2
        LI   R3,MAPRGA
-       B    @MAPWIN            (its RT returns to our caller)
-FB9    RT
+       B    @MAPWIN
 
-* FW - fetch a word (high byte first) into R1.  Clobbers R0, R2, R3,
-* R12, R13 (link).
-FW     MOV  R11,R13
+* FWSLOW - FW's slow path, near a page end: two byte fetches.
+FWSLOW MOV  R11,R13
        BL   @FB
        MOV  R0,R1
        SWPB R1
@@ -71,45 +69,12 @@ FW     MOV  R11,R13
        SOC  R0,R1
        B    *R13
 
-* BMAP - window B onto the page holding story address R1 (0->FFFF).
-* Returns R2 = the offset within the page.  Clobbers R3, R12, R13
-* (link).
-BMAP   MOV  R1,R2
+* BREMAP - window B onto the page whose base (a multiple of >1000) is in
+* R2; CURBH remembers it.  Clobbers R2, R12 (MAPWIN).  Leaf (tail call).
+BREMAP MOV  R2,@CURBH
        SRL  R2,12
-       C    R2,@CURB
-       JEQ  BMAP1
-       MOV  R2,@CURB
        LI   R3,MAPRGB
-       MOV  R11,R13
-       BL   @MAPWIN
-       MOV  R13,R11
-BMAP1  MOV  R1,R2
-       ANDI R2,>0FFF
-       RT
-
-* RDW / WRW / RDB / WRB - read or write the word or byte at story
-* address R1 (in the first 64K).  RDW and RDB return R0 (a byte in the
-* low half); WRW writes R0, WRB writes R0's low byte.  Clobbers R2, R3,
-* R12, R13, R9 (link).
-RDW    MOV  R11,R9
-       BL   @BMAP
-       MOV  @WINB(R2),R0
-       B    *R9
-WRW    MOV  R11,R9
-       BL   @BMAP
-       MOV  R0,@WINB(R2)
-       B    *R9
-RDB    MOV  R11,R9
-       BL   @BMAP
-       MOVB @WINB(R2),R0
-       SRL  R0,8
-       B    *R9
-WRB    MOV  R11,R9
-       BL   @BMAP
-       SWPB R0
-       MOVB R0,@WINB(R2)
-       SWPB R0
-       B    *R9
+       B    @MAPWIN
 
 * TXSET - start reading the string at packed address R1, in window D.
 * Clobbers R1-R3, R12.  Leaf.
