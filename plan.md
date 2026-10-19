@@ -21,9 +21,10 @@ Confirmed working: the picture over 80-column text with all four corners
 and eight ticks; moving and resizing (E S D X, W Z); fat pixels with 16
 colours and a round moon (F); 30 rows (R); the text and scrolling test
 (T, readable and fast enough); the full-screen view and return (V); Quit
-to a normal title screen (Q).  **M0 passes.**  Still wanted for the
-record: which environment (js99er or the console), the SAMS size shown,
-and the SR14/SR12 values.
+to a normal title screen (Q).  **M0 passes in js99er.**  Not yet run on
+real hardware: worth a pass on the console (FinalGROM cartridge, and the
+disk image through TIPI or a floppy) before M4, since js99er's F18A
+emulation and its forgiving disk drive have fooled tests before.
 
 ### What M0 must answer (Rebecca's report)
 
