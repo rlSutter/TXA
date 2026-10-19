@@ -32,15 +32,26 @@ AMSCRU EQU  >1E00              SAMS card CRU base
 AMSREG EQU  >4000              SAMS mapper registers (when exposed)
 
 * ---- VRAM layout: 80-column text mode (T80) --------------------------
-* The name table holds 80 x 30 = 2400 bytes in 30-row mode (>0000-
-* >095F), so the font starts at >1000.  The bitmap layer's picture
-* (256 x 96 at 2 bpp, 64 bytes a row = 6144 bytes) fills >2800->3FFF
-* exactly: one byte past it and the F18A would wrap to >0000.
-NAMTAB EQU  >0000              T80 name table (VR2 = 0: valid locked or not)
-GM1COL EQU  >0C00              Graphics I colour table (picture view only)
-PATTAB EQU  >1000              font: 256 patterns x 8 bytes (VR4 = 2)
-SPRATT EQU  >1800              sprite attributes (VR5 = >30), unused
-SPRPAT EQU  >2000              sprite patterns (VR6 = 4), kept all zero
+*   >0000->095F  name table, 80 x 30 = 2400 bytes (VR2 = 0: valid
+*                whether the F18A is locked or not)
+*   >0980->12DF  attribute table, 2400 bytes: one colour byte per cell
+*                (foreground high nibble, background low) when position
+*                attributes are on (VR50 bit 1; the engine, not the probe)
+*   >1300->137F  sprite attributes (unused; sprites are kept invisible)
+*   >1800->1FFF  font: 256 patterns x 8 bytes
+*   >2000->27FF  sprite patterns, kept all zero
+*   >2800->3FFF  the bitmap layer's picture (256 x 96 at 2 bpp, 64 bytes
+*                a row = 6144 bytes): one byte past it and the F18A
+*                would wrap to >0000
+* Graphics I screens (the probe's picture view, no-F18A messages) put
+* their 32-byte colour table at GM1COL, inside the attribute table's
+* space: they never run with position attributes on.
+NAMTAB EQU  >0000              T80 name table
+ATRTAB EQU  >0980              T80 attribute table (VR3 = ATRTAB / 64)
+GM1COL EQU  >0C00              Graphics I colour table
+SPRATT EQU  >1300              sprite attributes (VR5 = SPRATT / 128)
+PATTAB EQU  >1800              font (VR4 = PATTAB / 2048)
+SPRPAT EQU  >2000              sprite patterns (VR6 = SPRPAT / 2048)
 BMLDAT EQU  >2800              bitmap layer picture (VR32 = >A0)
 BMLPAL EQU  >08                bitmap layer palette select: entries 32-47
 PANETP EQU  8                  picture pane's top scanline (screen row 1)
@@ -48,6 +59,13 @@ PANEHT EQU  96                 picture pane's height in scanlines
 PANERW EQU  12                 picture pane's height in text rows
 COLS   EQU  80                 text columns
 TXTCOL EQU  >F1                VR7: white text on black (palette 15 / 1)
+* Text styles (the engine, with position attributes): normal text is
+* palette 14, set to a soft light gray; bold is 15, white; reverse swaps
+* foreground and background.  Underline is a glyph set: patterns 160-254
+* are 32-126 with the bottom row filled (CHOUT adds >80).
+ATNORM EQU  >E1                normal: gray on black
+ATBOLD EQU  >F1                bold: white on black
+ATREV  EQU  >1E                reverse: black on gray (the status line)
 
 * ---- RAM layout --------------------------------------------------------
 RAMVAR EQU  >3800              variables start here
@@ -144,3 +162,6 @@ VT3    EQU  RAMVAR+>1C4        PROPF: the property's length in words
 VT4    EQU  RAMVAR+>1C6
 VT5    EQU  RAMVAR+>1C8
 STBANK EQU  RAMVAR+>1CA        (unused; the story source is in storysrc.a99)
+CURAT  EQU  RAMVAR+>1CC        the current style's attribute byte (STYLE)
+CURUL  EQU  RAMVAR+>1CE        >0080 when underlining, else 0 (STYLE)
+ABUF   EQU  RAMVAR+>1D0        80 bytes: the attribute of each LBUF character

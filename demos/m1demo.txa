@@ -60,7 +60,9 @@ END
 
 ROUTINE Main
   LOCAL i, roll
+  STYLE(1)
   PRINT "TXA engine demonstration (M1)"
+  STYLE(0)
   PRINT "The story below is compiled TXA, run by the engine from SAMS."
   PRINT
   PRINT (name) LampRoom
@@ -100,6 +102,24 @@ ROUTINE Main
     PRINT "Line ", i, " of 32: scrolling and the [MORE] prompt (press any key at [MORE])."
     i = i + 1
   END
+  PRINT
+  WRITE "Text styles: plain, "
+  STYLE(1)
+  WRITE "bold"
+  STYLE(0)
+  WRITE ", "
+  STYLE(2)
+  WRITE "underlined"
+  STYLE(0)
+  WRITE ", "
+  STYLE(4)
+  WRITE "reverse"
+  STYLE(0)
+  WRITE ", and "
+  STYLE(7)
+  WRITE "all three"
+  STYLE(0)
+  PRINT "."
   PRINT
   PRINT "End of the demonstration."
 END

@@ -188,6 +188,40 @@ check('screen: the last lines, wrapped as the model says', [s.rstrip() for s in 
 if PNG:
     R.render(m, os.path.join(ROOT, 'build/shots/m1-wrap.png'))
 
+# text styles: bold and reverse are colours (position attributes), underline a glyph set
+img = compile_src('''INCLUDE "DSK1.STDLIB"
+ROUTINE Main
+  WRITE "plain "
+  STYLE(1)
+  WRITE "bold "
+  STYLE(2)
+  WRITE "under line "
+  STYLE(4)
+  WRITE "rev "
+  STYLE(5)
+  WRITE "boldrev"
+  STYLE(3)
+  WRITE " both"
+  STYLE(0)
+  PRINT " end"
+END
+''')
+m = same('styles: the transcript is unaffected', img)
+row = bytes(m.vram[80:160]); att = R.attrs(m, 1)
+segs = [('plain ', 0xE1, 0), ('bold ', 0xF1, 0), ('under line ', 0xE1, 0x80), ('rev ', 0x1E, 0), ('boldrev', 0x1F, 0), (' both', 0xF1, 0x80), (' end', 0xE1, 0)]
+pos, ok, why = 0, True, []
+for text, a, ul in segs:
+    for ch in text:
+        if row[pos] != ord(ch) | ul or att[pos] != a:
+            ok = False; why.append((pos, ch, hex(row[pos]), hex(att[pos]), hex(a)))
+        pos += 1
+check('styles on screen: bold white, underline glyphs, reverse swapped, combined', ok and att[pos] == 0xE1, why[:6])
+check('position attributes on; status line in reverse colours; normal gray and bold white in the palette',
+      m.vregs[50] & 2 and set(R.attrs(m, 0)) == {0x1E} and m.palette.get(14) == 0xBBB and m.palette.get(15) == 0xFFF)
+check('underlined font: patterns 160-254 with the bottom row filled', all(m.vram[0x1800 + (c | 0x80) * 8 + 7] == 0xFC for c in range(32, 127)))
+if PNG:
+    R.render(m, os.path.join(ROOT, 'build/shots/m1-styles.png'))
+
 # a damaged story is refused
 img = bytearray(compile_file(os.path.join(T, 'run1.txa'), LIB, date=DATE)[0]); img[200] ^= 0xFF
 got, m, why = run_engine(bytes(img), 20_000_000)

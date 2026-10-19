@@ -63,7 +63,7 @@ check('bitmap layer at >2800, 256 x 96 from scanline 8', (v[32], v[33], v[34], v
 raw2 = open(os.path.join(ROOT, 'build/pic2.raw'), 'rb').read()
 check('picture decoded into VRAM byte for byte (RLE)', bytes(m.vram[0x2800:0x4000]) == raw2)
 check('palette 32-35 loaded', all(i in m.palette for i in range(32, 36)))
-check('font and reverse font', m.vram[0x1000 + ord('A') * 8 + 1] == 0x30 and m.vram[0x1000 + (ord('A') | 0x80) * 8 + 1] == 0xCF)
+check('font and reverse font', m.vram[0x1800 + ord('A') * 8 + 1] == 0x30 and m.vram[0x1800 + (ord('A') | 0x80) * 8 + 1] == 0xCF)
 shot(m, 'probe-24')
 
 press(m, cpu, 'D'); press(m, cpu, 'X'); press(m, cpu, 'Z')

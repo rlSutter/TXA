@@ -35,6 +35,11 @@ def screen(m, reverse_marks=False):
         out.append(line.rstrip())
     return '\n'.join(out)
 
+def attrs(m, row):
+    """The attribute bytes of one T80 row (position attributes)."""
+    at = m.vregs[3] << 6
+    return bytes(m.vram[at + row * 80: at + row * 80 + 80])
+
 def render(m, path):
     pal = m.palette
     def rgb(i):
@@ -46,16 +51,22 @@ def render(m, path):
     H = int(nrow * 8 * YS)
     img = Image.new('RGB', (960, H), rgb(v[7] & 15)); px = img.load()
     nt = (v[2] & 15) * 0x400; pt = (v[4] & 7) * 0x800
+    posattr = m.f18a and m.unlocked and v[50] & 2      # per-cell colours (T80)
+    at = v[3] << 6
     def plot(x0, x1, y, col):                  # one span of one scanline, in canvas units
         for Y in range(int(y * YS), int((y + 1) * YS)):
             for X in range(int(x0), int(x1)):
                 if 0 <= X < 960 and Y < H:
                     px[X, Y] = col
     if is_t80(m):
-        fg, bg = rgb(v[7] >> 4), rgb(v[7] & 15)
+        fg0, bg0 = rgb(v[7] >> 4), rgb(v[7] & 15)
         for r in range(nrow):
             for c in range(80):
                 ch = m.vram[nt + r * 80 + c]
+                if posattr:
+                    a = m.vram[(at + r * 80 + c) & 0x3FFF]; fg, bg = rgb(a >> 4), rgb(a & 15)
+                else:
+                    fg, bg = fg0, bg0
                 for y in range(8):
                     b = m.vram[pt + ch * 8 + y]
                     for x in range(6):

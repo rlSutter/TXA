@@ -275,7 +275,7 @@ class VM:
             o = pop(); self.write(self.short_name(o) if o else 'nothing')
         elif name == 'PRINTC': self.write(chr(pop() & 0xFF))
         elif name == 'NEWLINE': self.write('\n')
-        elif name == 'STYLE': b()
+        elif name == 'STYLE': pop()                      # (styles change the screen, not the text)
         elif name == 'PRINTA':
             form = b(); o = pop(); nm = self.short_name(o)
             proper = self.attr_proper != 255 and self.has(o, self.attr_proper)

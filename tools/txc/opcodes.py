@@ -91,7 +91,7 @@ OPS = [
     (0x4B, 'PRINTO',   '',  'o ->',       "Print o's short name."),
     (0x4C, 'PRINTC',   '',  'c ->',       'Print one character.'),
     (0x4D, 'NEWLINE',  '',  '',           'End the line.'),
-    (0x4E, 'STYLE',    'b', '',           'Text style: 0 roman, 1 bold, 2 underline, 4 reverse (combinable).'),
+    (0x4E, 'STYLE',    '',  'n ->',       'Text style from now on: 0 roman, 1 bold, 2 underline, 4 reverse, added together to combine.'),
     (0x4F, 'PRINTA',   'b', 'o ->',       "Print o's name with an article: 0 'the', 1 'The', 2 'a', 3 'A' (plural, proper and vowel rules)."),
     # ---- input
     (0x50, 'READ',     '',  '-> n',       'Read a command line, tokenize and parse it (M2); push the word count.'),

@@ -36,7 +36,9 @@ CHO1   MOV  @LLEN,R1
        BL   @EMITLN
        JMP  CHO9
 CHO2   LI   R2,COLS-1          full mid-word: find the last space
-CHO3   CB   @LBUF(R2),@SPC
+CHO3   MOVB @LBUF(R2),R3       (plain or underlined: >20 or >A0)
+       ANDI R3,>7F00
+       CI   R3,>2000
        JEQ  CHO4
        DEC  R2
        JOC  CHO3               (DEC sets carry while the result is >= 0)
@@ -53,19 +55,26 @@ CHO4   MOV  R2,@CHBRK          the space's column
        INC  R2
        CLR  R3
 CHO5   MOVB @LBUF(R2),@LBUF(R3)
+       MOVB @ABUF(R2),@ABUF(R3)
        INC  R2
        INC  R3
        DEC  R1
        JNE  CHO5
-CHO6   MOV  @CHCHR,R0          add the character
-       SWPB R0
+CHO6   MOV  @CHCHR,R0          add the character ...
+       CI   R0,' '
+       JL   CHO7
+       CI   R0,126
+       JH   CHO7
+       SOC  @CURUL,R0          ... underlined: the glyph set at +>80 ...
+CHO7   SWPB R0
        MOV  @LLEN,R1
        MOVB R0,@LBUF(R1)
+       MOV  @CURAT,R2          and its colours
+       SWPB R2
+       MOVB R2,@ABUF(R1)
        INC  @LLEN
 CHO9   .leave
        RT
-SPC    TEXT ' '
-       EVEN
 
 * EMITLN - write LBUF (LLEN characters) on row CROW, blank to the
 * right, and move down a row; scroll first if CROW is below the window.
@@ -80,12 +89,24 @@ EMITLN .enter
        MOV  @LLEN,R2
        JEQ  EML1
        BL   @VMBW
-EML1   MOV  R14,R0             blank the rest of the row
+       MOV  R14,R0             the characters' colours
+       AI   R0,ATRTAB
+       LI   R1,ABUF
+       MOV  @LLEN,R2
+       BL   @VMBW
+EML1   MOV  R14,R0             blank the rest of the row: spaces ...
        A    @LLEN,R0
        LI   R1,>2000
        LI   R2,COLS
        S    @LLEN,R2
        JEQ  EML2
+       BL   @VFILL
+       MOV  R14,R0             ... in normal colours
+       A    @LLEN,R0
+       AI   R0,ATRTAB
+       LI   R1,ATNORM*256
+       LI   R2,COLS
+       S    @LLEN,R2
        BL   @VFILL
 EML2   CLR  @LLEN
        INC  @CROW
@@ -133,11 +154,50 @@ WSC1   C    R14,R15
        LI   R1,ROWBUF
        LI   R2,COLS
        BL   @VMBW
+       MOV  R14,R1             the row's colours, the same way
+       INC  R1
+       MPY  @D80,R1
+       MOV  R2,R0
+       AI   R0,ATRTAB
+       LI   R1,ROWBUF
+       LI   R2,COLS
+       BL   @VMBR
+       MOV  R14,R1
+       MPY  @D80,R1
+       MOV  R2,R0
+       AI   R0,ATRTAB
+       LI   R1,ROWBUF
+       LI   R2,COLS
+       BL   @VMBW
        INC  R14
        JMP  WSC1
 WSC2   MOV  R15,R0
-       MOV  R15,R1
-       BL   @TXROWS
+       BL   @ECLR
+       .leave
+       RT
+
+* ECLR - row R0: spaces in normal colours.  Uses R0-R3.
+ECLR   .enter
+       MPY  @D80,R0            R1 = row * 80
+       MOV  R1,R3
+       MOV  R3,R0
+       LI   R1,>2000
+       LI   R2,COLS
+       BL   @VFILL
+       MOV  R3,R0
+       AI   R0,ATRTAB
+       LI   R1,ATNORM*256
+       LI   R2,COLS
+       BL   @VFILL
+       .leave
+       RT
+
+* REVSPN - reverse colours for R2 cells from screen offset R0 (row * 80
+* + column).  Uses R0-R2.
+REVSPN .enter
+       AI   R0,ATRTAB
+       LI   R1,ATREV*256
+       BL   @VFILL
        .leave
        RT
 
@@ -149,24 +209,19 @@ MORE   .enter
        MPY  @D80,R0
        MOV  R1,R0
        MOV  R0,R14
-       BL   @VWAD
        LI   R1,SMORE
        LI   R2,6
-MOR1   MOVB *R1+,R3
-       SOCB @B80,R3            the reverse glyph set
-       MOVB R3,@VDPWD
-       DEC  R2
-       JNE  MOR1
-       BL   @WAITKY
-       MOV  R14,R0
-       LI   R1,>2000
+       BL   @VMBW
+       MOV  R14,R0             in reverse colours
        LI   R2,6
-       BL   @VFILL
+       BL   @REVSPN
+       BL   @WAITKY
+       MOV  @CROW,R0           then blank the row again
+       BL   @ECLR
        CLR  @MORECT
        .leave
        RT
 SMORE  TEXT '[MORE]'
-B80    BYTE >80
        EVEN
 
 * WAITKY - wait for a key press; R0 = its code (high byte).  Saves R4

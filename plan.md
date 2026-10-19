@@ -145,7 +145,18 @@ description and contents list, the log book, the lantern's BEFORE/AFTER
 rules, the die roll, the wrapped paragraph, scrolling with [MORE], and
 the end-of-story return to the title screen all worked.
 
-M1 remaining: bold and underline glyph sets (STYLE).
+Text styles (finishing M1): `STYLE(n)`, a built-in, with 1 bold, 2
+underline, 4 reverse, added together.  256 glyph slots cannot hold
+normal, bold, underlined and reverse sets, so bold and reverse are
+colours from the F18A's per-position attributes in 80-column mode (on
+every F18A-class board, RP2040 included): normal text is a soft light
+gray (palette 14), bold white (15), reverse swaps them.  Underline is a
+glyph set in patterns 160-254.  VRAM moved to make room for the
+2400-byte attribute table (defs.a99 has the map).  The status line,
+[MORE] and the end message use reverse colours.  Tests check the
+glyphs and colours on screen.
+
+**M1 is complete.**
 
 ## Next: M2 (the parser)
 
@@ -174,6 +185,7 @@ text output, word wrap and [MORE]; bold and underline glyph sets.
 
 ## History
 
+- 2026-10-19 M1 complete: text styles (bold, underline, reverse) through position attributes and an underlined glyph set.
 - 2026-10-19 M1: the assembly VM, cross-checked against the Python VM; the demo cartridge.
 - 2026-10-19 M1: semantic pass, opcodes, code generation and linking, Python reference VM.
 - 2026-10-19 M1 begun: the TXA lexer and parser (`tools/txc/`), 31-check test.

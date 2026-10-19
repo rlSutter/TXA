@@ -348,8 +348,8 @@ GM1REG DATA >8000              VR0: Graphics I
        DATA >81E0              VR1: 16K, display on, interrupts
        DATA >8200              VR2: names >0000
        DATA >8300+(GM1COL/>40) VR3: colours >0C00
-       DATA >8402              VR4: patterns >1000 (the same font)
-       DATA >8530              VR5
+       DATA >8400+(PATTAB/>800) VR4: the same font
+       DATA >8500+(SPRATT/>80) VR5
        DATA >8604              VR6
        DATA >8701              VR7: black backdrop
        DATA >B100              VR49: 24 rows

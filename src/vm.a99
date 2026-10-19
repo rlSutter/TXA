@@ -784,8 +784,31 @@ OPPRC  DECT R6
 OPNL   LI   R0,10
        BL   @CHOUT
        B    @NEXT
-OPSTYL BL   @FB                (styles come with the bold and underline
-       B    @NEXT              glyph sets)
+* STYLE: n = 1 bold, 2 underline, 4 reverse, added together.  Bold and
+* reverse make the attribute byte each character gets (CURAT); underline
+* adds >80 to each character, selecting the underlined glyph set (CURUL).
+OPSTYL DECT R6
+       MOV  *R6,R0
+       LI   R1,ATNORM          gray, or white for bold
+       MOV  R0,R2
+       ANDI R2,1
+       JEQ  STY1
+       LI   R1,ATBOLD
+STY1   MOV  R0,R2
+       ANDI R2,4
+       JEQ  STY2
+       MOV  R1,R2              reverse: swap the nibbles
+       SLA  R1,4
+       SRL  R2,4
+       SOC  R2,R1
+       ANDI R1,>FF
+STY2   MOV  R1,@CURAT
+       CLR  @CURUL
+       ANDI R0,2
+       JEQ  STY3
+       LI   R0,>80
+       MOV  R0,@CURUL
+STY3   B    @NEXT
 
 * PRNAME - print object R14's short name; "nothing" for 0, "?" for an
 * object with no name.

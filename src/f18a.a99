@@ -109,6 +109,7 @@ F18RST .enter
        .leave
        RT
 F18RTB DATA >B100              VR49 = 0: 24 rows, no tile layer 2, no ECM
+       DATA >B200              VR50 = 0: position attributes off
        DATA >9F00              VR31 = 0: bitmap layer off
        DATA >AF00              VR47 = 0: palette data-port mode off
        DATA >8F00              VR15 = 0: status register 0

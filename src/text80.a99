@@ -29,10 +29,10 @@ T80N1  BL   @VDPWR
 T80REG DATA >8004              VR0: M4 = 80-column text
        DATA >81F0              VR1: 16K, display on, interrupts, M1 = text
        DATA >8200              VR2: name table >0000
-       DATA >8300              VR3: (position attributes: unused)
-       DATA >8402              VR4: patterns >1000
-       DATA >8530              VR5: sprite attributes >1800
-       DATA >8604              VR6: sprite patterns >2000 (all zero)
+       DATA >8300+(ATRTAB/>40) VR3: attribute table: used only with VR50 bit 1
+       DATA >8400+(PATTAB/>800) VR4: the font
+       DATA >8500+(SPRATT/>80) VR5: sprite attributes
+       DATA >8600+(SPRPAT/>800) VR6: sprite patterns: all zero
        DATA >8700+TXTCOL       VR7: text and background colours
        DATA 0
 D30    DATA 30
@@ -58,10 +58,26 @@ FNL1   MOVB *R1+,R3
        CLR  R1
        LI   R2,8
        BL   @VFILL
-       LI   R0,PATTAB+(160*8)-8   pattern 159, and 160 (reverse space) is
-       LI   R1,>FF00              solid: fill 159 too so a reverse bar can
-       LI   R2,8                  use either
-       BL   @VFILL
+       .leave
+       RT
+
+* FONTUL - patterns 160-254 become the underlined font (32-126 with the
+* bottom row filled), replacing the reverse set: the engine shows
+* reverse video with position attributes instead.  Uses R0-R4.
+FONTUL .enter
+       LI   R0,PATTAB+(160*8)
+       BL   @VWAD
+       LI   R1,FONT
+       LI   R4,95
+FNU1   LI   R2,7               rows 0-6 as they are ...
+FNU2   MOVB *R1+,@VDPWD
+       DEC  R2
+       JNE  FNU2
+       INC  R1                 ... row 7 (descenders) under the line
+       LI   R3,>FC00
+       MOVB R3,@VDPWD
+       DEC  R4
+       JNE  FNU1
        .leave
        RT
 
