@@ -88,7 +88,7 @@ def tokenize(text, file='<source>'):
             m = DEC.match(raw, i)
             if m:
                 v = int(m.group(0))
-                if v > 32767:
+                if v > 32768:                       # 32768 only after a minus sign (the parser checks)
                     raise TxaError(file, ln, f'number {v} is larger than 32767')
                 emit('NUM', v, m.group(0)); i = m.end(); continue
             m = HEX.match(raw, i)

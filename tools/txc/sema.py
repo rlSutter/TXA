@@ -34,7 +34,17 @@ MAX_ATTRS, MAX_PROPS, MAX_OBJECTS, MAX_LOCALS, MAX_GLOBALS = 48, 63, 1000, 16, 2
 DICT_LEN = 12
 SLOT_TOKENS = {'noun', 'held', 'multi', 'multiheld', 'multiexcept', 'multiinside',
                'creature', 'number', 'topic', 'scope'}
-RULE_PROPS = {'BEFORE', 'AFTER', 'LIFE', 'ORDERS'}   # routine properties whose cases are actions
+RULE_PROPS = {'BEFORE', 'AFTER', 'LIFE', 'ORDERS'}
+# Built-in functions: name -> (opcode, arguments, gives a value).  Their
+# names are reserved.  Those that give no value give 0 in an expression.
+BUILTINS = {
+    'PARENT': ('PARENT', 1, True), 'CHILD': ('CHILD', 1, True), 'SIBLING': ('SIBLING', 1, True),
+    'RANDOM': ('RANDOM', 1, True), 'READKEY': ('READKEY', 0, True),
+    'SAVE': ('SAVE', 0, True), 'RESTORE': ('RESTORE', 0, True),
+    'UNDOSAVE': ('UNDOSAVE', 0, True), 'UNDO': ('UNDO', 0, True),
+    'QUIT': ('QUIT', 0, False), 'RESTART': ('RESTART', 0, False),
+    'STATUS': ('STATUS', 0, False), 'SOUND': ('SOUND', 1, False),
+}   # routine properties whose cases are actions
 
 
 class Sym:
@@ -115,6 +125,8 @@ class Sema:
     # ---- 2. declarations ----------------------------------------------------
     def declare(self, kind, name, node, number=None):
         u = name.upper()
+        if u in BUILTINS:
+            self.err(node, f'{name} is a built-in function and cannot be declared')
         if u in self.p.symbols:
             old = self.p.symbols[u].decl
             self.err(node, f'{name} is already declared ({old.file} line {old.line})')
@@ -413,7 +425,10 @@ class Sema:
                 target(s.target); expr(s.value)
             elif isinstance(s, A.ExprStmt):
                 e = s.expr
-                if isinstance(e, A.Name):
+                if isinstance(e, A.Name) and e.id.upper() in BUILTINS and e.id.upper() not in scope:
+                    s.expr = A.Call(e, [], file=e.file, line=e.line)
+                    expr(s.expr)
+                elif isinstance(e, A.Name):
                     sy = self.p.sym(e.id)
                     if e.id.upper() in scope or not sy or sy.kind != 'routine':
                         self.err(s, f'{e.id} on its own does nothing: did you mean a call, {e.id}()?')
@@ -473,6 +488,13 @@ class Sema:
                     self.err(e, f'unknown property {e.prop}')
                 return
             if isinstance(e, A.Call):
+                if isinstance(e.func, A.Name) and e.func.id.upper() in BUILTINS and e.func.id.upper() not in scope:
+                    n = BUILTINS[e.func.id.upper()][1]
+                    if len(e.args) != n:
+                        self.err(e, f'{e.func.id.upper()} takes {n} argument{"s" if n != 1 else ""}, not {len(e.args)}')
+                    for a in e.args:
+                        expr(a)
+                    return
                 if isinstance(e.func, A.Name) and e.func.id.upper() not in scope:
                     sy = self.p.sym(e.func.id)
                     if not sy:

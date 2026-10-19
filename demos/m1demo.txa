@@ -1,0 +1,105 @@
+! m1demo.txa - the M1 demonstration: the engine running compiled TXA.
+! No parser yet (M2): the story narrates itself, then ends.
+INCLUDE "DSK1.STDLIB"
+
+ROOM LampRoom "Lamp Room"
+  DESC "The great lens turns slowly above you, throwing its beam across a sea that has gone quite still. A narrow iron stair spirals down into the dark."
+END
+OBJECT Desk "writing desk" IN LampRoom
+  NAME "desk"
+  HAS static supporter
+END
+OBJECT LogBook "log book" IN Desk
+  NAME "log" "book"
+  DESC "The last entry, in a hurried hand: ~Light kept. Tide wrong again.~"
+END
+OBJECT Oil "oil cans" IN LampRoom
+  NAME "oil" "cans"
+  HAS plural
+END
+OBJECT Keeper "Elsbeth" IN LampRoom
+  NAME "elsbeth" "keeper"
+  HAS animate proper female
+END
+OBJECT Lantern "brass lantern" IN LampRoom
+  NAME "brass" "lantern"
+  HAS switchable
+  BEFORE
+    SwitchOn:
+      IF self HAS on
+        PRINT "It is already lit."
+        RETURN TRUE
+      END
+  END
+  AFTER
+    SwitchOn: GIVE self light
+              PRINT "The wick catches; ", (the) self, " throws a warm circle on the floor."
+              RETURN TRUE
+  END
+END
+
+ROUTINE ListContents obj
+  LOCAL c, n, total
+  FOR EACH c IN obj
+    total = total + 1
+  END
+  FOR EACH c IN obj
+    IF c <> Keeper
+      IF n > 0
+        IF n = total - 2
+          WRITE " and "
+        ELSE
+          WRITE ", "
+        END
+      END
+      WRITE (a) c
+      n = n + 1
+    END
+  END
+END
+
+ROUTINE Main
+  LOCAL i, roll
+  PRINT "TXA engine demonstration (M1)"
+  PRINT "The story below is compiled TXA, run by the engine from SAMS."
+  PRINT
+  PRINT (name) LampRoom
+  LampRoom.DESC()
+  PRINT
+  WRITE "You can see "
+  ListContents(LampRoom)
+  PRINT " here. ", (The) Keeper, " is trimming a wick."
+  PRINT
+  PRINT "On ", (the) Desk, " lies ", (a) LogBook, ". ", (The) LogBook, " reads:"
+  LogBook.DESC()
+  PRINT
+  PRINT
+  noun = Lantern
+  action = ##SwitchOn
+  IF Lantern.BEFORE() = FALSE
+    SwitchOnSub()
+    Lantern.AFTER()
+  END
+  IF Lantern.BEFORE() = FALSE
+    PRINT "(not reached)"
+  END
+  PRINT
+  WRITE "Elsbeth rolls a die six times:"
+  RANDOM(0)
+  WHILE i < 6
+    roll = RANDOM(6)
+    WRITE " ", roll
+    i = i + 1
+  END
+  PRINT "."
+  PRINT
+  PRINT "A long line, to show word wrap at 80 columns: the beam sweeps the water, the water gives nothing back, and somewhere past the reef a bell that should not be ringing is ringing anyway, slow and patient, as if it has all night."
+  PRINT
+  i = 1
+  WHILE i <= 32
+    PRINT "Line ", i, " of 32: scrolling and the [MORE] prompt (press any key at [MORE])."
+    i = i + 1
+  END
+  PRINT
+  PRINT "End of the demonstration."
+END

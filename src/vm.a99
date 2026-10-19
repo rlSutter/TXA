@@ -1,0 +1,969 @@
+*======================================================================
+* vm.a99 - the TXA story VM: dispatch and the opcode handlers.
+*
+* tools/txc/opcodes.py is the definition: every handler here does what
+* that table says, and tests/m1_vm_test.py runs the same images on this
+* VM and on the Python reference VM (tools/txc/txvm.py) and compares the
+* text they print.  OPTAB's order is checked against opcodes.py.
+*
+* Registers (see defs.a99): R4 PC, R5 PC page, R6 value stack pointer
+* (next free word; the top is at -2(R6)), R7 frame (first local), R8
+* SELF.  Handlers may use R0-R3, R9, R12-R15 and VT1-VT5; every helper
+* they call says what it clobbers.  Each handler ends with B @NEXT.
+*
+* Pushing is MOV x,*R6+; popping is DECT R6, MOV *R6,x.
+*======================================================================
+
+* NEXT - fetch the next opcode and jump to its handler.
+NEXT   MOVB *R4+,R0
+       SRL  R0,8
+       CI   R4,WINB            the opcode was the page's last byte
+       JL   NEXT1
+       INC  R5
+       LI   R4,WINA
+       MOV  R5,R2
+       LI   R3,MAPRGA
+       MOV  R0,R14
+       BL   @MAPWIN
+       MOV  R14,R0
+NEXT1  CI   R0,OPLAST
+       JH   BADOP
+       MOV  R0,R1
+       SLA  R1,1
+       MOV  @OPTAB(R1),R1      (R0 cannot index: copy to R1)
+       B    *R1
+BADOP  MOV  R0,@ERRN1
+       LI   R1,EBADOP
+       B    @VMERR
+
+* the dispatch table: one entry per code from >00 to OPLAST
+OPTAB  DATA OPNOP,OPPSHB,OPPSHW,OPPSH0,OPPSH1,OPPOP,OPDUP,OPSELF  >00
+       DATA OPLOAD,OPSTOR,OPINC,OPDEC,BADOP,BADOP,BADOP,BADOP
+       DATA OPADD,OPSUB,OPMUL,OPDIV,OPMOD,OPNEG,OPNOT,BADOP
+       DATA OPEQ,OPNE,OPLT,OPGT,OPLE,OPGE,BADOP,BADOP
+       DATA OPJMP,OPJZ,OPJNZ,OPCALL,OPCLLV,OPRET,OPRTRU,OPRFAL
+       DATA BADOP,BADOP,BADOP,BADOP,BADOP,BADOP,BADOP,BADOP
+       DATA OPPAR,OPCHLD,OPSIB,OPMOVE,OPREM,OPIN,OPHAS,OPSETA
+       DATA OPCLRA,OPGETP,OPPUTP,OPPLEN,OPRUNP,OPCLLP,OPGTPN,BADOP
+       DATA OPALD,OPAST,OPALEN,BADOP,BADOP,BADOP,BADOP,BADOP
+       DATA OPPRS,OPPRV,OPPRN,OPPRO,OPPRC,OPNL,OPSTYL,OPPRA
+       DATA OPREAD,OPRKEY,BADOP,BADOP,BADOP,BADOP,BADOP,BADOP
+       DATA OPRAND,OPQUIT,OPRST,OPSAVE,OPREST,OPUSAV,OPUNDO,OPPIC
+       DATA OPSTAT,OPSND
+OPLAST EQU  >61
+
+* ---- constants, stack, variables -----------------------------------------
+OPNOP  B    @NEXT
+OPPSHB BL   @FB
+       SLA  R0,8               sign-extend the byte
+       SRA  R0,8
+       MOV  R0,*R6+
+       B    @NEXT
+OPPSHW BL   @FW
+       MOV  R1,*R6+
+       B    @NEXT
+OPPSH0 CLR  *R6+
+       B    @NEXT
+OPPSH1 LI   R0,1
+       MOV  R0,*R6+
+       B    @NEXT
+OPPOP  DECT R6
+       B    @NEXT
+OPDUP  MOV  @-2(R6),*R6+
+       B    @NEXT
+OPSELF MOV  R8,*R6+
+       B    @NEXT
+OPLOAD BL   @FB
+       MOV  R0,R14
+       BL   @GETV
+       MOV  R0,*R6+
+       B    @NEXT
+OPSTOR BL   @FB
+       MOV  R0,R14
+       DECT R6
+       MOV  *R6,R15
+       BL   @PUTV
+       B    @NEXT
+OPINC  BL   @FB
+       MOV  R0,R14
+       BL   @GETV
+       MOV  R0,R15
+       INC  R15
+       BL   @PUTV
+       B    @NEXT
+OPDEC  BL   @FB
+       MOV  R0,R14
+       BL   @GETV
+       MOV  R0,R15
+       DEC  R15
+       BL   @PUTV
+       B    @NEXT
+
+* GETV - R0 = variable R14 (0-15 a local, 16-255 a global).
+* Clobbers R1-R3, R9, R12, R13.
+GETV   CI   R14,16
+       JHE  GTV1
+       MOV  R14,R1
+       SLA  R1,1
+       A    R7,R1
+       MOV  *R1,R0
+       RT
+GTV1   MOV  R14,R1             global n is at globals + 2(n-16)
+       AI   R1,-16
+       SLA  R1,1
+       A    @H.GLOB,R1
+       B    @RDW               (RDW returns to our caller)
+
+* PUTV - variable R14 = R15.  A local past the routine's count is a
+* run-time error.  Clobbers R0-R3, R9, R12, R13.
+PUTV   CI   R14,16
+       JHE  PTV1
+       C    R14,@-4(R7)        the frame's local count
+       JHE  PTV2
+       MOV  R14,R1
+       SLA  R1,1
+       A    R7,R1
+       MOV  R15,*R1
+       RT
+PTV1   MOV  R14,R1
+       AI   R1,-16
+       SLA  R1,1
+       A    @H.GLOB,R1
+       MOV  R15,R0
+       B    @WRW
+PTV2   MOV  R14,@ERRN1
+       LI   R1,ELOCAL
+       B    @VMERR
+
+* ---- arithmetic -------------------------------------------------------------
+OPADD  DECT R6
+       A    *R6,@-2(R6)
+       B    @NEXT
+OPSUB  DECT R6
+       S    *R6,@-2(R6)
+       B    @NEXT
+OPMUL  DECT R6
+       MOV  *R6,R1
+       MOV  @-2(R6),R2
+       MPY  R1,R2              R2:R3 = product; the low word is right
+       MOV  R3,@-2(R6)         for signed values too
+       B    @NEXT
+* DIV and MOD: the hardware divides unsigned, so divide the magnitudes
+* and fix the signs: the quotient is negative when the signs differ
+* (truncating toward zero), the remainder takes the dividend's sign.
+* -32768 / -1 gives -32768, as 16-bit arithmetic wraps.
+OPDIV  BL   @SDIV
+       MOV  R2,@-2(R6)
+       B    @NEXT
+OPMOD  BL   @SDIV
+       MOV  R3,@-2(R6)
+       B    @NEXT
+SDIV   DECT R6
+       MOV  *R6,R1             divisor
+       JEQ  SDIV9
+       MOV  @-2(R6),R14        dividend
+       MOV  R1,R15
+       ABS  R1
+       MOV  R14,R3
+       ABS  R3
+       CLR  R2
+       DIV  R1,R2              R2 = quotient, R3 = remainder
+       MOV  R14,R0
+       XOR  R15,R0
+       JGT  SDIV1              signs equal (or ... )
+       JEQ  SDIV1
+       NEG  R2
+SDIV1  MOV  R14,R14
+       JGT  SDIV2
+       JEQ  SDIV2
+       NEG  R3
+SDIV2  RT
+SDIV9  LI   R1,EDIV0
+       B    @VMERR
+OPNEG  NEG  @-2(R6)
+       B    @NEXT
+OPNOT  MOV  @-2(R6),R0
+       CLR  @-2(R6)
+       MOV  R0,R0
+       JNE  OPNOT9
+       INC  @-2(R6)
+OPNOT9 B    @NEXT
+
+* comparisons: pop b, compare with a, leave 1 or 0
+CMPAB  DECT R6
+       MOV  *R6,R1
+       MOV  @-2(R6),R2
+       CLR  @-2(R6)
+       C    R2,R1
+       RT
+OPEQ   BL   @CMPAB
+       JNE  CTRUE0
+       JMP  CTRUE
+OPNE   BL   @CMPAB
+       JEQ  CTRUE0
+       JMP  CTRUE
+OPLT   BL   @CMPAB
+       JLT  CTRUE
+       B    @NEXT
+OPGT   BL   @CMPAB
+       JGT  CTRUE
+       B    @NEXT
+OPLE   BL   @CMPAB
+       JLT  CTRUE
+       JEQ  CTRUE
+       B    @NEXT
+OPGE   BL   @CMPAB
+       JGT  CTRUE
+       JEQ  CTRUE
+       B    @NEXT
+CTRUE  INC  @-2(R6)
+CTRUE0 B    @NEXT
+
+* ---- control ------------------------------------------------------------------
+OPJMP  BL   @FW
+       BL   @JUMP
+       B    @NEXT
+OPJZ   BL   @FW
+       DECT R6
+       MOV  *R6,R0
+       JNE  OPJZ9
+       BL   @JUMP
+OPJZ9  B    @NEXT
+OPJNZ  BL   @FW
+       DECT R6
+       MOV  *R6,R0
+       JEQ  OPJZ9
+       BL   @JUMP
+       B    @NEXT
+
+* JUMP - move the PC by the signed offset R1.  The new place is the
+* offset into the page plus R1; its page is that over 4096 (an
+* arithmetic shift, so backward jumps work).  Routines are limited to
+* 28K so the sum never overflows.  Clobbers R1-R3, R12.
+JUMP   MOV  R4,R2
+       AI   R2,-WINA           offset into the page
+       A    R2,R1
+       MOV  R1,R2
+       SRA  R2,12              pages moved
+       JNE  JMP1
+       MOV  R1,R4              same page: no mapping
+       AI   R4,WINA
+       RT
+JMP1   A    R2,R5
+       ANDI R1,>0FFF
+       B    @SETPC
+
+OPCALL BL   @FW
+       MOV  R1,R15             routine
+       BL   @FB
+       MOV  R0,R14             arguments
+       B    @GOCALL
+OPCLLV BL   @FB
+       MOV  R0,R14
+       DECT R6
+       MOV  *R6,R15
+       B    @GOCALL
+
+* GOCALL - call routine R15 (packed) with the top R14 values as its
+* arguments.  If NEWSLF is not -1, SELF becomes NEWSLF for the call.
+* Calling 0 just takes the arguments and pushes 0.
+GOCALL MOV  R14,R0
+       SLA  R0,1
+       S    R0,R6              the arguments come off the stack ...
+       MOV  R6,@VT1            ... from here
+       MOV  R15,R15
+       JNE  GOC1
+       CLR  *R6+               calling 0: result 0
+       SETO @NEWSLF
+       B    @NEXT
+GOC1   MOV  @FREND,R9          the new frame
+       MOV  R9,R0
+       AI   R0,FRHDR+32        room for the header and 16 locals?
+       CI   R0,FRMEND
+       JH   GOC9
+       MOV  R5,*R9             return page
+       MOV  R4,@2(R9)          return PC
+       MOV  R6,@4(R9)          the caller's stack, arguments taken
+       MOV  R8,@6(R9)          the caller's SELF
+       MOV  R7,@10(R9)         the caller's frame
+       MOV  R15,R1
+       BL   @PACKPC            to the routine
+       BL   @FB                its local count
+       MOV  R0,@8(R9)
+       MOV  R9,R7
+       AI   R7,FRHDR           the locals
+       MOV  R0,R1              locals to fill
+       MOV  R7,R2
+       MOV  @VT1,R3            arguments
+GOC2   MOV  R1,R1
+       JEQ  GOC4
+       MOV  R14,R14
+       JEQ  GOC3
+       MOV  *R3+,*R2+          an argument
+       DEC  R14
+       DEC  R1
+       JMP  GOC2
+GOC3   CLR  *R2+               a local past the arguments: 0
+       DEC  R1
+       JMP  GOC2
+GOC4   MOV  R2,@FREND          (extra arguments are dropped)
+       MOV  @NEWSLF,R0
+       CI   R0,-1
+       JEQ  GOC5
+       MOV  R0,R8
+       SETO @NEWSLF
+GOC5   B    @NEXT
+GOC9   LI   R1,ENEST
+       B    @VMERR
+
+OPRTRU LI   R14,1
+       JMP  RETV
+OPRFAL CLR  R14
+       JMP  RETV
+OPRET  DECT R6
+       MOV  *R6,R14
+* RETV - return R14 to the caller.  A return page of -1 is the end of
+* Main: the game is over.
+RETV   MOV  R7,R9
+       AI   R9,-FRHDR          the frame
+       MOV  *R9,R5
+       CI   R5,-1
+       JNE  RETV1
+       B    @VMEND
+RETV1  MOV  @2(R9),R4
+       MOV  @4(R9),R6
+       MOV  @6(R9),R8
+       MOV  @10(R9),R7
+       MOV  R9,@FREND
+       MOV  R5,R2              the caller's page back in window A
+       LI   R3,MAPRGA
+       BL   @MAPWIN
+       MOV  R14,*R6+
+       B    @NEXT
+
+* ---- the object tree -------------------------------------------------------------
+* OBJE - R1 = the story address of object R1's entry; a run-time error
+* if there is no such object.  Clobbers R0.
+OBJE   MOV  R1,R1
+       JLT  OBJE9
+       JEQ  OBJE9
+       C    R1,@H.NOBJ
+       JGT  OBJE9
+       DEC  R1
+       MOV  R1,R0
+       SLA  R1,4               (o-1) * 14 = (o-1) * 16 - (o-1) * 2
+       SLA  R0,1
+       S    R0,R1
+       A    @H.OBJS,R1
+       RT
+OBJE9  MOV  R1,@ERRN1
+       LI   R1,ENOOBJ
+       B    @VMERR
+
+* TREE - R0 = the word at offset R15 of object R1's entry (0 parent,
+* 2 sibling, 4 child).  Clobbers R1-R3, R9, R12, R13.
+TREE   MOV  R11,@VT5
+       BL   @OBJE
+       A    R15,R1
+       BL   @RDW
+       MOV  @VT5,R11
+       RT
+
+OPPAR  CLR  R15
+       JMP  OPTRE
+OPCHLD LI   R15,4
+       JMP  OPTRE
+OPSIB  LI   R15,2
+OPTRE  MOV  @-2(R6),R1
+       BL   @TREE
+       MOV  R0,@-2(R6)
+       B    @NEXT
+
+OPMOVE DECT R6
+       MOV  *R6,R15            destination
+       DECT R6
+       MOV  *R6,R14            object
+       MOV  R15,@VT3
+MOV1   MOV  @VT3,R1            never into itself: walk up from the
+       JEQ  MOV2               destination
+       C    R1,R14
+       JEQ  MOV9
+       MOV  R15,@VT4
+       CLR  R15
+       BL   @TREE
+       MOV  @VT4,R15
+       MOV  R0,@VT3
+       JMP  MOV1
+MOV2   MOV  R15,@VT4
+       BL   @DETACH
+       MOV  R14,R1             o's entry: parent = d
+       BL   @OBJE
+       MOV  R1,@VT1
+       MOV  @VT4,R1            d's entry
+       BL   @OBJE
+       MOV  R1,@VT2
+       MOV  @VT4,R0
+       MOV  @VT1,R1
+       BL   @WRW               parent(o) = d
+       MOV  @VT2,R1
+       AI   R1,4
+       BL   @RDW               sibling(o) = child(d)
+       MOV  @VT1,R1
+       INCT R1
+       BL   @WRW
+       MOV  @VT2,R1            child(d) = o
+       AI   R1,4
+       MOV  R14,R0
+       BL   @WRW
+       B    @NEXT
+MOV9   MOV  R14,@ERRN1
+       LI   R1,EINSLF
+       B    @VMERR
+
+OPREM  DECT R6
+       MOV  *R6,R14
+       BL   @DETACH
+       B    @NEXT
+
+* DETACH - take object R14 out of the tree.  Keeps R14.
+DETACH MOV  R11,@VT5
+       MOV  R14,R1
+       BL   @OBJE
+       MOV  R1,@VT1            e
+       BL   @RDW
+       MOV  R0,R1              parent
+       JEQ  DET9
+       BL   @OBJE
+       MOV  R1,@VT2            pe
+       AI   R1,4
+       BL   @RDW               child(parent)
+       C    R0,R14
+       JNE  DET2
+       MOV  @VT1,R1            first child: child(parent) = sibling(o)
+       INCT R1
+       BL   @RDW
+       MOV  @VT2,R1
+       AI   R1,4
+       BL   @WRW
+       JMP  DET5
+DET2   MOV  R0,@VT3            walk the siblings to the one before o
+DET3   MOV  @VT3,R1
+       BL   @OBJE
+       INCT R1
+       MOV  R1,@VT4
+       BL   @RDW
+       C    R0,R14
+       JEQ  DET4
+       MOV  R0,@VT3
+       JMP  DET3
+DET4   MOV  @VT1,R1            sibling(prev) = sibling(o)
+       INCT R1
+       BL   @RDW
+       MOV  @VT4,R1
+       BL   @WRW
+DET5   CLR  R0                 o: no parent, no sibling
+       MOV  @VT1,R1
+       BL   @WRW
+       MOV  @VT1,R1
+       INCT R1
+       CLR  R0
+       BL   @WRW
+DET9   MOV  @VT5,R11
+       RT
+
+OPIN   DECT R6
+       MOV  *R6,R14            p
+       MOV  @-2(R6),R1         o
+       CLR  @-2(R6)
+       MOV  R1,R1              (o = 0 is in nothing: false)
+       JEQ  OPIN9
+       CLR  R15
+       BL   @TREE
+       C    R0,R14
+       JNE  OPIN9
+       INC  @-2(R6)
+OPIN9  B    @NEXT
+
+* ATTRB - for attribute R14 of object R1: R1 = the story address of its
+* byte, R15 = its mask (in the low byte).  Clobbers R0.
+ATTRB  MOV  R11,@VT5
+       BL   @OBJE
+       MOV  R14,R0
+       SRL  R0,3
+       A    R0,R1
+       AI   R1,6
+       MOV  R14,R2
+       ANDI R2,7
+       MOVB @MASKT(R2),R15
+       SRL  R15,8
+       MOV  @VT5,R11
+       RT
+MASKT  BYTE >80,>40,>20,>10,>08,>04,>02,>01
+
+OPHAS  BL   @FB
+       MOV  R0,R14
+       MOV  @-2(R6),R1
+       BL   @ATTRB
+       BL   @RDB
+       CLR  @-2(R6)
+       CZC  R15,R0             all mask bits clear in R0?
+       JEQ  OPHAS9
+       INC  @-2(R6)
+OPHAS9 B    @NEXT
+OPSETA BL   @FB
+       MOV  R0,R14
+       DECT R6
+       MOV  *R6,R1
+       BL   @ATTRB
+       MOV  R1,@VT1
+       BL   @RDB
+       SOC  R15,R0
+       JMP  ATTW
+OPCLRA BL   @FB
+       MOV  R0,R14
+       DECT R6
+       MOV  *R6,R1
+       BL   @ATTRB
+       MOV  R1,@VT1
+       BL   @RDB
+       SZC  R15,R0
+ATTW   MOV  @VT1,R1
+       BL   @WRB
+       B    @NEXT
+
+* ---- properties ---------------------------------------------------------------------
+* PROPF - find property R15 of object R14.  R1 = the story address of
+* its first word, or 0 if the object has none; VT2 = its kind bits
+* (>00 values, >40 string, >80 routine); VT3 = its length in words.
+* Keeps R14, R15.
+PROPF  MOV  R11,@VT4
+       MOV  R14,R1
+       BL   @OBJE
+       AI   R1,12
+       BL   @RDW
+       MOV  R0,R1
+       INCT R1                 past the short name
+PRF1   MOV  R1,@VT1
+       BL   @RDB               entry header: number and kind
+       MOV  R0,R0
+       JEQ  PRF8
+       MOV  R0,@VT2
+       MOV  @VT1,R1
+       INC  R1
+       BL   @RDB               length in words
+       MOV  R0,@VT3
+       MOV  @VT2,R1
+       ANDI R1,>3F
+       C    R1,R15
+       JEQ  PRF2
+       MOV  @VT1,R1            next entry: 2 + 2 * length on
+       A    R0,R1
+       A    R0,R1
+       INCT R1
+       JMP  PRF1
+PRF2   ANDI R1,>FFC0           (R1 = the number; make VT2 the kind)
+       MOV  @VT2,R1
+       ANDI R1,>C0
+       MOV  R1,@VT2
+       MOV  @VT1,R1
+       INCT R1
+       MOV  @VT4,R11
+       RT
+PRF8   CLR  R1
+       CLR  @VT3
+       MOV  @VT4,R11
+       RT
+
+OPGETP BL   @FB
+       MOV  R0,R15
+       MOV  @-2(R6),R14
+       BL   @PROPF
+       CLR  @-2(R6)
+       MOV  R1,R1
+       JEQ  OPGP9
+       BL   @RDW
+       MOV  R0,@-2(R6)
+OPGP9  B    @NEXT
+OPPUTP BL   @FB
+       MOV  R0,R15
+       DECT R6
+       MOV  *R6,@VT5           value
+       DECT R6
+       MOV  *R6,R14
+       BL   @PROPF
+       MOV  R1,R1
+       JEQ  OPPP9
+       MOV  @VT5,R0
+       BL   @WRW
+       B    @NEXT
+OPPP9  MOV  R14,@ERRN1
+       MOV  R15,@ERRN2
+       LI   R1,ENOPRP
+       B    @VMERR
+OPPLEN BL   @FB
+       MOV  R0,R15
+       MOV  @-2(R6),R14
+       BL   @PROPF
+       MOV  @VT3,@-2(R6)
+       B    @NEXT
+OPGTPN BL   @FB
+       MOV  R0,R15
+       DECT R6
+       MOV  *R6,@VT5           index
+       MOV  @-2(R6),R14
+       BL   @PROPF
+       CLR  @-2(R6)
+       MOV  R1,R1
+       JEQ  OPGN9
+       MOV  @VT5,R0
+       JLT  OPGN9
+       C    R0,@VT3
+       JHE  OPGN9
+       A    R0,R1
+       A    R0,R1
+       BL   @RDW
+       MOV  R0,@-2(R6)
+OPGN9  B    @NEXT
+OPRUNP BL   @FB
+       MOV  R0,R15
+       DECT R6
+       MOV  *R6,R14
+       BL   @PROPF
+       MOV  R1,R1
+       JEQ  ORP0
+       BL   @RDW               the word: a packed address or a value
+       MOV  @VT2,R1
+       CI   R1,>80
+       JEQ  ORP2
+       CI   R1,>40
+       JEQ  ORP3
+       MOV  R0,*R6+            a value
+       B    @NEXT
+ORP0   CLR  *R6+               none
+       B    @NEXT
+ORP2   MOV  R14,@NEWSLF        a routine: call it, SELF = the object
+       MOV  R0,R15
+       CLR  R14
+       B    @GOCALL
+ORP3   MOV  R0,R1              a string: print it, push 1
+       BL   @PRSTR
+       LI   R0,1
+       MOV  R0,*R6+
+       B    @NEXT
+OPCLLP BL   @FB
+       MOV  R0,R15             property
+       BL   @FB
+       MOV  R0,@VT5            argument count
+       SLA  R0,1               the object is under the arguments ...
+       MOV  R6,R1
+       S    R0,R1
+       DECT R1
+       MOV  *R1,R14
+       MOV  @VT5,R2            ... take it out: arguments down a word
+       JEQ  OCP2
+OCP1   MOV  @2(R1),*R1+
+       DEC  R2
+       JNE  OCP1
+OCP2   DECT R6
+       BL   @PROPF
+       MOV  R1,R1
+       JEQ  OCP8
+       MOV  @VT2,R0
+       CI   R0,>80
+       JNE  OCP8
+       BL   @RDW
+       MOV  R14,@NEWSLF
+       MOV  R0,R15
+       MOV  @VT5,R14
+       B    @GOCALL
+OCP8   MOV  @VT5,R0            not a routine: drop the arguments, 0
+       SLA  R0,1
+       S    R0,R6
+       CLR  *R6+
+       B    @NEXT
+
+* ---- arrays --------------------------------------------------------------------------
+* ARRAY - for array R14: VT1 = the story address of its first element,
+* VT2 = its length.  A run-time error if there is no such array.
+ARRAY  MOV  R11,@VT5
+       MOV  @H.ARRS,R1
+       BL   @RDW
+       C    R14,R0
+       JHE  ARR9
+       MOV  R14,R1
+       SLA  R1,2
+       A    @H.ARRS,R1
+       INCT R1
+       MOV  R1,@VT3
+       BL   @RDW
+       MOV  R0,@VT1
+       MOV  @VT3,R1
+       INCT R1
+       BL   @RDW
+       MOV  R0,@VT2
+       MOV  @VT5,R11
+       RT
+ARR9   MOV  R14,@ERRN1
+       LI   R1,ENOARR
+       B    @VMERR
+* AINDEX - R1 = the story address of element R15 of array R14 (ARRAY
+* already called); a run-time error outside the array.
+AINDEX MOV  R15,R15
+       JLT  AIX9
+       C    R15,@VT2
+       JHE  AIX9
+       MOV  @VT1,R1
+       A    R15,R1
+       A    R15,R1
+       RT
+AIX9   MOV  R15,@ERRN1
+       MOV  R14,@ERRN2
+       MOV  @VT2,R0
+       DEC  R0
+       MOV  R0,@ERRN3
+       LI   R1,EINDEX
+       B    @VMERR
+
+OPALD  BL   @FB
+       MOV  R0,R14
+       BL   @ARRAY
+       MOV  @-2(R6),R15
+       BL   @AINDEX
+       BL   @RDW
+       MOV  R0,@-2(R6)
+       B    @NEXT
+OPAST  BL   @FB
+       MOV  R0,R14
+       BL   @ARRAY
+       DECT R6
+       MOV  *R6,@VT4           value
+       DECT R6
+       MOV  *R6,R15
+       BL   @AINDEX
+       MOV  @VT4,R0
+       BL   @WRW
+       B    @NEXT
+OPALEN BL   @FB
+       MOV  R0,R14
+       BL   @ARRAY
+       MOV  @VT2,*R6+
+       B    @NEXT
+
+* ---- text ----------------------------------------------------------------------------
+OPPRS  BL   @FW
+       BL   @PRSTR
+       B    @NEXT
+OPPRV  DECT R6
+       MOV  *R6,R1
+       JEQ  OPPRV9
+       BL   @PRSTR
+OPPRV9 B    @NEXT
+OPPRN  DECT R6
+       MOV  *R6,R1
+       BL   @PRNUM
+       B    @NEXT
+OPPRO  DECT R6
+       MOV  *R6,R14
+       BL   @PRNAME
+       B    @NEXT
+OPPRC  DECT R6
+       MOV  *R6,R0
+       ANDI R0,>FF
+       BL   @CHOUT
+       B    @NEXT
+OPNL   LI   R0,10
+       BL   @CHOUT
+       B    @NEXT
+OPSTYL BL   @FB                (styles come with the bold and underline
+       B    @NEXT              glyph sets)
+
+* PRNAME - print object R14's short name; "nothing" for 0, "?" for an
+* object with no name.
+PRNAME MOV  R11,@VT4
+       MOV  R14,R1
+       JNE  PRNM1
+       LI   R1,SNOTHG
+       BL   @CHSTR
+       JMP  PRNM9
+PRNM1  BL   @SHORTN
+       MOV  R0,R1
+       JNE  PRNM2
+       LI   R1,SQUERY
+       BL   @CHSTR
+       JMP  PRNM9
+PRNM2  BL   @PRSTR
+PRNM9  MOV  @VT4,R11
+       RT
+* SHORTN - R0 = the packed address of object R14's short name (0 if
+* none).  Clobbers R1-R3, R9, R12, R13.
+SHORTN MOV  R11,@VT5
+       MOV  R14,R1
+       BL   @OBJE
+       AI   R1,12
+       BL   @RDW
+       MOV  R0,R1
+       BL   @RDW
+       MOV  @VT5,R11
+       RT
+
+* PRINTA: an article, then the name.  A proper name has none; "the" or
+* "The"; for "a": plural objects take "some", names starting with a
+* vowel "an".  (The attributes meaning proper and plural are in the
+* header; 255 means the game has none.)
+OPPRA  BL   @FB
+       MOV  R0,@VT3            form: 0 the, 1 The, 2 a, 3 A
+       DECT R6
+       MOV  *R6,R14
+       MOVB @H.PROP,R0         proper?
+       SRL  R0,8
+       CI   R0,255
+       JEQ  PRA1
+       BL   @HASAT
+       JNE  PRA9               proper: no article
+PRA1   LI   R1,STHE            the / The
+       MOV  @VT3,R0
+       CI   R0,2
+       JL   PRA7
+       MOVB @H.PROP+1,R0       plural?
+       SRL  R0,8
+       CI   R0,255
+       JEQ  PRA3
+       BL   @HASAT
+       JEQ  PRA3
+       LI   R1,SSOME
+       JMP  PRA7
+PRA3   BL   @SHORTN            a vowel?
+       MOV  R0,R1
+       JEQ  PRA5
+       BL   @FIRSTC
+       ORI  R0,>20             lower case (only letters matter here)
+       LI   R1,VOWELS
+PRA4   CB   @WS+1,*R1+         R0's low byte against each vowel
+       JEQ  PRA6
+       CB   *R1,@VOWEND
+       JNE  PRA4
+PRA5   LI   R1,SA
+       JMP  PRA7
+PRA6   LI   R1,SAN
+PRA7   MOV  @VT3,R0            a capital form: the twin string, which
+       ANDI R0,1               follows the lower-case one in the table
+       JEQ  PRA8
+       MOVB *R1,R0
+       SRL  R0,8
+       INC  R0
+       A    R0,R1
+PRA8   BL   @CHSTR
+PRA9   BL   @PRNAME
+       B    @NEXT
+* HASAT - EQ status clear (JNE taken) if object R14 has attribute R0.
+HASAT  MOV  R11,@VT2
+       MOV  R14,R1
+       MOV  R14,@VT4
+       MOV  R0,R14
+       BL   @ATTRB
+       MOV  @VT4,R14
+       BL   @RDB
+       MOV  @VT2,R11
+       CZC  R15,R0
+       RT
+VOWELS TEXT 'aeiou'
+VOWEND BYTE 0
+       EVEN
+
+* ---- input and system ------------------------------------------------------------------
+* READ: the parser arrives in M2.  For now a READ ends the game, which
+* is what the Python VM does when its command script runs out.
+OPREAD B    @VMEND
+OPRKEY BL   @FLUSH
+       BL   @WAITKY
+       SRL  R0,8
+       MOV  R0,*R6+
+       B    @NEXT
+
+* RANDOM: seed' = (75 * seed + 74) mod 65537 (the ZX81's generator, as
+* in txvm.py), then 1 + seed mod n.  The 32-bit product hi:lo mod 65537
+* is lo - hi (65536 = -1 mod 65537), plus 65537 (that is, plus 1 in 16
+* bits) when that goes negative.
+OPRAND DECT R6
+       MOV  *R6,R14            n
+       JGT  RND1
+       LI   R0,12345           n = 0: reseed
+       MOV  R14,R14
+       JEQ  RND0
+       MOV  R14,R0             n < 0: seed -n
+       NEG  R0
+RND0   MOV  R0,@SEED
+       CLR  *R6+
+       B    @NEXT
+RND1   MOV  @SEED,R1
+       LI   R0,75
+       MPY  R0,R1              R1:R2 = 75 * seed
+       AI   R2,74
+       JNC  RND2
+       INC  R1
+RND2   MOV  R2,R3              lo - hi, as a 17-bit value
+       S    R1,R3
+       C    R2,R1              lo < hi: negative, add 65537
+       JHE  RND3
+       INC  R3
+RND3   MOV  R3,@SEED
+       CLR  R0
+       MOV  R3,R1
+       DIV  R14,R0             R1 = seed mod n
+       INC  R1
+       MOV  R1,*R6+
+       B    @NEXT
+
+OPQUIT B    @VMEND
+* RESTART: the dynamic area back from the pristine copy (SAMS pages
+* PRPAGE on), the stacks emptied, Main called again.
+OPRST  BL   @PRISTN
+       B    @VMRUN
+OPSAVE CLR  *R6+               (saving and undo come in M4)
+       B    @NEXT
+OPREST CLR  *R6+
+       B    @NEXT
+OPUSAV CLR  *R6+
+       B    @NEXT
+OPUNDO CLR  *R6+
+       B    @NEXT
+* PICTURE and SOUND print a placeholder for now, as txvm.py does, so
+* the two VMs' transcripts agree until M4 makes them real.
+OPPIC  LI   R1,SPIC
+       JMP  OPPS1
+OPSND  LI   R1,SSND
+OPPS1  BL   @CHSTR
+       DECT R6
+       MOV  *R6,R1
+       BL   @PRNUM
+       LI   R0,']'
+       BL   @CHOUT
+       B    @NEXT
+OPSTAT B    @NEXT
+
+* ---- text for the handlers ------------------------------------------------------------
+SNOTHG BYTE 7
+       TEXT 'nothing'
+SQUERY BYTE 1
+       TEXT '?'
+STHE   BYTE 4
+       TEXT 'the '
+STHEC  BYTE 4
+       TEXT 'The '
+SSOME  BYTE 5
+       TEXT 'some '
+SSOMEC BYTE 5
+       TEXT 'Some '
+SA     BYTE 2
+       TEXT 'a '
+SAC    BYTE 2
+       TEXT 'A '
+SAN    BYTE 3
+       TEXT 'an '
+SANC   BYTE 3
+       TEXT 'An '
+SPIC   BYTE 9
+       TEXT '[picture '
+SSND   BYTE 7
+       TEXT '[sound '
+       EVEN

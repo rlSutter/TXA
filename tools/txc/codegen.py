@@ -288,6 +288,15 @@ class Gen:
                     self.expr(a)
                 return c.op('CALLPROP', self.prop_number(f.prop), len(e.args))
             u = f.id.upper()
+            from .sema import BUILTINS
+            if u in BUILTINS and u not in self.scope:
+                op, _, value = BUILTINS[u]
+                for a in e.args:
+                    self.expr(a)
+                c.op(op)
+                if not value:
+                    c.op('PUSH0')
+                return
             s = None if u in self.scope else self.p.sym(f.id)
             if s and s.kind == 'array':
                 self.expr(e.args[0]); return c.op('ALOAD', s.number)

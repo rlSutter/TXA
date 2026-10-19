@@ -73,3 +73,74 @@ KEYMAP EQU  RAMVAR+>1C         six keyboard column bytes (KSCAN), to >21
 SAVWRD EQU  RAMVAR+>22         8 words: >xFFE of windows 2,3,A-F (AMSSIZ)
 NUMBUF EQU  RAMVAR+>40         8 bytes: number formatting
 ROWBUF EQU  RAMVAR+>80         80 bytes: one text row (scrolling)
+
+* ---- the story VM (engine) --------------------------------------------
+* SAMS pages: 0-15 the identity-mapped 32K and overlays; 16-27 the undo
+* ring (M4); 28-31 a pristine copy of the dynamic area (RESTART); 32 on,
+* the story image: story byte address a lives in page 32 + a/4096.
+STPAGE EQU  32                 first SAMS page of the story image
+PRPAGE EQU  28                 first page of the pristine dynamic copy
+MAPRGA EQU  AMSREG+>1C         mapper register of window >E000 (A: code)
+MAPRGB EQU  AMSREG+>1E         window >F000 (B: data, the first 64K)
+MAPRGD EQU  AMSREG+>1A         window >D000 (D: text being printed)
+WINA   EQU  >E000
+WINB   EQU  >F000
+WIND   EQU  >D000
+
+VSTK   EQU  >3000              value stack, grows up, to >33FF
+VSTKND EQU  >3400
+FRAMES EQU  >3400              call frames, grow up, to >37FF
+FRMEND EQU  >3800
+* A frame: return page, return PC (window A address), the caller's value
+* stack pointer after its arguments are taken, the caller's SELF, the
+* local count, the caller's frame pointer; then the locals.  R7 points
+* at the locals, so the header is at R7-12.
+FRHDR  EQU  12
+
+* VM registers, kept in the workspace for speed:
+*   R4 = PC (an address in window A)    R5 = PC's story page
+*   R6 = value stack pointer (next free word)
+*   R7 = frame pointer (first local)    R8 = SELF
+* R9, R13 are helper link registers (never hold handler state);
+* R14, R15 are helper scratch.
+
+HDRCPY EQU  RAMVAR+>100        64 bytes: the story header, copied at load
+H.OBJS EQU  HDRCPY+16          object table offset
+H.NOBJ EQU  HDRCPY+18          object count
+H.GLOB EQU  HDRCPY+22          globals offset
+H.ARRS EQU  HDRCPY+24          array directory offset
+H.ABBR EQU  HDRCPY+32          substitution table offset
+H.ENTR EQU  HDRCPY+34          Main's packed address
+H.CSUM EQU  HDRCPY+36          checksum
+H.DYN  EQU  HDRCPY+14          dynamic area length
+H.LENH EQU  HDRCPY+10          image length, high word
+H.LENL EQU  HDRCPY+12          image length, low word
+H.TITL EQU  HDRCPY+46          16-byte title
+H.PROP EQU  HDRCPY+62          proper attribute (byte), then plural
+
+CURB   EQU  RAMVAR+>140        story page mapped in window B (-1 = none)
+FREND  EQU  RAMVAR+>142        end of the current frame (next frame's start)
+TPAGE  EQU  RAMVAR+>144        text reader: story page in window D
+TPTR   EQU  RAMVAR+>146        text reader: address in window D
+ABPTR  EQU  RAMVAR+>148        substitution being printed (story address)
+LLEN   EQU  RAMVAR+>14A        characters in the output line
+CROW   EQU  RAMVAR+>14C        screen row the next line goes on
+MORECT EQU  RAMVAR+>14E        lines since the last pause ([MORE])
+SEED   EQU  RAMVAR+>150        random number generator state
+ERRN1  EQU  RAMVAR+>152        numbers for a run-time error message
+ERRN2  EQU  RAMVAR+>154
+ERRN3  EQU  RAMVAR+>156
+NEWSLF EQU  RAMVAR+>158        SELF for the routine being called (-1 = keep)
+TMP1   EQU  RAMVAR+>15A        handler scratch words
+TMP2   EQU  RAMVAR+>15C
+TMP3   EQU  RAMVAR+>15E
+NUMDIG EQU  RAMVAR+>160        8 bytes: digits of a number being printed
+LBUF   EQU  RAMVAR+>170        80 bytes: the output line being built
+CHCHR  EQU  RAMVAR+>168        CHOUT: the character being added
+CHBRK  EQU  RAMVAR+>16A        CHOUT: the column of the line break
+VT1    EQU  RAMVAR+>1C0        handler scratch (output.a99 never touches these)
+VT2    EQU  RAMVAR+>1C2        PROPF: the property's kind bits
+VT3    EQU  RAMVAR+>1C4        PROPF: the property's length in words
+VT4    EQU  RAMVAR+>1C6
+VT5    EQU  RAMVAR+>1C8
+STBANK EQU  RAMVAR+>1CA        (unused; the story source is in storysrc.a99)

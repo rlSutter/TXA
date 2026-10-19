@@ -378,7 +378,10 @@ class Parser:
         return e
     def unary(self):
         if self.at_sym('-'):
-            t = self.take(); a = self.unary()
+            t = self.take()
+            if self.at('NUM') and self.tok.value == 32768:     # the one place 32768 may appear
+                self.take(); return A.Num(-32768, **self.pos(t))
+            a = self.unary()
             if isinstance(a, A.Num):
                 return A.Num(-a.value, **self.pos(t))
             return A.Unary('-', a, **self.pos(t))
@@ -403,7 +406,10 @@ class Parser:
     def primary(self):
         t = self.tok; p = self.pos()
         if t.kind == 'NUM':
-            self.take(); return A.Num(t.value, **p)
+            self.take()
+            if t.value == 32768:
+                self.err('number 32768 is larger than 32767 (-32768 is allowed)', t)
+            return A.Num(t.value, **p)
         if t.kind == 'STR':
             self.take(); return A.Str(t.value, **p)
         if t.kind == 'ACT':

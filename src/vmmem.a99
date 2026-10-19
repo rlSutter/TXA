@@ -1,0 +1,141 @@
+*======================================================================
+* vmmem.a99 - the story image in SAMS, seen through three 4K windows.
+*
+* The image lives in SAMS from page STPAGE; story byte address a is in
+* story page a/4096 at offset a mod 4096.  Three windows look at it:
+*
+*   A  >E000  the code being run.  R4 = PC (an address in the window),
+*             R5 = its story page.  FB moves to the next page when R4
+*             reaches >F000.
+*   B  >F000  data: the object table, properties, globals, arrays,
+*             dictionary and substitutions, all in the first 64K, so a
+*             16-bit story address names them.  CURB caches the page.
+*   D  >D000  text being printed: a string can be anywhere in 256K.
+*
+* A word never straddles two pages: words are on even addresses and
+* pages start on multiples of 4096.  Strings and routines may run over
+* a page end; the readers follow them.
+*
+* Register rules for these helpers: R0 returns the value; R2, R3, R12
+* are clobbered; R9 and R13 are link registers as each routine says.
+*======================================================================
+
+* MAPWIN - map story page R2 into the window whose mapper register is at
+* R3 (MAPRGA, MAPRGB or MAPRGD).  Clobbers R2, R12.  Leaf.
+* The card takes the page in either byte, so the page goes in both:
+* MOVB @WS+5 copies R2's low byte into its high byte.
+MAPWIN AI   R2,STPAGE
+       MOVB @WS+5,R2
+       LI   R12,AMSCRU
+       SBO  0
+       MOV  R2,*R3
+       SBZ  0
+       RT
+
+* SETPC - set the PC to story address (page R5, offset R1 0-4095) and
+* map the page into window A.  Clobbers R1-R3, R12.  Leaf (tail call).
+SETPC  MOV  R1,R4
+       AI   R4,WINA
+       MOV  R5,R2
+       LI   R3,MAPRGA
+       B    @MAPWIN
+
+* PACKPC - set the PC from a packed address R1 (byte address R1*4):
+* page = R1 / 1024, offset = (R1 mod 1024) * 4.  Clobbers R1-R3, R12.
+PACKPC MOV  R1,R5
+       SRL  R5,10
+       ANDI R1,>03FF
+       SLA  R1,2
+       JMP  SETPC
+
+* FB - fetch the byte at the PC into R0 (0-255), advancing the PC.
+* Clobbers R0 and, at a page end, R2, R3, R12.  Leaf.
+FB     MOVB *R4+,R0
+       SRL  R0,8
+       CI   R4,WINB            past the window's end?
+       JL   FB9
+       INC  R5                 next story page, from its start
+       LI   R4,WINA
+       MOV  R5,R2
+       LI   R3,MAPRGA
+       B    @MAPWIN            (its RT returns to our caller)
+FB9    RT
+
+* FW - fetch a word (high byte first) into R1.  Clobbers R0, R2, R3,
+* R12, R13 (link).
+FW     MOV  R11,R13
+       BL   @FB
+       MOV  R0,R1
+       SWPB R1
+       BL   @FB
+       SOC  R0,R1
+       B    *R13
+
+* BMAP - window B onto the page holding story address R1 (0->FFFF).
+* Returns R2 = the offset within the page.  Clobbers R3, R12, R13
+* (link).
+BMAP   MOV  R1,R2
+       SRL  R2,12
+       C    R2,@CURB
+       JEQ  BMAP1
+       MOV  R2,@CURB
+       LI   R3,MAPRGB
+       MOV  R11,R13
+       BL   @MAPWIN
+       MOV  R13,R11
+BMAP1  MOV  R1,R2
+       ANDI R2,>0FFF
+       RT
+
+* RDW / WRW / RDB / WRB - read or write the word or byte at story
+* address R1 (in the first 64K).  RDW and RDB return R0 (a byte in the
+* low half); WRW writes R0, WRB writes R0's low byte.  Clobbers R2, R3,
+* R12, R13, R9 (link).
+RDW    MOV  R11,R9
+       BL   @BMAP
+       MOV  @WINB(R2),R0
+       B    *R9
+WRW    MOV  R11,R9
+       BL   @BMAP
+       MOV  R0,@WINB(R2)
+       B    *R9
+RDB    MOV  R11,R9
+       BL   @BMAP
+       MOVB @WINB(R2),R0
+       SRL  R0,8
+       B    *R9
+WRB    MOV  R11,R9
+       BL   @BMAP
+       SWPB R0
+       MOVB R0,@WINB(R2)
+       SWPB R0
+       B    *R9
+
+* TXSET - start reading the string at packed address R1, in window D.
+* Clobbers R1-R3, R12.  Leaf.
+TXSET  MOV  R1,R2
+       SRL  R2,10              page
+       MOV  R2,@TPAGE
+       ANDI R1,>03FF
+       SLA  R1,2
+       AI   R1,WIND
+       MOV  R1,@TPTR
+       LI   R3,MAPRGD
+       B    @MAPWIN
+
+* TXNEXT - the next byte of the string (R0, 0-255).  Window D must still
+* show TPAGE: anything that maps window D in between must call TXREMAP.
+* Clobbers R0-R3, R12.  Leaf.
+TXNEXT MOV  @TPTR,R1
+       MOVB *R1+,R0
+       SRL  R0,8
+       CI   R1,WIND+>1000
+       JL   TXN1
+       INC  @TPAGE             the string runs into the next page
+       LI   R1,WIND
+       MOV  R1,@TPTR
+       MOV  @TPAGE,R2
+       LI   R3,MAPRGD
+       B    @MAPWIN
+TXN1   MOV  R1,@TPTR
+       RT

@@ -102,12 +102,43 @@ More language details settled (for Rebecca's review):
 - Direction properties for in and out are INSIDE and OUTSIDE, because
   IN is the keyword for an object's parent.
 
-Next in M1: the VM in assembly (dispatch, stack and frames, variables,
-arithmetic, control, the object tree, properties, arrays, text output
-with word wrap and [MORE]), loading a story image into SAMS, and the
-test that runs the same images on both VMs and compares transcripts.
+Also done (the engine):
+- the VM in TMS9900 assembly: `src/engine.a99` (boot, loading the story
+  from cartridge banks into SAMS, checksum, the pristine dynamic copy,
+  run-time errors, the end of the story), `src/vm.a99` (dispatch and all
+  71 opcodes), `src/vmmem.a99` (the story through three SAMS windows: A
+  for code, B for data, D for text being printed), `src/output.a99`
+  (CHOUT, word wrap at 80 columns, scrolling, [MORE], strings, numbers).
+  The resident engine is about 5K at >A000; the kernel 2K at >2000.
+- `tests/m1_vm_test.py`, 13 checks: the same compiled images run on the
+  assembly VM (in the simulator) and the Python VM, and every character
+  the engine prints must equal the Python transcript; plus the screen
+  against a model of the wrap rules, the opcode table against
+  `opcodes.py`, and a damaged story refused.
+- `demos/m1demo.txa` and its cartridge `txa-m1demo8.bin` for js99er.
 
-## Next: M1 remaining
+More language additions (for Rebecca's review):
+- built-in functions with reserved names: PARENT, CHILD, SIBLING,
+  RANDOM, READKEY, SAVE, RESTORE, UNDOSAVE, UNDO, QUIT, RESTART, STATUS,
+  SOUND (save/undo are placeholders returning 0 until M4);
+- -32768 may be written (only with the minus sign).
+
+A real bug found by the tests and fixed: a second press of the same
+key at a second [MORE] was ignored, because nothing scans the keyboard
+between waits.  Each wait now forgets the last key.
+
+SAMS layout change from the spec: pages 28-31 hold a pristine copy of
+the dynamic area for RESTART, so the undo ring is pages 16-27 (48K).
+
+M1 remaining: bold and underline glyph sets (STYLE), and Rebecca's
+js99er check of the demo cartridge.
+
+## Next: M2 (the parser)
+
+Tokenizer, dictionary lookup, grammar tables in the image, noun
+resolution, disambiguation, orders, AGAIN/OOPS; READ becomes real.
+
+## (old heading) M1 remaining
 
 Python cross-compiler's semantic pass and code generation; the VM,
 text output, word wrap and [MORE]; bold and underline glyph sets.
@@ -126,6 +157,7 @@ text output, word wrap and [MORE]; bold and underline glyph sets.
 
 ## History
 
+- 2026-10-19 M1: the assembly VM, cross-checked against the Python VM; the demo cartridge.
 - 2026-10-19 M1: semantic pass, opcodes, code generation and linking, Python reference VM.
 - 2026-10-19 M1 begun: the TXA lexer and parser (`tools/txc/`), 31-check test.
 - 2026-10-19 M0: repository, kernel ported (VDP, F18A, SAMS, keyboard),

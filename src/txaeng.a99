@@ -1,0 +1,32 @@
+*======================================================================
+* txaeng.a99 - the engine build: the VM at >A000, the kernel at >2000.
+*
+* tools/build.py assembles this twice: once to learn the engine's size,
+* then again with gen/storysrc.a99 saying which cartridge bank the story
+* starts in.  The resident engine must end below >D000: window D (text)
+* is mapped over >D000 while the story runs.  build.py checks.
+*======================================================================
+       COPY "macros.a99"
+       COPY "defs.a99"
+
+       AORG >A000
+       COPY "engine.a99"
+       COPY "vm.a99"
+       COPY "vmmem.a99"
+       COPY "output.a99"
+       COPY "gen/storysrc.a99"
+* ENGND: first free byte of the resident window
+ENGND
+
+       AORG >2000
+KENTRY B    @START             the entry: E/A 5 and the cartridge start here
+       COPY "vdp.a99"
+       COPY "f18a.a99"
+       COPY "pager.a99"
+       COPY "keys.a99"
+       COPY "text80.a99"
+       COPY "rle.a99"
+* KERNND: first free byte of the kernel window
+KERNND
+       COPY "gen/font.a99"
+       END  START

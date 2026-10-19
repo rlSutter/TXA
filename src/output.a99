@@ -1,0 +1,294 @@
+*======================================================================
+* output.a99 - everything the story prints goes through CHOUT.
+*
+* CHOUT takes one character at a time and builds the current line in
+* LBUF.  A line is written to the screen (EMITLN) when the story ends it
+* or when it passes 80 columns; then it breaks at the last space, which
+* is dropped, and the rest of the word starts the next line.  A word
+* longer than the whole line is cut at 80.  A space arriving exactly at
+* the break is dropped too.  tests/m1_vm_test.py checks the screen
+* against a Python model of these rules.
+*
+* The text window runs from TXTTOP to the bottom row.  Lines go in at
+* CROW; when CROW passes the bottom, the window scrolls.  After a
+* windowful of lines with no input, [MORE] waits for a key.
+*
+* CHOUT is the one way text reaches the screen, which is why the tests
+* watch it: the stream of characters passing through it must equal the
+* Python reference VM's transcript, character for character.
+*
+* Registers: CHOUT and everything below preserve R4-R8 (the VM's) and
+* clobber R0-R3, R12, R14, R15.
+*======================================================================
+
+* CHOUT - print the character in R0 (low byte; 10 = new line).
+CHOUT  .enter
+       MOV  R0,@CHCHR          keep the character across the calls below
+       CI   R0,10
+       JNE  CHO1
+       BL   @EMITLN            a new line: write what there is
+       JMP  CHO9
+CHO1   MOV  @LLEN,R1
+       CI   R1,COLS
+       JL   CHO6               room on the line: just add it
+       CI   R0,' '             full, and a space: the break, dropped
+       JNE  CHO2
+       BL   @EMITLN
+       JMP  CHO9
+CHO2   LI   R2,COLS-1          full mid-word: find the last space
+CHO3   CB   @LBUF(R2),@SPC
+       JEQ  CHO4
+       DEC  R2
+       JOC  CHO3               (DEC sets carry while the result is >= 0)
+       BL   @EMITLN            no space at all: cut the word at 80
+       JMP  CHO6
+CHO4   MOV  R2,@CHBRK          the space's column
+       MOV  R2,@LLEN           write the line up to the space
+       BL   @EMITLN
+       MOV  @CHBRK,R2          move the word's start to the line start
+       LI   R1,COLS-1
+       S    R2,R1              R1 = characters after the space
+       MOV  R1,@LLEN
+       JEQ  CHO6
+       INC  R2
+       CLR  R3
+CHO5   MOVB @LBUF(R2),@LBUF(R3)
+       INC  R2
+       INC  R3
+       DEC  R1
+       JNE  CHO5
+CHO6   MOV  @CHCHR,R0          add the character
+       SWPB R0
+       MOV  @LLEN,R1
+       MOVB R0,@LBUF(R1)
+       INC  @LLEN
+CHO9   .leave
+       RT
+SPC    TEXT ' '
+       EVEN
+
+* EMITLN - write LBUF (LLEN characters) on row CROW, blank to the
+* right, and move down a row; scroll first if CROW is below the window.
+* Counts lines toward [MORE].
+EMITLN .enter
+       BL   @ROWFIT            CROW onto the screen (scrolling)
+       MOV  @CROW,R0
+       MPY  @D80,R0            R1 = row * 80
+       MOV  R1,R0
+       MOV  R0,R14             row start, kept
+       LI   R1,LBUF
+       MOV  @LLEN,R2
+       JEQ  EML1
+       BL   @VMBW
+EML1   MOV  R14,R0             blank the rest of the row
+       A    @LLEN,R0
+       LI   R1,>2000
+       LI   R2,COLS
+       S    @LLEN,R2
+       JEQ  EML2
+       BL   @VFILL
+EML2   CLR  @LLEN
+       INC  @CROW
+       INC  @MORECT            a windowful without a pause?
+       MOV  @ROWS,R0
+       S    @TXTTOP,R0
+       DEC  R0                 (one row is left for [MORE] itself)
+       C    @MORECT,R0
+       JL   EML9
+       BL   @MORE
+EML9   .leave
+       RT
+
+* ROWFIT - if CROW is past the bottom row, scroll the text window up a
+* row and put CROW on the bottom row.
+ROWFIT .enter
+       C    @CROW,@ROWS
+       JL   RWF9
+       BL   @WSCRL
+       MOV  @ROWS,R0
+       DEC  R0
+       MOV  R0,@CROW
+RWF9   .leave
+       RT
+
+* WSCRL - scroll rows TXTTOP+1 .. bottom up one row; blank the bottom.
+* One row at a time through ROWBUF.  Uses R0-R3, R14, R15 (not
+* text80.a99's TXSCRL, which uses R4-R8, the VM's registers).
+WSCRL  .enter
+       MOV  @TXTTOP,R14        destination row
+       MOV  @ROWS,R15
+       DEC  R15                bottom row
+WSC1   C    R14,R15
+       JHE  WSC2
+       MOV  R14,R1
+       INC  R1
+       MPY  @D80,R1            R2 = (n+1) * 80
+       MOV  R2,R0
+       LI   R1,ROWBUF
+       LI   R2,COLS
+       BL   @VMBR
+       MOV  R14,R1
+       MPY  @D80,R1
+       MOV  R2,R0
+       LI   R1,ROWBUF
+       LI   R2,COLS
+       BL   @VMBW
+       INC  R14
+       JMP  WSC1
+WSC2   MOV  R15,R0
+       MOV  R15,R1
+       BL   @TXROWS
+       .leave
+       RT
+
+* MORE - "[MORE]" in reverse video on the next row; wait for a key;
+* blank it.  The count starts again.
+MORE   .enter
+       BL   @ROWFIT
+       MOV  @CROW,R0
+       MPY  @D80,R0
+       MOV  R1,R0
+       MOV  R0,R14
+       BL   @VWAD
+       LI   R1,SMORE
+       LI   R2,6
+MOR1   MOVB *R1+,R3
+       SOCB @B80,R3            the reverse glyph set
+       MOVB R3,@VDPWD
+       DEC  R2
+       JNE  MOR1
+       BL   @WAITKY
+       MOV  R14,R0
+       LI   R1,>2000
+       LI   R2,6
+       BL   @VFILL
+       CLR  @MORECT
+       .leave
+       RT
+SMORE  TEXT '[MORE]'
+B80    BYTE >80
+       EVEN
+
+* WAITKY - wait for a key press; R0 = its code (high byte).  Saves R4
+* and R5 around the keyboard scan, which uses them.
+* KEYGET reports a key only when it differs from the last one it saw.
+* Nothing scans the keyboard between two waits, so a release in between
+* goes unseen and pressing the same key again (SPACE at every [MORE])
+* would look like one long press.  So each wait forgets the last key.
+WAITKY .enter
+       DECT R10
+       MOV  R4,*R10
+       DECT R10
+       MOV  R5,*R10
+       CLR  @KEYLST
+WKY1   BL   @KSCAN
+       BL   @KEYGET
+       MOV  R0,R0
+       JEQ  WKY1
+       MOV  *R10+,R5
+       MOV  *R10+,R4
+       .leave
+       RT
+
+* FLUSH - write a partly built line (at a prompt, or when the game
+* ends) without waiting for more.
+FLUSH  .enter
+       MOV  @LLEN,R0
+       JEQ  FLS9
+       BL   @EMITLN
+FLS9   .leave
+       RT
+
+* CHSTR - print the length-prefixed string at R1 (in RAM).
+CHSTR  .enter
+       MOVB *R1+,R2
+       SRL  R2,8
+       JEQ  CHS9
+       MOV  R1,@TMP1
+       MOV  R2,@TMP2
+CHS1   MOV  @TMP1,R1
+       MOVB *R1+,R0
+       SRL  R0,8
+       MOV  R1,@TMP1
+       BL   @CHOUT
+       DEC  @TMP2
+       JNE  CHS1
+CHS9   .leave
+       RT
+
+* PRSTR - print the story string at packed address R1.  Bytes 1-127
+* are characters (10 = new line); >80->FF are entries of the
+* substitution table, each a zero-ended run of characters; 0 ends.
+PRSTR  .enter
+       BL   @TXSET
+PRS1   BL   @TXNEXT
+       MOV  R0,R0
+       JEQ  PRS9
+       CI   R0,>80
+       JHE  PRS2
+       BL   @CHOUT
+       JMP  PRS1
+PRS2   AI   R0,->80            a substitution: its offset from the table
+       SLA  R0,1
+       MOV  @H.ABBR,R1
+       A    R0,R1
+       BL   @RDW
+       A    @H.ABBR,R0
+       MOV  R0,@ABPTR
+PRS3   MOV  @ABPTR,R1
+       BL   @RDB
+       MOV  R0,R0
+       JEQ  PRS1
+       INC  @ABPTR
+       BL   @CHOUT
+       JMP  PRS3
+PRS9   .leave
+       RT
+
+* FIRSTC - the first character of the story string at packed address
+* R1 (following a substitution), in R0; 0 for an empty string.
+FIRSTC .enter
+       BL   @TXSET
+       BL   @TXNEXT
+       CI   R0,>80
+       JL   FSC9
+       AI   R0,->80
+       SLA  R0,1
+       MOV  @H.ABBR,R1
+       A    R0,R1
+       BL   @RDW
+       MOV  R0,R1
+       A    @H.ABBR,R1
+       BL   @RDB
+FSC9   .leave
+       RT
+
+* PRNUM - print R1 as a signed decimal number.
+PRNUM  .enter
+       MOV  R1,R1
+       JGT  PRN1
+       JEQ  PRN1
+       MOV  R1,@TMP1
+       LI   R0,'-'
+       BL   @CHOUT
+       MOV  @TMP1,R1
+       NEG  R1                 -32768 stays >8000: 32768 unsigned, right
+PRN1   LI   R14,NUMDIG         digits, last first
+PRN2   CLR  R0
+       DIV  @D10,R0            R0 = R1 / 10, R1 = remainder (unsigned)
+       AI   R1,'0'
+       SWPB R1
+       MOVB R1,*R14+
+       MOV  R0,R1
+       JNE  PRN2
+       MOV  R14,@TMP1
+PRN3   DEC  @TMP1
+       MOV  @TMP1,R1
+       MOVB *R1,R0
+       SRL  R0,8
+       BL   @CHOUT
+       C    @TMP1,@NUMDP
+       JNE  PRN3
+       .leave
+       RT
+NUMDP  DATA NUMDIG
