@@ -1,0 +1,40 @@
+! The example from the specification's Authoring language section.
+INCLUDE "DSK1.STDLIB"
+
+ROOM Kitchen "Kitchen"
+  DESC "A cramped kitchen. A trapdoor is set in the floor."
+  DOWN Trapdoor
+  HAS light
+END
+
+OBJECT Trapdoor "trapdoor" IN Kitchen
+  CLASS Door
+  NAME "trapdoor" "trap" "door"
+  HAS openable scenery
+  DOOR_TO Cellar
+END
+
+OBJECT Lamp "brass lamp" IN Kitchen
+  NAME "brass" "lamp" "lantern"
+  HAS switchable
+  INITIAL "A brass lamp sits on the table."
+  BEFORE
+    Rub:
+      IF self HAS on
+        PRINT "The glass is too hot to rub."
+        RETURN TRUE
+      END
+  END
+  AFTER
+    SwitchOn:  GIVE self light
+    SwitchOff: GIVE self NOT light
+  END
+END
+
+VERB "rub" "polish"
+  noun -> Rub
+END
+
+ROUTINE RubSub
+  PRINT "You rub ", (the) noun, ". Nothing happens."
+END

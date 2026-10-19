@@ -50,10 +50,40 @@ to work. On an F18A or a PICO9918 PRO both should work.
 - **Picture pane size**: settled by M0. 30 rows works, so the split
   screen (96-line pane, 17 text rows) is the main layout.
 
-## Next: M1 (VM and compiler core)
+## M1 (VM and compiler core): under way
 
-Python cross-compiler for declarations, routines and expressions; the
-VM, text output, word wrap and [MORE]; bold and underline glyph sets.
+Done: the compiler's front end, `tools/txc/` (lexer, AST, parser), with
+`tests/txc_parse_test.py` (31 checks: the spec's example, every
+construct, and ten malformed inputs that must get a clear message on the
+right line).
+
+Syntax details settled while building the parser (for Rebecca's review;
+the spec's language summary is unchanged by them):
+
+- Keywords are written in uppercase, but keywords and names are matched
+  without regard to case, so ALPHA LOCK never breaks a program.
+- `PRINT` ends the line; `WRITE` prints without ending it.
+- `ATTRIBUTE` and `PROPERTY` declare new attributes and properties (the
+  standard library declares its own this way).
+- Any property can hold a routine: the property name alone on its line,
+  then statements, then `END` (`DESC ... END`). In a routine property,
+  `Action, Action:` lines open rule cases, which is how `BEFORE ... END`
+  works.
+- Array elements use call syntax: `slots(3) = 7`.
+- Action names may be keywords (`Give`, `Remove`, `Move`) after `->` and
+  in case labels.
+- Hex numbers use the TI's `>` prefix (`>1F`).
+- A statement line must be a statement, a call or an assignment;
+  `target = value` at the start of a line always assigns.
+
+Next in M1: names and checking (the symbol table, attribute and
+property numbering, the object tree), then code generation and the
+story-image layout, then the VM in assembly.
+
+## Next: M1 remaining
+
+Python cross-compiler's semantic pass and code generation; the VM,
+text output, word wrap and [MORE]; bold and underline glyph sets.
 
 ## Decisions
 
@@ -65,9 +95,11 @@ VM, text output, word wrap and [MORE]; bold and underline glyph sets.
 | 2026-10-18 | Native workbench delivered and documented separately |
 | 2026-10-18 | Full spec as a Claude Doc before coding |
 | 2026-10-19 | M0 started from The Lantern Coast 1.13 bundle |
+| 2026-10-19 | Authoring language approved as proposed: uppercase keywords, terse property names, BEFORE ... END rule blocks, name TXA |
 
 ## History
 
+- 2026-10-19 M1 begun: the TXA lexer and parser (`tools/txc/`), 31-check test.
 - 2026-10-19 M0: repository, kernel ported (VDP, F18A, SAMS, keyboard),
   80-column text layer, RLE picture decoder, SAMS page counting, the
   probe, cartridge loader, build (EA5 + disk image + cartridge),
