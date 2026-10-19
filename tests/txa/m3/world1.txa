@@ -68,11 +68,12 @@ ROUTINE WatchActions
   END
   RETURN FALSE
 END
+REPLACE JumpSub
 ROUTINE JumpSub
   PRINT "You jump."
 END
-VERB "jump" "hop"
-  -> Jump
+EXTEND "jump" FIRST
+  "about" -> Jump
 END
 VERB "light"
   noun -> Kindle

@@ -78,7 +78,7 @@ t0 = time.time()
 got, m, why, per_cmd = play(img, cmds)
 ok = got == want and why == 'halt'
 i = next((k for k in range(min(len(got), len(want))) if got[k] != want[k]), min(len(got), len(want)))
-check(f'the 45-command script: engine transcript = Python transcript ({len(want)} chars, {time.time() - t0:.0f}s)', ok,
+check(f'the parser script: engine transcript = Python transcript ({len(want)} chars, {time.time() - t0:.0f}s)', ok,
       f'stopped by {why}; first difference at {i}:\n  python: {want[max(0, i-80):i+60]!r}\n  engine: {got[max(0, i-80):i+60]!r}')
 if per_cmd:
     # An estimate only: about 9 microseconds an instruction for this kind of

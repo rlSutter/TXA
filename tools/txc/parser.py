@@ -122,6 +122,16 @@ class Parser:
             return self.objdecl(k, p)
         elif k == 'VERB':
             return self.verb(p)
+        elif k == 'EXTEND':
+            w = self.expect('STR', what='a verb word in quotes').value
+            first = False
+            if self.at_kw('FIRST'):
+                self.take(); first = True
+            self.expect_nl()
+            v = self.verb_lines(p)
+            return A.Extend(w, first, v, **p)
+        elif k == 'REPLACE':
+            d = A.Replace(self.ident('the routine to replace'), **p)
         elif k == 'ROUTINE':
             n = self.ident('the routine name'); params = []
             if self.at('ID'):
@@ -200,6 +210,9 @@ class Parser:
         while self.at('STR'):
             words.append(self.take().value)
         self.expect_nl()
+        return A.Verb(words, self.verb_lines(p), **p)
+
+    def verb_lines(self, p):
         lines = []
         while not self.at_kw('END'):
             if self.at('EOF'):
@@ -222,7 +235,7 @@ class Parser:
             self.expect_nl()
             lines.append(A.GLine(toks, act, rev, **lp))
         self.take(); self.expect_nl()
-        return A.Verb(words, lines, **p)
+        return lines
 
     # ---- statements
     def stmts(self, enders, cases=False):

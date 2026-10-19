@@ -27,6 +27,8 @@ Property  = node('Property', 'names')
 Picture   = node('Picture', 'name', 'path')
 ObjDecl   = node('ObjDecl', 'kind', 'name', 'short', 'parent', 'body')   # kind: CLASS, OBJECT, ROOM
 Verb      = node('Verb', 'words', 'lines')
+Extend    = node('Extend', 'word', 'first', 'lines')            # EXTEND "verb" [FIRST]
+Replace   = node('Replace', 'name')                            # REPLACE routine
 GLine     = node('GLine', 'tokens', 'action', 'reverse')
 GTok      = node('GTok', 'kind', 'value', 'filter')            # kind: 'slot' / 'word'; filter: routine for noun=R / scope=R
 Routine   = node('Routine', 'name', 'params', 'body')

@@ -1,0 +1,53 @@
+! world3.txa - M3 part 3: the standard verbs, REPLACE and EXTEND.
+INCLUDE "DSK1.STDLIB"
+
+ROOM Shed "Potting Shed"
+  DESC "Shelves of clay pots and a smell of earth."
+  HAS light
+END
+OBJECT Cloak "wool cloak" IN Shed
+  NAME "wool" "cloak"
+  HAS wearable
+END
+OBJECT Bread "heel of bread" IN Shed
+  NAME "heel" "bread"
+  HAS edible
+END
+OBJECT Note "note" IN Shed
+  NAME "note" "paper"
+  DESC "It says: water the ferns."
+END
+OBJECT Pots "clay pots" IN Shed
+  NAME "clay" "pots" "pot" "shelves"
+  HAS scenery plural
+END
+OBJECT Lever "rusty lever" IN Shed
+  NAME "rusty" "lever"
+  HAS static
+  BEFORE
+    Pull: PRINT "The lever grinds down. Somewhere, water gurgles."
+          RETURN TRUE
+  END
+END
+OBJECT Gardener "gardener" IN Shed
+  NAME "gardener" "old" "man"
+  HAS animate male
+  LIFE
+    Show: PRINT "~That's ", (the) noun, ", that is,~ the gardener says."
+          RETURN TRUE
+    Kiss: PRINT "The gardener looks startled."
+          RETURN TRUE
+  END
+END
+
+REPLACE SingSub
+ROUTINE SingSub
+  PRINT "You hum a tune the ferns seem to like."
+END
+EXTEND "smell"
+  "the" "air" -> Smell
+END
+
+ROUTINE Initialise
+  location = Shed
+END

@@ -316,6 +316,27 @@ Part 2 done (19 October 2026):
 Library names that collide (names ignore case): IsInside, not Inside
 (the INSIDE exit property).
 
+Part 3 done (19 October 2026):
+- lib/verbs2.txa: about 45 more verbs (73 verbs, 76 actions in all):
+  READ, EAT, DRINK, WEAR, REMOVE/DOFF/TAKE OFF, PUSH/PULL/MOVE/TURN,
+  TOUCH, SMELL, LISTEN, TASTE, THROW AT, SHOW, KISS, ATTACK, ANSWER/SAY,
+  CLIMB, DIG, BURN, CUT, TIE, FILL, WAVE, SQUEEZE, BLOW, BUY, SLEEP,
+  WAKE, THINK, SING, PRAY, SWIM, JUMP, YES, NO, SORRY, RESTART, SAVE,
+  RESTORE, UNDO, VERSION.  Default responses written fresh for TXA.
+- QUIT and RESTART ask yes or no (YesOrNo); SAVE, RESTORE, UNDO report
+  failure until M4.
+- Language: REPLACE name (the game's routine of that name replaces the
+  library's: the one in the same file as the REPLACE is kept) and
+  EXTEND "verb" [FIRST] (grammar lines added to an existing verb).
+- TAKE OFF X / GET OFF X: TakeOffSub decides (worn or held: Disrobe;
+  otherwise get off).
+- tests: world3 (reference + 8 named checks); the engine plays all three
+  M3 worlds identically, status lines checked.  The parser script now
+  ends with "y" for the quit question.
+- size: world3 compiles to 24K with 5K of dynamic state.
+- speed: the bigger library raised the parser script's estimate from
+  0.8 s to 1.0 s median (worst 3.7 -> 4.3 s); to look into.
+
 ## Next
 
 1. M3 part 3: the verb set.  Part 4: the sample game.
@@ -353,6 +374,7 @@ text output, word wrap and [MORE]; bold and underline glyph sets.
 
 ## History
 
+- 2026-10-19 M3 part 3: the verb set (73 verbs), QUIT/RESTART confirmation, REPLACE and EXTEND.
 - 2026-10-19 M3 part 2: doors, floating objects, locks and keys, containers in depth, inventory contents, EMPTY, ENTER/EXIT.
 - 2026-10-19 M3 part 1: action sequence and hooks, end of turn (daemons, timers, EACH_TURN, score notification), light, room descriptions and modes, status line in the engine.
 - 2026-10-19 Engine speed work: scratchpad block, globals in RAM, unrolled VDP reads, LOAD/STORE paths: 8.13M -> 5.50M instructions on the script.

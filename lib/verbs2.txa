@@ -1,0 +1,465 @@
+! verbs2.txa - the rest of the standard verbs: grammar and default
+! responses.  Every response here is a default: a game changes any of
+! them with BEFORE rules on objects or rooms, or the beforehook.
+
+VERB "read"
+  noun -> Read
+END
+VERB "eat"
+  held -> Eat
+END
+VERB "drink" "sip" "swallow"
+  noun -> Drink
+END
+VERB "wear" "don"
+  held -> Wear
+END
+VERB "remove"
+  held -> Disrobe
+  multiinside "from" noun -> Remove
+END
+VERB "doff"
+  held -> Disrobe
+END
+VERB "push" "press" "shove"
+  noun -> Push
+  noun noun -> PushDir
+END
+VERB "pull" "drag" "tug"
+  noun -> Pull
+END
+VERB "move" "shift"
+  noun -> Push
+END
+VERB "rotate" "twist" "screw" "unscrew"
+  noun -> Turn
+END
+VERB "touch" "feel" "pat" "stroke"
+  noun -> Touch
+END
+VERB "smell" "sniff"
+  -> Smell
+  noun -> Smell
+END
+VERB "listen" "hear"
+  -> Listen
+  noun -> Listen
+  "to" noun -> Listen
+END
+VERB "taste" "lick"
+  noun -> Taste
+END
+VERB "throw" "toss" "hurl"
+  held "at" noun -> ThrowAt
+  held "to" noun -> ThrowAt
+  held -> Drop
+END
+VERB "show" "display"
+  held "to" creature -> Show
+  creature held -> Show REVERSE
+END
+VERB "kiss" "hug" "embrace"
+  creature -> Kiss
+END
+VERB "attack" "hit" "kill" "fight" "punch" "kick" "strike" "smash" "break"
+  noun -> Attack
+END
+VERB "answer" "say" "shout" "speak"
+  topic "to" creature -> Answer
+  topic -> Answer
+END
+VERB "climb" "scale"
+  noun -> Climb
+  "up" noun -> Climb
+  "over" noun -> Climb
+END
+VERB "dig"
+  -> Dig
+  noun -> Dig
+  noun "with" held -> Dig
+END
+VERB "burn" "ignite"
+  noun -> Burn
+  noun "with" held -> Burn
+END
+VERB "cut" "chop" "slice"
+  noun -> Cut
+  noun "with" held -> Cut
+END
+VERB "tie" "attach" "fasten"
+  noun -> Tie
+  noun "to" noun -> Tie
+END
+VERB "fill"
+  noun -> Fill
+END
+VERB "wave"
+  -> WaveHands
+  noun -> Wave
+END
+VERB "squeeze" "squash"
+  noun -> Squeeze
+END
+VERB "blow"
+  held -> Blow
+END
+VERB "buy" "purchase"
+  noun -> Buy
+END
+VERB "sleep" "nap"
+  -> Sleep
+END
+VERB "wake" "awake"
+  -> Wake
+  "up" -> Wake
+  creature -> WakeOther
+  creature "up" -> WakeOther
+END
+VERB "think" "ponder"
+  -> Think
+END
+VERB "sing" "hum" "whistle"
+  -> Sing
+END
+VERB "pray"
+  -> Pray
+END
+VERB "swim" "dive"
+  -> Swim
+END
+VERB "jump" "hop" "leap"
+  -> Jump
+  "over" noun -> JumpOver
+END
+VERB "yes" "y"
+  -> Yes
+END
+VERB "no"
+  -> No
+END
+VERB "sorry"
+  -> Sorry
+END
+VERB "restart"
+  -> Restart
+END
+VERB "save"
+  -> Save
+END
+VERB "restore"
+  -> Restore
+END
+VERB "undo"
+  -> Undo
+END
+VERB "version"
+  -> Version
+END
+
+! ---- a yes or no from the player -------------------------------------------
+ROUTINE YesOrNo
+  LOCAL w
+  WHILE TRUE
+    WRITE "> "
+    IF READ(text2, parse2) > 0
+      w = parse2(1)
+      IF w = 'yes' OR w = 'y'
+        RETURN TRUE
+      END
+      IF w = 'no' OR w = 'n'
+        RETURN FALSE
+      END
+    END
+    WRITE "Please answer yes or no."
+  END
+END
+
+! ---- the actions ---------------------------------------------------------------
+ROUTINE ReadSub
+  IF NOT IsLit()
+    PRINT "It is too dark to read."
+  ELSEIF noun.DESC()
+    FRESHLINE()
+  ELSE
+    PRINT "There is nothing written on ", (the) noun, "."
+  END
+END
+
+ROUTINE EatSub
+  IF noun HASNT edible
+    PRINT "That's hardly something to eat."
+  ELSE
+    REMOVE noun
+    IF AfterRules()
+      RETURN
+    END
+    PRINT "You eat ", (the) noun, ". It does the job."
+  END
+END
+
+ROUTINE DrinkSub
+  PRINT "That's not something you can drink."
+END
+
+ROUTINE WearSub
+  IF noun HASNT wearable
+    PRINT "You can't wear that."
+  ELSEIF noun HAS worn
+    PRINT "You're already wearing ", (the) noun, "."
+  ELSE
+    GIVE noun worn
+    IF AfterRules()
+      RETURN
+    END
+    PRINT "You put on ", (the) noun, "."
+  END
+END
+
+ROUTINE DisrobeSub
+  IF noun HASNT worn
+    PRINT "You aren't wearing ", (the) noun, "."
+  ELSE
+    GIVE noun NOT worn
+    IF AfterRules()
+      RETURN
+    END
+    PRINT "You take off ", (the) noun, "."
+  END
+END
+
+ROUTINE FixedOrNot
+  IF noun HAS animate
+    PRINT (The) noun, " might object to that."
+    RETURN TRUE
+  END
+  IF noun HAS static OR noun HAS scenery
+    PRINT (The) noun, " won't budge."
+    RETURN TRUE
+  END
+  RETURN FALSE
+END
+
+ROUTINE PushSub
+  IF NOT FixedOrNot()
+    PRINT "You push ", (the) noun, ", but nothing comes of it."
+  END
+END
+
+ROUTINE PushDirSub
+  PRINT "You'd do better to pick it up and carry it."
+END
+
+ROUTINE PullSub
+  IF NOT FixedOrNot()
+    PRINT "You pull ", (the) noun, ", but nothing comes of it."
+  END
+END
+
+ROUTINE TurnSub
+  IF NOT FixedOrNot()
+    PRINT "Turning ", (the) noun, " does nothing useful."
+  END
+END
+
+ROUTINE TouchSub
+  IF noun HAS animate
+    PRINT "Better keep your hands to yourself."
+  ELSE
+    PRINT "It feels much as you'd expect."
+  END
+END
+
+ROUTINE SmellSub
+  PRINT "Nothing smells out of the ordinary."
+END
+
+ROUTINE ListenSub
+  PRINT "You hear nothing out of the ordinary."
+END
+
+ROUTINE TasteSub
+  PRINT "It tastes much as you'd expect."
+END
+
+ROUTINE ThrowAtSub
+  IF second HAS animate
+    PRINT "Throwing things at people seldom helps."
+  ELSE
+    PRINT "That would get you nowhere."
+  END
+END
+
+ROUTINE ShowSub
+  IF second.LIFE()
+    RETURN
+  END
+  PRINT (The) second, " glances at ", (the) noun, " without much interest."
+END
+
+ROUTINE KissSub
+  IF noun.LIFE()
+    RETURN
+  END
+  IF noun = player
+    PRINT "You'd need to be more flexible."
+  ELSE
+    PRINT "Perhaps not."
+  END
+END
+
+ROUTINE AttackSub
+  IF noun HAS animate
+    IF noun.LIFE()
+      RETURN
+    END
+  END
+  PRINT "Violence won't solve this one."
+END
+
+ROUTINE AnswerSub
+  IF second
+    IF second.LIFE()
+      RETURN
+    END
+    PRINT "There is no reply."
+    RETURN
+  END
+  PRINT "Nobody seems to be listening."
+END
+
+ROUTINE ClimbSub
+  PRINT "Climbing ", (the) noun, " wouldn't get you anywhere."
+END
+
+ROUTINE DigSub
+  PRINT "Digging here would get you nowhere."
+END
+
+ROUTINE BurnSub
+  PRINT "Setting fire to things is unlikely to help."
+END
+
+ROUTINE CutSub
+  PRINT "Cutting ", (the) noun, " would achieve little."
+END
+
+ROUTINE TieSub
+  PRINT "Tying that would achieve nothing."
+END
+
+ROUTINE FillSub
+  PRINT "There's nothing here to fill it with."
+END
+
+ROUTINE WaveHandsSub
+  PRINT "You wave, feeling slightly silly."
+END
+
+ROUTINE WaveSub
+  IF noun NOTIN player
+    PRINT "You'd need to be holding it first."
+  ELSE
+    PRINT "You wave ", (the) noun, ". Nothing happens."
+  END
+END
+
+ROUTINE SqueezeSub
+  IF noun HAS animate
+    PRINT "Better keep your hands to yourself."
+  ELSE
+    PRINT "Squeezing it achieves nothing."
+  END
+END
+
+ROUTINE BlowSub
+  PRINT "Blowing on ", (the) noun, " does nothing."
+END
+
+ROUTINE BuySub
+  PRINT "There's nothing for sale here."
+END
+
+ROUTINE SleepSub
+  PRINT "You aren't tired enough to sleep."
+END
+
+ROUTINE WakeSub
+  PRINT "You're as awake as you're going to get."
+END
+
+ROUTINE WakeOtherSub
+  IF noun.LIFE()
+    RETURN
+  END
+  PRINT (The) noun, " seems awake already."
+END
+
+ROUTINE ThinkSub
+  PRINT "You think hard, but nothing comes to mind."
+END
+
+ROUTINE SingSub
+  PRINT "You sing a few bars. Nobody applauds."
+END
+
+ROUTINE PraySub
+  PRINT "If anyone is listening, they don't answer."
+END
+
+ROUTINE SwimSub
+  PRINT "There's nothing here to swim in."
+END
+
+ROUTINE JumpSub
+  PRINT "You jump on the spot. Nothing happens."
+END
+
+ROUTINE JumpOverSub
+  PRINT "Jumping over ", (the) noun, " would achieve nothing."
+END
+
+ROUTINE YesSub
+  PRINT "That wasn't a question."
+END
+
+ROUTINE NoSub
+  PRINT "That wasn't a question."
+END
+
+ROUTINE SorrySub
+  PRINT "No need to apologise."
+END
+
+ROUTINE RestartSub
+  PRINT "Do you really want to start again?"
+  IF YesOrNo()
+    RESTART()
+  END
+  PRINT "Carrying on, then."
+END
+
+! SAVE, RESTORE and UNDO: the engine does them in M4; until then the
+! built-ins return 0 and these say so honestly.
+ROUTINE SaveSub
+  IF SAVE()
+    PRINT "Saved."
+  ELSE
+    PRINT "Save failed."
+  END
+END
+
+ROUTINE RestoreSub
+  IF RESTORE() = 0
+    PRINT "Restore failed."
+  END
+END
+
+ROUTINE UndoSub
+  IF UNDO() = 0
+    PRINT "You can't undo that."
+  END
+END
+
+ROUTINE VersionSub
+  PRINT "Written with TXA for the TI-99/4A."
+END

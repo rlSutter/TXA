@@ -1,0 +1,134 @@
+
+Potting Shed
+Shelves of clay pots and a smell of earth.
+You can see a wool cloak, a heel of bread, a note, a rusty lever and a gardener here.
+
+>take all
+wool cloak: Taken.
+heel of bread: Taken.
+note: Taken.
+
+>wear cloak
+You put on the wool cloak.
+
+>i
+You are carrying:
+  a note
+  a heel of bread
+  a wool cloak (being worn)
+
+>wear cloak
+You're already wearing the wool cloak.
+
+>remove cloak
+You take off the wool cloak.
+
+>take off cloak
+You aren't wearing the wool cloak.
+
+>eat bread
+You eat the heel of bread. It does the job.
+
+>eat note
+That's hardly something to eat.
+
+>read note
+It says: water the ferns.
+
+>push pots
+The clay pots won't budge.
+
+>pull lever
+The lever grinds down. Somewhere, water gurgles.
+
+>push gardener
+The gardener might object to that.
+
+>show note to gardener
+"That's the note, that is," the gardener says.
+
+>show gardener the note
+"That's the note, that is," the gardener says.
+
+>kiss gardener
+The gardener looks startled.
+
+>hit pots
+Violence won't solve this one.
+
+>smell
+Nothing smells out of the ordinary.
+
+>smell the air
+Nothing smells out of the ordinary.
+
+>listen
+You hear nothing out of the ordinary.
+
+>touch gardener
+Better keep your hands to yourself.
+
+>throw note at gardener
+Throwing things at people seldom helps.
+
+>climb pots
+Climbing the clay pots wouldn't get you anywhere.
+
+>dig
+Digging here would get you nowhere.
+
+>burn note
+Setting fire to things is unlikely to help.
+
+>sing
+You hum a tune the ferns seem to like.
+
+>think
+You think hard, but nothing comes to mind.
+
+>sleep
+You aren't tired enough to sleep.
+
+>jump
+You jump on the spot. Nothing happens.
+
+>wave
+You wave, feeling slightly silly.
+
+>wave note
+You wave the note. Nothing happens.
+
+>yes
+That wasn't a question.
+
+>sorry
+No need to apologise.
+
+>save
+Save failed.
+
+>restore
+Restore failed.
+
+>undo
+You can't undo that.
+
+>restart
+Do you really want to start again?
+> no
+Carrying on, then.
+
+>version
+Written with TXA for the TI-99/4A.
+
+>score
+There is no score in this story.
+
+>quit
+Do you really want to stop?
+> no
+Carrying on, then.
+
+>q
+Do you really want to stop?
+> y

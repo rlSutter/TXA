@@ -35,7 +35,7 @@ KEYWORDS = {
     # expressions
     'AND', 'OR', 'MOD', 'HASNT', 'NOTIN',
     # grammar lines
-    'REVERSE',
+    'REVERSE', 'EXTEND', 'FIRST', 'REPLACE',
 }
 
 class TxaError(Exception):

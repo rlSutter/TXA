@@ -68,5 +68,22 @@ check('ENTER (sit on) and EXIT (get off), and being on something', after('sit on
       and after('look', 1, nth=5) == 'Garden (on the bench)' and after('get off bench') == 'You get off the bench.'
       and after('get off bench', nth=2) == "But you aren't in anything at the moment.")
 
+out, vm = play('world3')
+check('WEAR, worn in the inventory, REMOVE; TAKE OFF a worn thing', after('wear cloak') == 'You put on the wool cloak.'
+      and '  a wool cloak (being worn)' in after('i', 4) and after('remove cloak') == 'You take off the wool cloak.'
+      and after('take off cloak') == "You aren't wearing the wool cloak.")
+check('EAT: edible or not; READ', after('eat bread').startswith('You eat the heel of bread') and after('eat note') == "That's hardly something to eat."
+      and after('read note') == 'It says: water the ferns.')
+check('PUSH and PULL: fixed things, characters, and a BEFORE rule', after('push pots') == "The clay pots won't budge."
+      and after('pull lever').startswith('The lever grinds down') and after('push gardener') == 'The gardener might object to that.')
+check('SHOW both ways round goes to the character (LIFE)', after('show note to gardener') == after('show gardener the note')
+      == '"That\'s the note, that is," the gardener says.')
+check('REPLACE: the game\'s SingSub instead of the library\'s', after('sing') == 'You hum a tune the ferns seem to like.')
+check('EXTEND: a new grammar line on a library verb', after('smell the air') == 'Nothing smells out of the ordinary.')
+check('SAVE, RESTORE, UNDO fail honestly until M4', after('save') == 'Save failed.' and after('restore') == 'Restore failed.'
+      and after('undo') == "You can't undo that.")
+check('RESTART and QUIT ask first', after('restart', 3) == 'Do you really want to start again?\n> no\nCarrying on, then.'
+      and after('quit', 3) == 'Do you really want to stop?\n> no\nCarrying on, then.')
+
 print('ALL PASS' if not fails else f'{fails} FAILED')
 sys.exit(1 if fails else 0)

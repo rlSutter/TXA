@@ -570,9 +570,38 @@ class Sema:
             stmt(s)
 
     # ---- driver -------------------------------------------------------------
+    def replace_and_extend(self, decls):
+        """REPLACE name: the routine of that name declared in the same file
+        as the REPLACE is kept, any other declaration of it dropped (so a
+        game replaces a library routine).  EXTEND "word" [FIRST]: the
+        grammar lines join the VERB that has the word, at the end (or the
+        start, with FIRST)."""
+        repl = {}
+        for d in decls:
+            if isinstance(d, A.Replace):
+                repl[d.name.upper()] = d
+        keep = []
+        for d in decls:
+            if isinstance(d, A.Routine) and d.name.upper() in repl and d.file != repl[d.name.upper()].file:
+                continue
+            if not isinstance(d, A.Replace):
+                keep.append(d)
+        for name, r in repl.items():
+            if not any(isinstance(d, A.Routine) and d.name.upper() == name for d in keep):
+                self.err(r, f'REPLACE {r.name}, but this file has no ROUTINE {r.name}')
+        decls[:] = keep
+        verbs = [d for d in decls if isinstance(d, A.Verb)]
+        for d in [d for d in decls if isinstance(d, A.Extend)]:
+            v = next((v for v in verbs if d.word.lower() in (w.lower() for w in v.words)), None)
+            if v is None:
+                self.err(d, f'EXTEND "{d.word}": no VERB has that word')
+            v.lines = (d.lines + v.lines) if d.first else (v.lines + d.lines)
+        decls[:] = [d for d in decls if not isinstance(d, A.Extend)]
+
     def run(self, path):
         decls = []
         self.load(path, decls)
+        self.replace_and_extend(decls)
         self.declare_all(decls)
         self.build_objects(decls)
         self.collect_actions()

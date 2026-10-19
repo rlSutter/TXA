@@ -24,7 +24,7 @@ VERB "take" "get" "carry"
   "on" noun -> Enter
   "out" -> Exit
   "off" -> Exit
-  "off" noun -> Exit
+  "off" noun -> TakeOff
   "out" "of" noun -> Exit
   multi -> Take
   "up" multi -> Take
@@ -736,6 +736,15 @@ ROUTINE InOrOn o
   RETURN "in"
 END
 
+! TAKE OFF X / GET OFF X: clothing comes off; anything else is got off
+ROUTINE TakeOffSub
+  IF noun HAS worn OR noun IN player
+    DisrobeSub()
+  ELSE
+    ExitSub()
+  END
+END
+
 ROUTINE ExitSub
   LOCAL p
   p = PARENT(player)
@@ -755,7 +764,12 @@ ROUTINE WaitSub
 END
 
 ROUTINE QuitSub
-  deadflag = 3
+  PRINT "Do you really want to stop?"
+  IF YesOrNo()
+    deadflag = 3
+  ELSE
+    PRINT "Carrying on, then."
+  END
 END
 
 ROUTINE ScoreSub

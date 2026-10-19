@@ -67,7 +67,7 @@ ROUTINE DropFrom arr, n, o
 END
 
 ROUTINE IsMeta a
-  RETURN a = ##Score OR a = ##Verbose OR a = ##Brief OR a = ##Superbrief OR a = ##Quit OR a = ##Notify
+  RETURN a = ##Score OR a = ##Verbose OR a = ##Brief OR a = ##Superbrief OR a = ##Quit OR a = ##Notify OR a = ##Save OR a = ##Restore OR a = ##Undo OR a = ##Restart OR a = ##Version
 END
 
 ROUTINE EndTurn
