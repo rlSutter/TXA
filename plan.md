@@ -89,7 +89,7 @@ Also done:
   VM will be tested against; `tests/txc_run_test.py`, 22 checks running
   compiled programs end to end.
 
-More language details settled (for Rebecca's review):
+More language details settled (approved by Rebecca, 2026-10-19):
 - `(string) x` prints a string value; `obj.prop()` with no arguments
   prints or runs the property (Inform's PrintOrRun): a string prints, a
   routine runs, a value is returned.
@@ -154,6 +154,7 @@ text output, word wrap and [MORE]; bold and underline glyph sets.
 | 2026-10-18 | Full spec as a Claude Doc before coding |
 | 2026-10-19 | M0 started from The Lantern Coast 1.13 bundle |
 | 2026-10-19 | Authoring language approved as proposed: uppercase keywords, terse property names, BEFORE ... END rule blocks, name TXA |
+| 2026-10-19 | Approved: `(string) x`; `obj.prop()` as print-or-run; `##Name` for action numbers; Inform's return defaults (ROUTINE TRUE, property routines and rule cases FALSE); INSIDE and OUTSIDE as the in/out direction properties |
 
 ## History
 
