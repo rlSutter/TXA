@@ -1,0 +1,59 @@
+! m2demo.txa - the M2 demonstration: the parser on the TI.
+! The parser test world, with an introduction.
+INCLUDE "DSK1.STDLIB"
+
+ROOM Kitchen "Kitchen"
+  DESC "A cramped kitchen. A trapdoor is set in the floor, and a doorway leads north."
+  HAS light
+  N Hall
+  DOWN "The trapdoor is shut fast."
+END
+ROOM Hall "Hall"
+  DESC "A long hall with a faded runner."
+  HAS light
+  S Kitchen
+END
+OBJECT Table "oak table" IN Kitchen
+  NAME "oak" "table"
+  HAS static supporter scenery
+END
+OBJECT BrassLamp "brass lamp" IN Table
+  NAME "brass" "lamp" "lantern"
+  DESC "A battered brass lamp."
+END
+OBJECT TinLamp "tin lamp" IN Kitchen
+  NAME "tin" "lamp"
+END
+OBJECT Box "wooden box" IN Kitchen
+  NAME "wooden" "box"
+  HAS container openable
+END
+OBJECT Coins "gold coins" IN Box
+  NAME "gold" "coins" "coin"
+  HAS plural
+END
+OBJECT Ada "Ada" IN Kitchen
+  NAME "ada" "cook"
+  HAS animate proper female
+  DESC "Ada is stirring a pot."
+  LIFE
+    Ask: PRINT "~Ask me later,~ says Ada."
+         RETURN TRUE
+    Give: PRINT "Ada takes ", (the) noun, " and thanks you."
+          MOVE noun TO Ada
+          RETURN TRUE
+  END
+  ORDERS
+    Take: PRINT "~Get it yourself,~ says Ada."
+          RETURN TRUE
+  END
+END
+
+ROUTINE Initialise
+  location = Kitchen
+  STYLE(1)
+  PRINT "TXA parser demonstration (M2)"
+  STYLE(0)
+  PRINT "Try: look, take lamp, take all, drop all but the brass lamp, open box, look in box, take coins from box, x it, give the tin lamp to ada, ada, take coins, n, s, again, oops (after a typo), and several commands at once: open box. take coins."
+  PRINT "FCTN S rubs out.  Q quits."
+END

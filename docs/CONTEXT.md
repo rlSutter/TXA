@@ -19,12 +19,13 @@ owns it; Claude builds it. The engine comes first; the story later.
 
 | What | Where |
 | --- | --- |
-| Repository | `/home/claude/txa` (restore: `git clone txa-latest.bundle txa`) |
+| Repository | `/home/claude/txa` (restore below) |
 | Assembler | xdt99 at `/home/claude/xdt99` (commit a77bd31); `git clone https://github.com/endlos99/xdt99` |
 | Kernel origin | The Lantern Coast 1.13 (`TheLanternCoast-1_13.bundle`, Rebecca's upload) |
 | Build | `python3 tools/build.py` |
 | Tests | `tests/m0_test.py`, `txc_parse_test.py`, `txc_sema_test.py`, `txc_run_test.py`, `m1_vm_test.py` (each prints PASS/FAIL lines and ALL PASS) |
-| Outputs | `/mnt/user-data/outputs/txa/` |
+| Outputs | `/mnt/user-data/outputs/txa/` (checkpoint: `checkpoint-m2/`) |
+| Library | `lib/`: stdlib.txa (Main), libdefs.txa, parser.txa, verbs.txa |
 
 ## Source map
 
@@ -45,13 +46,29 @@ owns it; Claude builds it. The engine comes first; the story later.
 | `src/txaeng.a99` | the engine build file (engine >A000 must end below >D000) |
 | `tools/txc/` | the TXA compiler: lexer, ast, parser, sema, opcodes (THE instruction set), codegen (+linker), txvm (Python reference VM) |
 | `tests/txa/` | test programs and `lib/stdlib.txa`, a stand-in standard library |
-| `demos/m1demo.txa` | the M1 demonstration story |
+| `src/input.a99` | line editor, KEYGT2, READ, TOKENIZE (+LOOKUP), ALOADV/ASTOREV/HASATTRV/FRESH, ISNAME, FILTERN |
+| `demos/m1demo.txa`, `demos/m2demo.txa` | the demonstration stories |
+| `lib/` | the standard library in TXA; the parser is lib/parser.txa |
+| `tests/txa/m2/` | the parser test world, its 45 commands and the reviewed reference transcript |
 | `src/txaprobe.a99` | the M0 build file: probe at >A000, kernel at >2000 (KENTRY first) |
 | `src/cartldr.a99` | cartridge loader: copies the E/A 5 image into RAM |
 | `tools/build.py` | generators, assembly, disk image, cartridge, memory-map checks; `engine_cart(image)` builds an engine cartridge carrying a story; `symbols()` reads xas99 -E output |
 | `tools/mkfont.py`, `tools/mkpics.py`, `tools/rlepack.py` | font, test pictures, RLE |
 | `tools/sim9900.py`, `tools/render.py` | the skill's simulator (1M SAMS, reset state extended) |
 | `tools/render80.py` | T80 and bitmap-layer screen dumps and PNGs |
+
+## Restoring in a new session
+
+1. Ask Rebecca to upload `txa-checkpoint-m2.bundle` (or `txa-latest.bundle`).
+2. `cd /home/claude && git clone <bundle> txa`
+3. `git clone https://github.com/endlos99/xdt99` next to it (tested at commit a77bd31).
+4. `cd txa && python3 tools/build.py` and run the tests (each ends ALL PASS):
+   `tests/m0_test.py`, `txc_parse_test.py`, `txc_sema_test.py`,
+   `txc_run_test.py`, `m2_parser_test.py`; the slow engine ones,
+   `m1_vm_test.py` and `m2_engine_test.py`, run 1-3 minutes each (start
+   them in the background with output to a file: the tool stops any
+   command after 300 s).
+5. Read `plan.md` (status, decisions, next) and the spec Claude Doc.
 
 ## Conventions
 
@@ -61,6 +78,24 @@ owns it; Claude builds it. The engine comes first; the story later.
 - Report audit findings before changing working code.
 - Rebecca reports from js99er in short messages: reproduce before fixing,
   and never claim a fix that was only reasoned.
+
+## Things learned the hard way
+
+- xas99 reads commas and parentheses in a DATA line's comment as
+  operands, and a comment starting with "..." as an expression: keep
+  such comments plain.
+- R0 cannot be an index register: copy to R1 first.
+- VSBW changes R0 (it sets the write bit).
+- Scratch words: VT1-VT5 belong to the VM's helpers (PROPF uses VT1-4,
+  ARRAY/TREE/ATTRB/SHORTN keep their link in VT5); CHOUT uses CHCHR and
+  CHBRK; CHSTR and PRNUM use TMP1-2; PUTPROP keeps the kind in TMP3.
+  DETACH, OBJE, RDW and WRW leave R15 alone.
+- KEYGET reports a key only when it differs from the last; nothing scans
+  between [MORE] waits, so WAITKY clears KEYLST first.
+- Simulator harnesses must offer key presses inside the polling loops
+  (WK21, WKY1), not at a routine's entry.
+- TXA names ignore case: a routine IsName collides with the built-in
+  ISNAME, a parameter "room" with the keyword ROOM.
 
 ## Hardware facts learned (with sources in the spec)
 

@@ -198,11 +198,39 @@ line by M4.  The PICTURE and SOUND placeholders print "[picture n]" and
 so M4 makes them silent where unsupported (and real on the TI).  Save
 files get their platform-independent format in M4 (rule 6).
 
-Next in M2 (the TI side): the line editor and READ, TOKENIZE, and the
-four small opcodes in assembly; then the engine must play the same
-script with the same transcript (m1_vm_test lists the five opcodes it is
-still missing).  Then: command history (FCTN E/X) and timing on real
-hardware.
+Done (the TI side):
+- src/input.a99: the line editor (block cursor; FCTN S rubs out; SHIFT;
+  FCTN I/O/P and SHIFT / and 1 for ? ' " - !), with its own key decoder
+  KEYGT2 (KEYGET ignores keys pressed with FCTN or SHIFT); READ (the
+  typed line goes through CHOUT, as txvm.py echoes it); TOKENIZE with a
+  binary search of the dictionary; ALOADV, ASTOREV, HASATTRV, FRESH.
+- Speed: profiling showed name matching dominating, so two inner loops
+  became engine built-ins: ISNAME(w, obj) and FILTERN(w, src, n, dst).
+  Bytecode run over the test script fell from 431K to 162K instructions.
+  Estimate (9 us an instruction): median 1.2 s a command, 90% under
+  3.3 s, worst 5.1 s (TAKE ALL and the like).  Needs timing on the
+  console.  The engine's own profile: about a third in fetch and
+  dispatch (NEXT, FB, FW), a tenth in story memory (BMAP, RDW): both can
+  be tightened without touching the library.
+- An engine bug from M1 fixed: MOVE kept its destination in VT4, which
+  DETACH overwrites when the object has an earlier sibling.
+- tests/m2_engine_test.py: the engine plays the 45-command script typed
+  key by key (holding and releasing each key) and its transcript equals
+  the Python VM's exactly; plus a rub-out/SHIFT test.
+- demos/m2demo.txa, cartridge txa-m2demo8.bin: the test world, playable.
+
+**M2 is complete** apart from Rebecca's js99er check and timing, and
+two follow-ups: command history (FCTN E/X) and a 160-character, two-row
+input line (now: what fits on the row after the prompt).
+
+## Next
+
+1. Rebecca's js99er (and console) check of txa-m2demo8.bin, and timing.
+2. Engine speed work if the timing says so: a faster fetch/dispatch
+   path and cheaper story-memory access.
+3. M3: the world model and full standard library (light, doors,
+   containers in depth, characters, daemons and timers, scoring, the
+   Infocom verb set, the sample game).
 
 ## (old heading) M1 remaining
 
@@ -229,6 +257,7 @@ text output, word wrap and [MORE]; bold and underline glyph sets.
 
 ## History
 
+- 2026-10-19 M2: the TI side (line editor, READ, TOKENIZE, ISNAME, FILTERN), engine plays the parser script identically; checkpoint-m2.
 - 2026-10-19 M2 begun: the standard library's parser in TXA, with the compiler and Python VM support it needs.
 - 2026-10-19 M1 complete: text styles (bold, underline, reverse) through position attributes and an underlined glyph set.
 - 2026-10-19 M1: the assembly VM, cross-checked against the Python VM; the demo cartridge.
