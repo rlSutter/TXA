@@ -1,0 +1,23 @@
+! stdlib.txa - a stand-in standard library for the compiler's tests.
+! The real library (M3) declares the same names and much more.
+ATTRIBUTE light lit open openable locked lockable container supporter
+ATTRIBUTE transparent scenery static worn wearable edible animate
+ATTRIBUTE concealed visited switchable on plural proper female male neuter
+PROPERTY DESC INITIAL N S E W NE NW SE SW UP DOWN INSIDE OUTSIDE
+PROPERTY DOOR_TO WITH_KEY CAPACITY BEFORE AFTER LIFE ORDERS
+GLOBAL noun
+GLOBAL second
+GLOBAL action
+GLOBAL player
+GLOBAL location
+
+CLASS Door
+  HAS static openable
+END
+
+ROUTINE SwitchOnSub
+  GIVE noun on
+END
+ROUTINE SwitchOffSub
+  GIVE noun NOT on
+END
