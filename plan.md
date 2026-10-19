@@ -5,8 +5,8 @@ Status, what remains, and Rebecca's decisions. Start a new session with
 
 ## Status (19 October 2026)
 
-**M0, the hardware probe: built and passing in the simulator (25 checks,
-`tests/m0_test.py`). Waiting on Rebecca's js99er and hardware results.**
+**M0, the hardware probe: complete.** 25 simulator checks pass
+(`tests/m0_test.py`) and Rebecca confirmed every screen and key.
 
 The probe runs from RAM at >A000 with the kernel at >2000, loaded either
 by E/A option 5 (`TXAP1`, `TXAP2` on `txaprobe.dsk`) or by the cartridge
@@ -19,8 +19,11 @@ layer, and 80-column text under it.
 
 Confirmed working: the picture over 80-column text with all four corners
 and eight ticks; moving and resizing (E S D X, W Z); fat pixels with 16
-colours and a round moon (F); 30 rows (R).  Still to report: the text
-test (T), the full-screen view (V), Quit (Q), the SAMS size, SR14/SR12.
+colours and a round moon (F); 30 rows (R); the text and scrolling test
+(T, readable and fast enough); the full-screen view and return (V); Quit
+to a normal title screen (Q).  **M0 passes.**  Still wanted for the
+record: which environment (js99er or the console), the SAMS size shown,
+and the SR14/SR12 values.
 
 ### What M0 must answer (Rebecca's report)
 
@@ -43,9 +46,8 @@ to work. On an F18A or a PICO9918 PRO both should work.
 - **Picture presentation on boards without the bitmap layer in 80
   columns**: the full-screen view (Graphics I + bitmap layer, any key to
   return) is the proposed fallback, chosen per board at startup.
-- **Picture pane size**: at 24 rows the 96-line pane leaves 11 text rows;
-  at 30 rows, 17. The spec assumes 30 rows; shorter pictures (64-80
-  lines) are an option if 24 rows must be supported.
+- **Picture pane size**: settled by M0. 30 rows works, so the split
+  screen (96-line pane, 17 text rows) is the main layout.
 
 ## Next: M1 (VM and compiler core)
 
