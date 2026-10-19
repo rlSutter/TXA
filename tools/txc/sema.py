@@ -316,14 +316,17 @@ class Sema:
         return w
 
     # ---- 4. actions ---------------------------------------------------------
+    def use_action(self, name, node):
+        p = self.p
+        if name.upper() not in (a.upper() for a in p.actions):
+            s = p.sym(name + 'Sub')
+            if not s or s.kind != 'routine':
+                self.err(node, f'the action {name} has no routine {name}Sub')
+            p.actions.append(name)
+
     def collect_actions(self):
         p = self.p
-        def use(name, node):
-            if name.upper() not in (a.upper() for a in p.actions):
-                s = p.sym(name + 'Sub')
-                if not s or s.kind != 'routine':
-                    self.err(node, f'the action {name} has no routine {name}Sub')
-                p.actions.append(name)
+        use = self.use_action
         for v in p.verbs:
             for w in v.words:
                 self.dict_word(w, v)
@@ -436,6 +439,9 @@ class Sema:
                     self.err(e, 'an array element takes one index')
                 expr(e.args[0])
         def expr(e):
+            if isinstance(e, A.ActionRef):
+                self.use_action(e.name, e)
+                return
             if isinstance(e, (A.Num, A.Str, A.Const)):
                 if isinstance(e, A.Const) and e.which == 'SELF' and not in_object:
                     self.warn(e, 'SELF in a routine that is not a property: it means the object whose property called it')

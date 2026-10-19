@@ -1,0 +1,106 @@
+! run1.txa - the M1 run test: language features end to end.
+INCLUDE "DSK1.STDLIB"
+CONSTANT TEN = 10
+GLOBAL counter = 3
+GLOBAL greeting = "Hello from a global."
+ARRAY squares 5
+ARRAY primes = 2, 3, 5, 7, 11
+
+ROOM Kitchen "Kitchen"
+  DESC "A cramped kitchen."
+END
+OBJECT Table "oak table" IN Kitchen
+  NAME "oak" "table"
+  HAS static supporter
+END
+OBJECT Apple "apple" IN Table
+  NAME "apple"
+  HAS edible
+  DESC
+    WRITE "A red apple"
+    IF self IN Table
+      WRITE ", on the table"
+    END
+    PRINT "."
+    RETURN TRUE
+  END
+END
+OBJECT Coins "coins" IN Kitchen
+  NAME "coins"
+  HAS plural
+END
+OBJECT Ada "Ada" IN Kitchen
+  NAME "ada"
+  HAS animate proper female
+  LIFE
+    Ask: PRINT "Ada shrugs."
+         RETURN TRUE
+  END
+END
+ROUTINE AskSub
+END
+
+ROUTINE Fact n
+  IF n <= 1
+    RETURN 1
+  END
+  RETURN n * Fact(n - 1)
+END
+
+ROUTINE Kids obj
+  LOCAL c, n
+  FOR EACH c IN obj
+    IF n > 0
+      WRITE ", "
+    END
+    WRITE (a) c
+    n = n + 1
+  END
+  PRINT "."
+  RETURN n
+END
+
+ROUTINE Main
+  LOCAL i, total
+  PRINT "Arithmetic: ", 2 + 3 * 4, " ", (2 + 3) * 4, " ", -7 / 2, " ", -7 MOD 3, " ", >7FFF + 1
+  PRINT "Constants and globals: ", TEN * counter, " ", (string) greeting
+  PRINT "Factorial 7 = ", Fact(7)
+  i = 0
+  WHILE i < 5
+    squares(i) = i * i
+    i = i + 1
+  END
+  total = 0
+  i = 0
+  WHILE i < 5
+    total = total + squares(i) + primes(i)
+    i = i + 1
+  END
+  PRINT "Arrays: ", total
+  IF counter = 3 AND NOT (counter > 5) OR FALSE
+    PRINT "Logic: yes"
+  ELSEIF TRUE
+    PRINT "Logic: wrong arm"
+  ELSE
+    PRINT "Logic: no"
+  END
+  WRITE "In the kitchen: "
+  i = Kids(Kitchen)
+  PRINT "That is ", i, " things; on the table: ", (the) Table.CAPACITY + Kids(Table)
+  PRINT (The) Apple, " / ", (a) Apple, " / ", (A) Coins, " / ", (the) Ada, " / ", (name) Kitchen
+  Apple.DESC()
+  MOVE Apple TO Kitchen
+  Apple.DESC()
+  Kitchen.DESC()
+  PRINT
+  IF Apple HAS edible AND Apple HASNT static
+    GIVE Apple NOT edible static
+  END
+  PRINT "Attributes: ", Apple HAS edible, Apple HAS static, Table HAS supporter
+  IF Apple IN Kitchen AND Apple NOTIN Table
+    PRINT "Tree: the apple moved"
+  END
+  REMOVE Apple
+  PRINT "Parent after REMOVE: ", Apple IN Kitchen, " ", Kids(Kitchen)
+  PRINT "Done."
+END

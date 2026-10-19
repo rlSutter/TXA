@@ -30,7 +30,7 @@ block ends at END, and one statement fills one line.
 from .lexer import tokenize, TxaError
 from . import ast as A
 
-PRINT_FORMS = {'the', 'The', 'a', 'A', 'an', 'An', 'name', 'number', 'char'}
+PRINT_FORMS = {'the', 'The', 'a', 'A', 'an', 'An', 'name', 'number', 'char', 'string'}
 CMP = {'=', '<>', '<', '>', '<=', '>='}
 CMP_KW = {'HAS', 'HASNT', 'IN', 'NOTIN'}
 
@@ -338,9 +338,9 @@ class Parser:
 
     def pitem(self):
         p = self.pos()
-        if self.at_sym('(') and self.peek().kind == 'ID' and self.peek().value in PRINT_FORMS \
+        if self.at_sym('(') and self.peek().kind in ('ID', 'KW') and self.peek().text in PRINT_FORMS \
                 and self.peek(2).kind == 'SYM' and self.peek(2).value == ')':
-            self.take(); form = self.take().value; self.take()
+            self.take(); form = self.take().text; self.take()   # spelling matters: (the) vs (The)
             return A.PItem(form, self.expr(), **p)
         return A.PItem(None, self.expr(), **p)
 
@@ -406,6 +406,8 @@ class Parser:
             self.take(); return A.Num(t.value, **p)
         if t.kind == 'STR':
             self.take(); return A.Str(t.value, **p)
+        if t.kind == 'ACT':
+            self.take(); return A.ActionRef(t.value, **p)
         if t.kind == 'ID':
             self.take(); return A.Name(t.value, **p)
         if self.at_kw('TRUE', 'FALSE', 'NOTHING', 'SELF'):

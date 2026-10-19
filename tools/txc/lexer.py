@@ -14,6 +14,7 @@ compiler's contract; the Authoring Language Reference will say the same):
 - Numbers are decimal (0-32767) or TI-style hex with a leading `>`
   (>1F).  A `>` directly followed by a hex digit after an operator or at
   the start of an expression is hex; otherwise it is "greater than".
+- `##Name` is the number of the action Name, as in Inform (`action = ##Take`).
 - Punctuation: : , ( ) . ->  and the operators + - * / = <> < > <= >=.
 
 Each token records its file and line for error messages."""
@@ -71,6 +72,11 @@ def tokenize(text, file='<source>'):
                     raise TxaError(file, ln, 'string not closed on this line')
                 s = raw[i + 1:j].replace('^', '\n').replace('~', '"')
                 emit('STR', s, raw[i:j + 1]); i = j + 1; continue
+            if raw.startswith('##', i):             # ##Take: an action's number
+                m = ID.match(raw, i + 2)
+                if not m:
+                    raise TxaError(file, ln, 'expected an action name after ##')
+                emit('ACT', m.group(0), raw[i:m.end()]); i = m.end(); continue
             m = ID.match(raw, i)
             if m:
                 w = m.group(0); u = w.upper()

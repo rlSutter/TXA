@@ -76,9 +76,36 @@ the spec's language summary is unchanged by them):
 - A statement line must be a statement, a call or an assignment;
   `target = value` at the start of a line always assigns.
 
-Next in M1: names and checking (the symbol table, attribute and
-property numbering, the object tree), then code generation and the
-story-image layout, then the VM in assembly.
+Also done:
+- the semantic pass, `tools/txc/sema.py` (includes, symbol table,
+  numbering, the object tree, class inheritance, actions, name checks;
+  `tests/txc_sema_test.py`, 35 checks);
+- the instruction set, `tools/txc/opcodes.py`: the single definition of
+  the VM's 72 opcodes and the image header, read by everything else;
+- code generation and linking, `tools/txc/codegen.py` (bytecode, the
+  word-substitution text compression, object/property/dictionary/action
+  tables, header and checksum; same source, same bytes);
+- the Python reference VM, `tools/txc/txvm.py`, the oracle the assembly
+  VM will be tested against; `tests/txc_run_test.py`, 22 checks running
+  compiled programs end to end.
+
+More language details settled (for Rebecca's review):
+- `(string) x` prints a string value; `obj.prop()` with no arguments
+  prints or runs the property (Inform's PrintOrRun): a string prints, a
+  routine runs, a value is returned.
+- `##Name` is an action's number (`action = ##Take`), as in Inform:
+  action names can't be bare words because actions like Open share
+  names with attributes like open.
+- Return defaults follow Inform: a ROUTINE that runs off its end returns
+  TRUE; a property routine or rule case that runs off its end returns
+  FALSE ("carry on with the action").
+- Direction properties for in and out are INSIDE and OUTSIDE, because
+  IN is the keyword for an object's parent.
+
+Next in M1: the VM in assembly (dispatch, stack and frames, variables,
+arithmetic, control, the object tree, properties, arrays, text output
+with word wrap and [MORE]), loading a story image into SAMS, and the
+test that runs the same images on both VMs and compares transcripts.
 
 ## Next: M1 remaining
 
@@ -99,6 +126,7 @@ text output, word wrap and [MORE]; bold and underline glyph sets.
 
 ## History
 
+- 2026-10-19 M1: semantic pass, opcodes, code generation and linking, Python reference VM.
 - 2026-10-19 M1 begun: the TXA lexer and parser (`tools/txc/`), 31-check test.
 - 2026-10-19 M0: repository, kernel ported (VDP, F18A, SAMS, keyboard),
   80-column text layer, RLE picture decoder, SAMS page counting, the

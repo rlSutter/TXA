@@ -60,4 +60,5 @@ Const     = node('Const', 'which')                             # TRUE FALSE NOTH
 Unary     = node('Unary', 'op', 'arg')
 Binary    = node('Binary', 'op', 'left', 'right')
 PropRef   = node('PropRef', 'obj', 'prop')
+ActionRef = node('ActionRef', 'name')                         # ##Name
 Call      = node('Call', 'func', 'args')                       # also array element: resolved later
