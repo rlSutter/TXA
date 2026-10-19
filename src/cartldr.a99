@@ -1,0 +1,57 @@
+*======================================================================
+* cartldr.a99 - the cartridge loader: copies an E/A 5 image into RAM.
+*
+* Bank 0 holds this loader and SEGTAB; banks 1 onward hold the image.
+* tools/build.py writes gen/cartsegs.a99 (SEGTAB: pieces of at most one
+* bank each, as bank, address in the >6000 window, RAM destination,
+* byte count, ending with a >FFFF bank) and appends the image banks.
+* The program then runs from RAM exactly as if E/A had loaded it, so the
+* cartridge and the disk files test the same code.
+*
+* The copy routine runs from scratchpad (TRAMP): code that switches
+* banks must not live in the bank it switches out.
+*======================================================================
+       AORG >6000
+       BYTE >AA,1,1,0          valid header, version 1, one program
+       DATA 0                  power-up list: none
+       DATA PROG               program list
+       DATA 0,0                DSR list, subprogram list: none
+PROG   DATA 0,LSTART
+       COPY "gen/cartname.a99"
+       EVEN
+
+TRAMP  EQU  >8320              scratchpad: the copy routine runs here
+
+LSTART LIMI 0
+       LWPI >8300
+       LI   R1,TRSRC           copy the copy routine to scratchpad
+       LI   R2,TRAMP
+       LI   R3,(TREND-TRSRC)/2
+LDR1   MOV  *R1+,*R2+
+       DEC  R3
+       JNE  LDR1
+       LI   R4,SEGTAB
+LDR2   MOV  *R4+,R5            bank
+       CI   R5,>FFFF
+       JEQ  LDR3
+       SLA  R5,1               bank n is selected by a write to >6000+2n
+       AI   R5,>6000
+       MOV  *R4+,R1            source in the window
+       MOV  *R4+,R2            destination in RAM
+       MOV  *R4+,R3            byte count
+       BL   @TRAMP
+       JMP  LDR2
+LDR3   B    @>2000             the image's entry (KENTRY)
+
+* TRSRC - select the bank at address R5, copy R3 bytes from R1 to R2,
+* select bank 0 again.  Copied to TRAMP and run there.
+TRSRC  CLR  *R5
+TR1    MOVB *R1+,*R2+
+       DEC  R3
+       JNE  TR1
+       CLR  @>6000
+       RT
+TREND
+
+       COPY "gen/cartsegs.a99"
+       END

@@ -1,0 +1,21 @@
+* macros.a99 - the stack and interrupt-service macros, shared by the kernel
+* and the overlay bank (which cannot COPY defs.a99: its EQUs arrive in
+* build/kernel.equ).
+       .defm enter
+       DECT R10
+       MOV  R11,*R10
+       .endm
+       .defm leave
+       MOV  *R10+,R11
+       .endm
+       .defm push
+       DECT R10
+       MOV  #1,*R10
+       .endm
+       .defm pop
+       MOV  *R10+,#1
+       .endm
+       .defm intsvc
+       LIMI 2
+       LIMI 0
+       .endm

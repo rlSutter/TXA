@@ -1,0 +1,35 @@
+*======================================================================
+* rle.a99 - run-length decoder for pictures, straight into VRAM
+*
+* The format (written by tools/rlepack.py; the spec's picture format):
+*   >00->7F  n: the next n+1 bytes are copied as they are (1-128)
+*   >80->FE  n: the next byte is repeated n - >7D times (3-129)
+*   >FF      end of data
+* A run of two equal bytes costs the same either way, so the packer
+* leaves pairs inside literal runs.
+*======================================================================
+
+* RLEVDP - decode the data at R1 into VRAM from address R0.
+* Uses R0-R3.
+RLEVDP .enter
+       BL   @VWAD              one write address; the VDP auto-increments
+RLE1   CLR  R2
+       MOVB *R1+,R2            control byte
+       CI   R2,>FF00
+       JEQ  RLE9               end
+       SRL  R2,8
+       CI   R2,>80
+       JHE  RLE3
+       INC  R2                 literal run: n+1 bytes
+RLE2   MOVB *R1+,@VDPWD
+       DEC  R2
+       JNE  RLE2
+       JMP  RLE1
+RLE3   AI   R2,->7D            repeat run: n - >7D copies
+       MOVB *R1+,R3
+RLE4   MOVB R3,@VDPWD
+       DEC  R2
+       JNE  RLE4
+       JMP  RLE1
+RLE9   .leave
+       RT

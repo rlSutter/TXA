@@ -1,0 +1,604 @@
+*======================================================================
+* probe.a99 - M0: the hardware probe for the TXA engine.
+*
+* What it answers (the spec's "to verify in M0"):
+*   1. Does the F18A's 80-column mode come up, in 24 and 30 rows?
+*   2. Does the bitmap layer show over 80-column text, where, and how
+*      wide are its pixels?  (The F18A: yes, on a 256-pixel grid.  An
+*      RP2040 PICO9918: no bitmap layer in 80 columns at all.)
+*   3. Does the fallback work: a full-screen picture view in Graphics I
+*      with the same bitmap layer, which every F18A-class board draws?
+*   4. How big is the SAMS card (counted, not assumed)?
+*   5. How fast does the 80-column text scroll?
+* It also prints the version registers, so a photo of the screen says
+* which board ran it.
+*
+* Runs from RAM at >A000 (the engine's resident window) with the kernel
+* at >2000, loaded either as E/A option 5 files or by the cartridge
+* loader (cartldr.a99), which copies the same image into RAM.
+*
+* Keys: E S D X move the picture, W Z taller/shorter, F fat pixels,
+* P pane on/off, R 24/30 rows, V full-screen view, T text test, Q quit.
+*======================================================================
+
+START  LIMI 0                  interrupts off for good: the console ISR
+       LWPI WS                 would reset the VDP latch mid-write
+       LI   R10,STACKT
+       LI   R1,RAMVAR          clear the variables: RAM is random at
+       LI   R2,>100/2          power-up and holds old values after a reset
+STRT1  CLR  *R1+
+       DEC  R2
+       JNE  STRT1
+* the F18A: ask before unlocking (f18a.a99), then identify it
+       BL   @F18UNL
+       BL   @F18DET            R0 = 1 and F18FLG set if found
+* SAMS: detect in pass-through mode, then identity-map and count
+       BL   @AMSDET
+       MOV  R0,R0
+       JEQ  STRT2
+       BL   @AMSINI
+       BL   @AMSSIZ            AMSPGS = pages
+STRT2  MOV  @F18FLG,R0
+       JNE  STRT3
+       B    @NOF18             no F18A: a Graphics I screen says so
+STRT3  LI   R0,14              version register
+       BL   @F18SR
+       MOV  R1,@SR14V
+       LI   R0,>BA00           VR58 = 0: PICO9918 option 0 (Pi model);
+       BL   @VDPWR             an F18A ignores VR58
+       LI   R0,12
+       BL   @F18SR
+       MOV  R1,@SR12V
+* defaults: 24 rows, pane on, picture at the top of the text window
+       LI   R0,24
+       MOV  R0,@ROWS
+       LI   R0,1
+       MOV  R0,@PANEON
+       LI   R0,PANETP
+       MOV  R0,@BMLY
+       LI   R0,PANEHT
+       MOV  R0,@BMLH
+* the screen: tables, font, picture
+       BL   @T80ON
+       BL   @TXCLS
+       BL   @FONTLD
+       LI   R0,SPRPAT          sprites can never show: blank patterns,
+       CLR  R1                 and the list ended (30-row mode ignores
+       LI   R2,>800            the >D0 end marker, so the blank patterns
+       BL   @VFILL             are what keeps them off)
+       LI   R0,SPRATT
+       LI   R1,>D000
+       LI   R2,128
+       BL   @VFILL
+       BL   @LOADPC
+       C    @AMSPGS,@D128      512K or more?
+       JHE  MAIN
+       B    @NOSAMS
+
+* ---- the probe's main loop --------------------------------------------
+MAIN   BL   @DRAW
+MLOOP  BL   @KSCAN
+       BL   @KEYGET
+       MOV  R0,R0
+       JEQ  MLOOP
+       LI   R1,KEYTAB          find the key in the dispatch table
+ML1    MOV  *R1+,R2
+       JEQ  MLOOP              not one of ours
+       MOV  *R1+,R3
+       CB   R0,R2
+       JNE  ML1
+       BL   *R3                handlers return; most then redraw
+       JMP  MAIN
+KEYTAB DATA 'E'*256,KUP,'X'*256,KDOWN,'S'*256,KLEFT,'D'*256,KRIGHT
+       DATA 'W'*256,KTALL,'Z'*256,KSHORT,'F'*256,KFAT,'P'*256,KPANE
+       DATA 'R'*256,KROWS,'V'*256,KVIEW,'T'*256,KTEXT,'Q'*256,QUIT
+       DATA 0
+
+KUP    MOV  @BMLY,R0
+       AI   R0,-8
+       JLT  KRT
+       MOV  R0,@BMLY
+KRT    RT
+KDOWN  MOV  @BMLY,R0
+       AI   R0,8
+       CI   R0,232
+       JH   KRT
+       MOV  R0,@BMLY
+       RT
+KLEFT  MOV  @BMLX,R0
+       AI   R0,-8
+       JLT  KRT
+       MOV  R0,@BMLX
+       RT
+KRIGHT MOV  @BMLX,R0
+       AI   R0,8
+       CI   R0,248
+       JH   KRT
+       MOV  R0,@BMLX
+       RT
+KTALL  MOV  @BMLH,R0           at most the 96 rows the picture has: past
+       AI   R0,8               them the F18A would read on to >4000 and
+       CI   R0,PANEHT          wrap into the name table
+       JH   KRT
+       MOV  R0,@BMLH
+       RT
+KSHORT MOV  @BMLH,R0
+       AI   R0,-8
+       JEQ  KRT                at least 8 (0 would hide the layer)
+       MOV  R0,@BMLH
+       RT
+KFAT   .enter
+       MOV  @BMLFAT,R0         0 <-> 1
+       INV  R0
+       ANDI R0,1
+       MOV  R0,@BMLFAT
+       BL   @LOADPC
+       .leave
+       RT
+KPANE  MOV  @PANEON,R0         0 <-> 1
+       INV  R0
+       ANDI R0,1
+       MOV  R0,@PANEON
+       RT
+KROWS  .enter
+       LI   R0,30
+       C    @ROWS,@D24
+       JEQ  KRW1
+       LI   R0,24
+KRW1   MOV  R0,@ROWS
+       BL   @T80ON
+       .leave
+       RT
+
+* ---- drawing -------------------------------------------------------------
+* DRAW - the whole probe screen from the variables.
+DRAW   .enter
+       BL   @TXCLS
+       CLR  R0                 the status line
+       BL   @TXBAR
+       CLR  R0
+       LI   R1,1
+       BL   @TXAT
+       LI   R1,STITLE
+       LI   R2,>8000
+       BL   @TXSTR
+       CLR  R0
+       LI   R1,52
+       BL   @TXAT
+       LI   R1,SSAMS
+       LI   R2,>8000
+       BL   @TXSTR
+       MOV  @AMSPGS,R0         pages x 4 = K
+       SLA  R0,2
+       LI   R1,4
+       LI   R2,>8000
+       BL   @TXDEC
+       LI   R1,SKF18
+       LI   R2,>8000
+       BL   @TXSTR
+       MOV  @ROWS,R0
+       LI   R1,2
+       LI   R2,>8000
+       BL   @TXDEC
+       LI   R1,SROWS
+       LI   R2,>8000
+       BL   @TXSTR
+* the text window starts under the pane, or under the status line
+       LI   R0,1+PANERW
+       MOV  @PANEON,@PANEON
+       JNE  DRW1
+       LI   R0,1
+DRW1   MOV  R0,@TXTTOP
+       MOV  R0,@CURROW
+       BL   @SHOWBM            the bitmap layer line
+       LI   R1,SVER            the version line
+       BL   @TXLINE
+       DEC  @CURROW            back onto it to add the values
+       LI   R1,15
+       BL   @SETCOL
+       MOV  @SR14V,R0
+       CLR  R2
+       BL   @TXHEX
+       LI   R1,26
+       BL   @SETCOL
+       MOV  @SR12V,R0
+       CLR  R2
+       BL   @TXHEX
+       INC  @CURROW
+       LI   R4,HELP            the key help and the questions
+DRW2   MOV  *R4+,R1
+       JEQ  DRW3
+       MOV  R4,@HELPP
+       BL   @TXLINE
+       MOV  @HELPP,R4
+       JMP  DRW2
+DRW3   BL   @SETBML
+       .leave
+       RT
+
+* SETCOL - cursor to column R1 on the current row.
+SETCOL MOV  R1,@CURCOL
+       RT
+
+* SHOWBM - the line describing the bitmap layer's registers, on the
+* cursor row; the cursor moves down a row.
+SHOWBM .enter
+       CLR  @CURCOL
+       LI   R1,SBML
+       CLR  R2
+       BL   @TXSTR
+       MOV  @BMLX,R0
+       LI   R1,3
+       CLR  R2
+       BL   @TXDEC
+       LI   R1,SBMLY
+       CLR  R2
+       BL   @TXSTR
+       MOV  @BMLY,R0
+       LI   R1,3
+       CLR  R2
+       BL   @TXDEC
+       LI   R1,SBMLH
+       CLR  R2
+       BL   @TXSTR
+       MOV  @BMLH,R0
+       LI   R1,3
+       CLR  R2
+       BL   @TXDEC
+       LI   R1,SFMT2
+       MOV  @BMLFAT,R0
+       JEQ  SHB1
+       LI   R1,SFMT4
+SHB1   CLR  R2
+       BL   @TXSTR
+       LI   R1,SPANE1
+       MOV  @PANEON,R0
+       JNE  SHB2
+       LI   R1,SPANE0
+SHB2   CLR  R2
+       BL   @TXSTR
+       INC  @CURROW
+       .leave
+       RT
+
+* SETBML - the bitmap layer's registers from the variables.  With the
+* pane off the layer is switched off (VR31 = 0) and nothing else moves.
+SETBML .enter
+       LI   R0,>A000+(BMLDAT/64)   VR32: picture at BMLDAT
+       BL   @VDPWR
+       MOV  @BMLX,R0           VR33: X
+       AI   R0,>A100
+       BL   @VDPWR
+       MOV  @BMLY,R0           VR34: top scanline
+       AI   R0,>A200
+       BL   @VDPWR
+       LI   R0,>A300           VR35: width 0 = 256 screen pixels (both
+       BL   @VDPWR             formats: 128 fat pixels are 256 wide)
+       MOV  @BMLH,R0           VR36: height
+       AI   R0,>A400
+       BL   @VDPWR
+       CLR  R0                 VR31: off ...
+       MOV  @PANEON,R1
+       JEQ  SBM1
+       LI   R0,>C0+BMLPAL      ... or on, above the text, palette 32-35
+       MOV  @BMLFAT,R1
+       JEQ  SBM1
+       ORI  R0,>10             fat pixels: 16 colours from 32-47
+SBM1   AI   R0,>9F00
+       BL   @VDPWR
+       .leave
+       RT
+
+* LOADPC - the picture and palette for the current format into VRAM.
+LOADPC .enter
+       LI   R0,32              palette entries from 32
+       LI   R1,PAL2
+       LI   R2,4
+       LI   R3,PIC2
+       MOV  @BMLFAT,R4
+       JEQ  LPC1
+       LI   R1,PAL4
+       LI   R2,16
+       LI   R3,PIC4
+LPC1   MOV  R3,@HELPP          (a spare word while F18PAL runs)
+       BL   @F18PAL
+       LI   R0,BMLDAT
+       MOV  @HELPP,R1
+       BL   @RLEVDP
+       .leave
+       RT
+
+* ---- the full-screen picture view (the fallback) --------------------------
+* Graphics I, 32 x 24, every cell a space; the same bitmap layer, 256
+* pixels wide, centred.  Every F18A-class board draws the bitmap layer
+* in Graphics I, so this is the view an RP2040 PICO9918 can use.
+KVIEW  .enter
+       LI   R1,GM1REG
+       BL   @F18REG
+       LI   R0,NAMTAB          32 x 24 spaces
+       LI   R1,>2000
+       LI   R2,768
+       BL   @VFILL
+       LI   R0,GM1COL          white on black for all 256 characters
+       LI   R1,>F100
+       LI   R2,32
+       BL   @VFILL
+       LI   R0,NAMTAB+(21*32)+4   a caption under the picture
+       LI   R1,SVIEW+1
+       MOVB @SVIEW,R2
+       SRL  R2,8
+       BL   @VMBW
+       MOV  @BMLX,@SAVX        the view's own position, then back
+       MOV  @BMLY,@SAVY
+       MOV  @PANEON,@SAVP
+       CLR  @BMLX
+       LI   R0,48
+       MOV  R0,@BMLY
+       LI   R0,1
+       MOV  R0,@PANEON
+       BL   @SETBML
+       MOV  @SAVX,@BMLX
+       MOV  @SAVY,@BMLY
+       MOV  @SAVP,@PANEON
+       BL   @WAITK
+       BL   @T80ON             back to 80 columns; MAIN redraws
+       .leave
+       RT
+GM1REG DATA >8000              VR0: Graphics I
+       DATA >81E0              VR1: 16K, display on, interrupts
+       DATA >8200              VR2: names >0000
+       DATA >8300+(GM1COL/>40) VR3: colours >0C00
+       DATA >8402              VR4: patterns >1000 (the same font)
+       DATA >8530              VR5
+       DATA >8604              VR6
+       DATA >8701              VR7: black backdrop
+       DATA >B100              VR49: 24 rows
+       DATA 0
+
+* WAITK - wait for a new key press.  Returns its code in R0.
+WAITK  .enter
+WK1    BL   @KSCAN
+       BL   @KEYGET
+       MOV  R0,R0
+       JEQ  WK1
+       .leave
+       RT
+
+* ---- the text and scroll test ------------------------------------------------
+* Prints the sample text into the text window line by line, scrolling
+* as a game would, then waits for a key.
+KTEXT  .enter
+       MOV  @TXTTOP,R0
+       MOV  @ROWS,R1
+       DEC  R1
+       BL   @TXROWS
+       MOV  @TXTTOP,@CURROW
+       LI   R4,SAMPLE
+       LI   R5,3               three times through: enough to scroll
+KTX1   MOV  *R4+,R1
+       JNE  KTX2
+       LI   R4,SAMPLE
+       DEC  R5
+       JEQ  KTX3
+       JMP  KTX1
+KTX2   MOV  R4,@HELPP
+       MOV  R5,@SAVP
+       BL   @TXLINE
+       MOV  @HELPP,R4
+       MOV  @SAVP,R5
+       JMP  KTX1
+KTX3   LI   R1,SANYK
+       BL   @TXLINE
+       BL   @WAITK
+       .leave
+       RT
+
+* ---- requirements not met ------------------------------------------------------
+* NOSAMS - an F18A but too little SAMS: say so in 80 columns.
+NOSAMS LI   R0,24
+       MOV  R0,@ROWS
+       BL   @T80ON
+       BL   @TXCLS
+       LI   R0,2
+       LI   R1,2
+       BL   @TXAT
+       LI   R1,SNEED
+       CLR  R2
+       BL   @TXSTR
+       LI   R0,4
+       LI   R1,2
+       BL   @TXAT
+       LI   R1,SFOUND
+       CLR  R2
+       BL   @TXSTR
+       MOV  @AMSPGS,R0
+       SLA  R0,2
+       CLR  R1                 just the digits
+       CLR  R2
+       BL   @TXDEC
+       LI   R1,SKSAMS
+       CLR  R2
+       BL   @TXSTR
+       LI   R0,6
+       LI   R1,2
+       BL   @TXAT
+       LI   R1,SANYQ
+       CLR  R2
+       BL   @TXSTR
+       BL   @WAITK
+       B    @QUIT
+
+* NOF18 - no F18A: Graphics I, which every VDP shows, with the font in
+* 8-pixel cells.
+NOF18  LI   R1,GM1REG
+NOF1   MOV  *R1+,R0            VR0-VR7 only: VR49 would wrap onto VR1
+       CI   R0,>B100
+       JEQ  NOF2
+       BL   @VDPWR
+       JMP  NOF1
+NOF2   LI   R0,NAMTAB
+       LI   R1,>2000
+       LI   R2,768
+       BL   @VFILL
+       LI   R0,GM1COL
+       LI   R1,>F100
+       LI   R2,32
+       BL   @VFILL
+       LI   R0,PATTAB+(32*8)
+       LI   R1,FONT
+       LI   R2,95*8
+       BL   @VMBW
+       LI   R4,NOFTXT          lines of up to 30 characters
+       LI   R5,NAMTAB+(4*32)+1
+NOF3   MOV  *R4+,R1
+       JEQ  NOF4
+       MOVB *R1+,R2
+       SRL  R2,8
+       MOV  R5,R0
+       BL   @VMBW
+       AI   R5,64              every other row
+       JMP  NOF3
+NOF4   BL   @WAITK
+       B    @QUIT
+
+* QUIT - put the hardware back and reset the console to its title.
+QUIT   MOV  @F18FLG,R0
+       JEQ  QT1
+       BL   @F18RST            30-row mode and the bitmap layer off
+QT1    BL   @AMSOFF            plain 32K for the console
+       BLWP @>0000
+
+* ---- data ------------------------------------------------------------------------
+D128   DATA 128
+
+STITLE BYTE STITLX-STITLE-1
+       TEXT 'TXA M0 PROBE  0.01'
+STITLX
+SSAMS  BYTE SSAMSX-SSAMS-1
+       TEXT 'SAMS '
+SSAMSX
+SKF18  BYTE SKF18X-SKF18-1
+       TEXT 'K  F18A  '
+SKF18X
+SROWS  BYTE SROWSX-SROWS-1
+       TEXT ' ROWS'
+SROWSX
+SBML   BYTE SBMLX-SBML-1
+       TEXT 'Bitmap layer  X='
+SBMLX
+SBMLY  BYTE SBMLYX-SBMLY-1
+       TEXT '  Y='
+SBMLYX
+SBMLH  BYTE SBMLHX-SBMLH-1
+       TEXT '  H='
+SBMLHX
+SFMT2  BYTE SFMT2X-SFMT2-1
+       TEXT '  2 bpp, 4 colours, 256 x 96'
+SFMT2X
+SFMT4  BYTE SFMT4X-SFMT4-1
+       TEXT '  fat pixels, 16 colours, 128 x 96'
+SFMT4X
+SPANE1 BYTE SPAN1X-SPANE1-1
+       TEXT '  pane on'
+SPAN1X
+SPANE0 BYTE SPAN0X-SPANE0-1
+       TEXT '  pane off'
+SPAN0X
+SVER   BYTE SVERX-SVER-1
+       TEXT 'Version  SR14=>     SR12=>     (PICO9918 Pi model: 1 = RP2040, 2 = RP2350)'
+SVERX
+SVIEW  BYTE SVIEWX-SVIEW-1
+       TEXT 'Full-screen view: any key'
+SVIEWX
+SANYK  BYTE SANYKX-SANYK-1
+       TEXT '[Press any key]'
+SANYKX
+SNEED  BYTE SNEEDX-SNEED-1
+       TEXT 'TXA needs an F18A (or PICO9918) and a SAMS card of 512K or more.'
+SNEEDX
+SFOUND BYTE SFNDX-SFOUND-1
+       TEXT 'This console has an F18A and '
+SFNDX
+SKSAMS BYTE SKSMX-SKSAMS-1
+       TEXT 'K of SAMS.'
+SKSMX
+SANYQ  BYTE SANYQX-SANYQ-1
+       TEXT 'Press any key to return to the title screen.'
+SANYQX
+       EVEN
+
+HELP   DATA H0,H1,H2,H3,H4,H5,H6,0
+H0     BYTE H0X-H0-1
+       TEXT ' '
+H0X
+H1     BYTE H1X-H1-1
+       TEXT 'E S D X  move the picture 8 pixels     W Z  taller / shorter'
+H1X
+H2     BYTE H2X-H2-1
+       TEXT 'F  2 bpp or fat pixels     P  pane on or off     R  24 or 30 rows'
+H2X
+H3     BYTE H3X-H3-1
+       TEXT 'V  full-screen picture view     T  text and scrolling test     Q  quit'
+H3X
+H4     BYTE H4X-H4-1
+       TEXT ' '
+H4X
+H5     BYTE H5X-H5-1
+       TEXT 'No picture above?  This board has no bitmap layer in 80 columns: try V.'
+H5X
+H6     BYTE H6X-H6-1
+       TEXT 'Please note: does the frame show all four amber corners and 8 ticks?'
+H6X
+       EVEN
+
+NOFTXT DATA N1,N2,N3,N4,0
+N1     BYTE N1X-N1-1
+       TEXT 'TXA NEEDS AN F18A OR'
+N1X
+N2     BYTE N2X-N2-1
+       TEXT 'PICO9918 VIDEO CARD.'
+N2X
+N3     BYTE N3X-N3-1
+       TEXT ' '
+N3X
+N4     BYTE N4X-N4-1
+       TEXT 'PRESS ANY KEY.'
+N4X
+       EVEN
+
+SAMPLE DATA T1,T2,T3,T4,T5,T6,T7,T8,0
+T1     BYTE T1X-T1-1
+       TEXT 'Lamp Room'
+T1X
+T2     BYTE T2X-T2-1
+       TEXT 'The great lens turns slowly above you, throwing its beam across a sea'
+T2X
+T3     BYTE T3X-T3-1
+       TEXT 'that has gone quite still.  A brass log book lies open on the desk, and'
+T3X
+T4     BYTE T4X-T4-1
+       TEXT 'a narrow iron stair spirals down into the dark.'
+T4X
+T5     BYTE T5X-T5-1
+       TEXT ' '
+T5X
+T6     BYTE T6X-T6-1
+       TEXT '>read the log book'
+T6X
+T7     BYTE T7X-T7-1
+       TEXT 'The last entry, in a hurried hand: "Light kept.  Tide wrong again.  jqy|g"'
+T7X
+T8     BYTE T8X-T8-1
+       TEXT ' '
+T8X
+       EVEN
+
+* spare words for the handlers (kept out of the registers they use)
+HELPP  DATA 0
+SAVX   DATA 0
+SAVY   DATA 0
+SAVP   DATA 0
+
+* the generated data: font, then the test pictures and palettes
+       COPY "gen/font.a99"
+       COPY "gen/pics.a99"

@@ -1,0 +1,65 @@
+*======================================================================
+* keys.a99 - keyboard matrix scan via the TMS9901
+*
+* KSCAN reads all six keyboard columns into KEYMAP (one byte each,
+* 0 bit = pressed).  KEYGET translates the first pressed key to ASCII
+* with edge detection so a held key reports once.
+* Matrix: column select on CRU bits 18-20, rows read on bits 3-10.
+*======================================================================
+
+* KSCAN - fill KEYMAP.  Uses R1-R4, R12.  Leaf.
+KSCAN  LI   R2,KEYMAP          6 output bytes, one per column
+       CLR  R1                 column number in the high byte
+       LI   R3,6               six keyboard columns
+KSC1   LI   R12,>0024          CRU bits 18-20 select the column
+       LDCR R1,3               3 bits from the high byte of R1
+       NOP                     settle time for the 9901 outputs
+       NOP
+       LI   R12,>0006          CRU bits 3-10 are the row lines
+       CLR  R4                 STCR of 8 bits leaves the low byte alone
+       STCR R4,8               row bits -> high byte, bit 3 -> LSB
+       MOVB R4,*R2+            store: 0 bit = key down
+       AI   R1,>0100           next column
+       DEC  R3
+       JNE  KSC1
+       RT
+
+* KEYGET - R0 = ASCII (high byte) of a newly pressed key, or 0.
+* Uses R1-R5.  Leaf.
+KEYGET LI   R1,KEYMAP          scan the columns in order
+       LI   R2,KTAB            8 ASCII codes per column
+       LI   R3,6
+KG1    MOVB *R1+,R4            this column's row bits
+       INV  R4                 now 1 = pressed
+       ANDI R4,>FF00           high byte only (INV touched the low byte too)
+       JNE  KG2                something pressed in this column
+       AI   R2,8               next column's table row
+       DEC  R3
+       JNE  KG1
+       CLR  R0                 nothing pressed: clear edge state
+       MOVB R0,@KEYLST
+       RT
+KG2    SRL  R4,8               bit r of the low byte = row r
+       CLR  R5                 row index
+KG3    SRL  R4,1               shift bit 0 into carry
+       JOC  KG4                carry set: this row is pressed
+       INC  R5
+       JMP  KG3
+KG4    A    R5,R2              table entry for (column, row)
+       CLR  R0                 (low byte clean: callers compare whole words)
+       MOVB *R2,R0             ASCII, or 0 for modifiers
+       CB   R0,@KEYLST
+       JEQ  KG5                same key still held
+       MOVB R0,@KEYLST
+       RT
+KG5    CLR  R0
+       RT
+
+* Key table: 6 columns x 8 rows.  0 = modifier / unused.
+KTAB   BYTE '=',' ',13,0,0,0,0,0
+       TEXT '.LO92SWX'
+       TEXT ',KI83DEC'
+       TEXT 'MJU74FRV'
+       TEXT 'NHY65GTB'
+       TEXT '/;P01AQZ'
+       EVEN

@@ -1,0 +1,75 @@
+*======================================================================
+* defs.a99 - every address, port and layout constant TXA uses.
+*
+* One equates file, COPYed by every source, as in The Lantern Coast:
+* change a layout here and nowhere else.
+*
+* CPU memory (M0 layout; the engine keeps it, see the spec's memory map)
+*   >2000->2FFF  kernel: VDP, F18A, SAMS, keyboard, text, RLE
+*   >3000->37FF  free in M0 (the VM's value stack and frames from M1)
+*   >3800->3EFF  variables (RAMVAR below)
+*   >3F00->3FEF  return stack, R10, growing down from STACKT
+*   >A000->CFFF  the resident program (the probe in M0, the engine later)
+*   >D000->DFFF  overlay window (unused in M0)
+*   >E000->FFFF  story windows; in M0, >E000 is the SAMS sizing window
+*
+* AMSSIZ (pager.a99) writes a probe value into the last word (>xFFE) of
+* every SAMS page, so for the moment it runs, the last word of each
+* window the program lives in is overwritten; it saves and restores
+* those words.  The one rule: the code running during the count (AMSSIZ,
+* MAPPG, in the kernel) must not sit on >2FFE.  build.py checks.
+*======================================================================
+
+* ---- console hardware ------------------------------------------------
+VDPRD  EQU  >8800              VDP read data
+VDPSTA EQU  >8802              VDP status
+VDPWD  EQU  >8C00              VDP write data
+VDPWA  EQU  >8C02              VDP address / register (low byte first)
+GRMRD  EQU  >9800              GROM read data
+GRMWA  EQU  >9C02              GROM address (high byte first)
+SOUND  EQU  >8400              TMS9919 sound chip
+AMSCRU EQU  >1E00              SAMS card CRU base
+AMSREG EQU  >4000              SAMS mapper registers (when exposed)
+
+* ---- VRAM layout: 80-column text mode (T80) --------------------------
+* The name table holds 80 x 30 = 2400 bytes in 30-row mode (>0000-
+* >095F), so the font starts at >1000.  The bitmap layer's picture
+* (256 x 96 at 2 bpp, 64 bytes a row = 6144 bytes) fills >2800->3FFF
+* exactly: one byte past it and the F18A would wrap to >0000.
+NAMTAB EQU  >0000              T80 name table (VR2 = 0: valid locked or not)
+GM1COL EQU  >0C00              Graphics I colour table (picture view only)
+PATTAB EQU  >1000              font: 256 patterns x 8 bytes (VR4 = 2)
+SPRATT EQU  >1800              sprite attributes (VR5 = >30), unused
+SPRPAT EQU  >2000              sprite patterns (VR6 = 4), kept all zero
+BMLDAT EQU  >2800              bitmap layer picture (VR32 = >A0)
+BMLPAL EQU  >08                bitmap layer palette select: entries 32-47
+PANETP EQU  8                  picture pane's top scanline (screen row 1)
+PANEHT EQU  96                 picture pane's height in scanlines
+PANERW EQU  12                 picture pane's height in text rows
+COLS   EQU  80                 text columns
+TXTCOL EQU  >F1                VR7: white text on black (palette 15 / 1)
+
+* ---- RAM layout --------------------------------------------------------
+RAMVAR EQU  >3800              variables start here
+STACKT EQU  >3FF0              return stack top (R10), grows down
+WS     EQU  >8300              our workspace
+GPLWS  EQU  >83E0              the console's GPL workspace (DSR calls)
+
+F18FLG EQU  RAMVAR+>00         1 = F18A found (F18DET)
+AMSPGS EQU  RAMVAR+>02         SAMS pages found (0 = no card), from AMSSIZ
+ROWS   EQU  RAMVAR+>04         screen rows: 24 or 30
+TXTTOP EQU  RAMVAR+>06         first row of the text window
+CURROW EQU  RAMVAR+>08         text cursor row (TXPUT, TXNL)
+CURCOL EQU  RAMVAR+>0A         text cursor column
+BMLX   EQU  RAMVAR+>0C         bitmap layer X (VR33)
+BMLY   EQU  RAMVAR+>0E         bitmap layer top scanline (VR34)
+BMLH   EQU  RAMVAR+>10         bitmap layer height (VR36)
+BMLFAT EQU  RAMVAR+>12         0 = 2 bpp picture, 1 = 4 bpp fat pixels
+PANEON EQU  RAMVAR+>14         0 = pane hidden, 1 = shown
+SR14V  EQU  RAMVAR+>16         F18A status register 14 (version), high byte
+SR12V  EQU  RAMVAR+>18         status register 12 after VR58 = 0 (PICO9918)
+KEYLST EQU  RAMVAR+>1A         last key reported (KEYGET's edge detection)
+KEYMAP EQU  RAMVAR+>1C         six keyboard column bytes (KSCAN), to >21
+SAVWRD EQU  RAMVAR+>22         8 words: >xFFE of windows 2,3,A-F (AMSSIZ)
+NUMBUF EQU  RAMVAR+>40         8 bytes: number formatting
+ROWBUF EQU  RAMVAR+>80         80 bytes: one text row (scrolling)

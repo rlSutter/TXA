@@ -1,0 +1,119 @@
+*======================================================================
+* pager.a99 - SAMS (AMS) page manager
+*
+* AMSDET and MAPPG come from The Lantern Coast.  AMSINI is simplified
+* (no slot bookkeeping yet) and AMSSIZ and AMSOFF are new.
+*
+* Windows are numbered by address nibble: window 2 = >2000, window >E
+* = >E000.  A mapper register is written as a word with the page in
+* both bytes, because cards differ in which byte they latch.
+*
+* Rule: code that calls MAPPG must not live in the window it remaps.
+*======================================================================
+
+* AMSDET - detect a mapper.  Call in pass-through mode (before AMSINI).
+* Returns R0 = 1 if present, 0 if not.  Uses R1-R3, R12.  Leaf.
+AMSDET LI   R12,AMSCRU
+       SBO  0                  expose registers at >4000
+       MOV  @AMSREG+4,R1       save window-2 register
+       LI   R2,>1515           arbitrary probe value, same in both bytes
+       MOV  R2,@AMSREG+4
+       NOP                     let the bus settle before reading back
+       MOV  @AMSREG+4,R3
+       MOV  R1,@AMSREG+4       restore
+       SBZ  0                  registers hidden again
+       CLR  R0
+       CB   R2,R3              compare the byte the register latched
+       JNE  AMSD1
+       INC  R0
+AMSD1  RT
+
+* AMSINI - identity-map all 16 windows and switch mapping mode on.
+* Page n is then at address n<<12, so nothing the program sees moves.
+* Uses R1-R3, R12.  Leaf.
+AMSINI LI   R12,AMSCRU
+       SBO  0                  registers visible
+       CLR  R1                 window 0
+       LI   R3,AMSREG          its register
+AMSI1  MOV  R1,R2              identity: window n gets page n
+       SLA  R2,8
+       SOC  R1,R2              page in both bytes
+       MOV  R2,*R3+
+       INC  R1
+       CI   R1,16
+       JL   AMSI1
+       SBO  1                  mapping mode on
+       SBZ  0                  hide registers (they share DSR space)
+       RT
+
+* AMSOFF - mapping mode off (pass-through), before a console reset, so
+* the console and the next program see a plain 32K.  Uses R12.  Leaf.
+AMSOFF LI   R12,AMSCRU
+       SBZ  1
+       RT
+
+* MAPPG - map one page into one window.
+*   R0 = page (0-255), R1 = window (0-15)
+* Uses R2, R3, R12.  Leaf.
+MAPPG  MOV  R0,R2              build (page<<8)|page: the card latches one byte
+       SLA  R2,8
+       SOC  R0,R2
+       MOV  R1,R3              window number ...
+       SLA  R3,1               ... times two = register offset
+       AI   R3,AMSREG          register address
+       LI   R12,AMSCRU
+       SBO  0
+       MOV  R2,*R3             write the page
+       SBZ  0
+       RT
+
+* AMSSIZ - count the card's pages (after AMSINI).  Returns R0 = pages,
+* 256 for 1M or more.  Also stored in AMSPGS.
+*
+* A card of N pages answers to page numbers past N by aliasing page
+* p mod N.  So write each page's own number into it, from 255 down to 0
+* (the lowest number written to a physical page is written last and
+* stays), then read upward: the first page that does not hold its own
+* number is N.  The values go in the last word of each page (>FFE),
+* through window >E000.  Pages 2, 3 and >A->F are the 32K the program
+* lives in; their last words are saved first and put back after.  Only
+* the kernel's code runs meanwhile, and it must not reach >2FFE.
+* Uses R0-R7, R12.
+AMSSIZ .enter
+       LI   R4,SAVWRD          save >2FFE, >3FFE, >AFFE ... >FFFE
+       MOV  @>2FFE,*R4+
+       MOV  @>3FFE,*R4+
+       LI   R5,>AFFE
+AMSZ1  MOV  *R5,*R4+
+       AI   R5,>1000
+       JNC  AMSZ1              until the address wraps past >FFFE
+       LI   R4,255             write pass: 255 down to 0
+AMSZ2  MOV  R4,R0
+       LI   R1,>E
+       BL   @MAPPG
+       MOV  R4,@>EFFE          page p holds p
+       DEC  R4
+       JOC  AMSZ2              DEC sets carry while the result is >= 0
+       CLR  R4                 read pass: 0 upward
+AMSZ3  MOV  R4,R0
+       LI   R1,>E
+       BL   @MAPPG
+       C    @>EFFE,R4
+       JNE  AMSZ4              first page not holding its number = size
+       INC  R4
+       CI   R4,256
+       JL   AMSZ3
+AMSZ4  LI   R0,>E              window >E000 back to its own page
+       LI   R1,>E
+       BL   @MAPPG
+       LI   R5,SAVWRD          put the program's words back
+       MOV  *R5+,@>2FFE
+       MOV  *R5+,@>3FFE
+       LI   R6,>AFFE
+AMSZ5  MOV  *R5+,*R6
+       AI   R6,>1000
+       JNC  AMSZ5
+       MOV  R4,@AMSPGS
+       MOV  R4,R0
+       .leave
+       RT

@@ -1,0 +1,28 @@
+*======================================================================
+* txaprobe.a99 - M0 build: the probe at >A000, the kernel at >2000.
+*
+* Assembled by tools/build.py into E/A option 5 files and a cartridge.
+* xas99 writes the E/A 5 files in address order, and E/A starts a
+* program at its first file's load address, so the kernel at >2000
+* opens with the jump to the program (KENTRY).  The cartridge loader
+* jumps to >2000 too.
+*======================================================================
+       COPY "macros.a99"
+       COPY "defs.a99"
+
+       AORG >A000
+       COPY "probe.a99"
+* PROGND: first free byte of the resident window
+PROGND
+
+       AORG >2000
+KENTRY B    @START             the entry: E/A 5 and the cartridge start here
+       COPY "vdp.a99"
+       COPY "f18a.a99"
+       COPY "pager.a99"
+       COPY "keys.a99"
+       COPY "text80.a99"
+       COPY "rle.a99"
+* KERNND: first free byte of the kernel window
+KERNND
+       END  START

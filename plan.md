@@ -1,0 +1,64 @@
+# TXA plan
+
+Status, what remains, and Rebecca's decisions. Start a new session with
+`docs/CONTEXT.md`.
+
+## Status (19 October 2026)
+
+**M0, the hardware probe: built and passing in the simulator (25 checks,
+`tests/m0_test.py`). Waiting on Rebecca's js99er and hardware results.**
+
+The probe runs from RAM at >A000 with the kernel at >2000, loaded either
+by E/A option 5 (`TXAP1`, `TXAP2` on `txaprobe.dsk`) or by the cartridge
+(`txaprobe8.bin`), whose loader copies the same image into RAM. It
+checks for an F18A and 512K of SAMS (counting the card's pages), then
+shows the split screen: status line, a 256 x 96 picture on the bitmap
+layer, and 80-column text under it.
+
+### What M0 must answer (Rebecca's report)
+
+1. Does 80-column mode come up, in 24 and 30 rows (R)?
+2. Does the picture show over the text? All four amber corners and 8
+   ticks? Do E S D X move it, W Z resize it?
+3. Fat pixels (F): 16 colours, the moon round?
+4. The full-screen view (V): picture centred, caption under it?
+5. The text test (T): readable at 80 columns? Scrolling speed acceptable?
+6. The status line's SAMS size: right for the card?
+7. The version line's SR14 and SR12 values (they identify the board).
+8. Quit (Q): back to the TI title screen with normal colours?
+
+On an RP2040 PICO9918 question 2 is expected to fail (no bitmap layer in
+80 columns on that board, per the F18A/PICO9918 reference) and the V view
+to work. On an F18A or a PICO9918 PRO both should work.
+
+### Decision waiting on M0's results
+
+- **Picture presentation on boards without the bitmap layer in 80
+  columns**: the full-screen view (Graphics I + bitmap layer, any key to
+  return) is the proposed fallback, chosen per board at startup.
+- **Picture pane size**: at 24 rows the 96-line pane leaves 11 text rows;
+  at 30 rows, 17. The spec assumes 30 rows; shorter pictures (64-80
+  lines) are an option if 24 rows must be supported.
+
+## Next: M1 (VM and compiler core)
+
+Python cross-compiler for declarations, routines and expressions; the
+VM, text output, word wrap and [MORE]; bold and underline glyph sets.
+
+## Decisions
+
+| Date | Decision |
+| --- | --- |
+| 2026-10-18 | Engine first, then an original story developed together |
+| 2026-10-18 | Custom engine on the Lantern Coast kernel, not a Z-machine |
+| 2026-10-18 | Text plus occasional illustrations; import now, editor later |
+| 2026-10-18 | Native workbench delivered and documented separately |
+| 2026-10-18 | Full spec as a Claude Doc before coding |
+| 2026-10-19 | M0 started from The Lantern Coast 1.13 bundle |
+
+## History
+
+- 2026-10-19 M0: repository, kernel ported (VDP, F18A, SAMS, keyboard),
+  80-column text layer, RLE picture decoder, SAMS page counting, the
+  probe, cartridge loader, build (EA5 + disk image + cartridge),
+  simulator extended for T80 and the bitmap layer, 25-check test.

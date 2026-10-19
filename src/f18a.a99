@@ -1,0 +1,116 @@
+*======================================================================
+* f18a.a99 - F18A extended VDP driver
+*
+* From The Lantern Coast: unlock, detect, palette load.  TXA adds the
+* 80-column text mode, 30-row mode, the bitmap layer, version reads and
+* the restore-before-quit routine (F18RST).
+*======================================================================
+
+* F18UNL - unlock the F18A extended registers, unless they are unlocked
+* already.  An F18A stays unlocked through the console's reset (a Quit), and
+* ANY write to VR57 while unlocked locks it again: an unlock sequence sent
+* then locks it, the game falls back to plain colours and the title breaks.
+* So first ask: select status register 1 and read the ID (twice: on a locked
+* F18A or a 9918A the write lands on VR7 and the reads return status
+* register 0, the first of which clears its flags).  Only if no F18A answers,
+* write >1C to VR57 twice.  On a stock 9918A that lands on VR1 (blanking the
+* screen), so F18UNL must be followed by a full register init (VDPINI).
+F18UNL .enter
+       LI   R0,>8F01           status register 1 ...
+       BL   @VDPWR
+       MOVB @VDPSTA,R1
+       MOVB @VDPSTA,R1
+       LI   R0,>8F00           ... and back to 0
+       BL   @VDPWR
+       ANDI R1,>E000           bits 7-5 = 111: an F18A, already unlocked
+       CI   R1,>E000
+       JEQ  FU9
+       LI   R0,>B91C           VR57 (>80|>39) = >1C, written twice
+       BL   @VDPWR
+       LI   R0,>B91C
+       BL   @VDPWR
+FU9    .leave
+       RT
+
+* F18DET - after F18UNL, select status register 1 and read the ID.
+* Bits 7-5 = 111 identify an F18A.  Returns R0 = 1 if found, else 0.
+* Restores VR15 = 0 and VR7 (which a real 9918A would have hit).
+F18DET .enter
+       LI   R0,>8F01           VR15 = 1: status register 1
+       BL   @VDPWR
+       MOVB @VDPSTA,R1         ID byte: 111xxxxx on an F18A
+       LI   R0,>8F00           back to status register 0
+       BL   @VDPWR
+       LI   R0,>8701           VR7 backdrop black (9918A aliased VR15 onto VR7)
+       BL   @VDPWR
+       CLR  R0
+       ANDI R1,>E000           top three bits of the ID
+       CI   R1,>E000           all set = F18A
+       JNE  F18D1
+       INC  R0
+F18D1  MOV  R0,@F18FLG         remembered for palette / ECM / sprite colour choices
+       .leave
+       RT
+
+* F18PAL - load palette entries.
+*   R0 = first palette index (0-63), R1 = table of words >0RGB,
+*   R2 = entry count
+* VR47 = >C0 | index puts the data port into palette mode with
+* auto-increment; each entry is two data-port writes (0R, GB).
+F18PAL .enter
+       MOV  R2,R3              entry counter
+       ORI  R0,>00C0           DPM=1, auto-increment=1, plus the start index
+       SWPB R0
+       MOVB R0,@VDPWA          data: >C0|index
+       LI   R0,>AF00           VR47
+       MOVB R0,@VDPWA          data byte of the register write
+F18P1  MOVB *R1+,@VDPWD        0R byte
+       MOVB *R1+,@VDPWD        GB byte
+       DEC  R3
+       JNE  F18P1
+       LI   R0,>AF00           VR47 = 0: leave palette mode
+       BL   @VDPWR
+       .leave
+       RT
+
+* F18SR - read F18A status register n.  R0 = n (0-15).
+* Returns R1 = the status byte in the high byte (low byte clear).
+* VR15 selects which status register the status port returns; it is put
+* back to 0 so later VSYNC-style polls read status register 0 again.
+F18SR  .enter
+       ORI  R0,>8F00           VR15 = n
+       BL   @VDPWR
+       CLR  R1
+       MOVB @VDPSTA,R1         the selected status register
+       LI   R0,>8F00           VR15 = 0 again
+       BL   @VDPWR
+       .leave
+       RT
+
+* F18REG - write a list of VDP registers.  R1 = list of words >RRDD
+* (>80|register, value) ending in a 0 word.  The same format as Lantern's
+* VREGS list, extended past VR7: register numbers 8-63 work only while
+* the F18A is unlocked (locked, they wrap onto VR0-VR7).
+F18REG .enter
+FRG1   MOV  *R1+,R0
+       JEQ  FRG2
+       BL   @VDPWR
+       JMP  FRG1
+FRG2   .leave
+       RT
+
+* F18RST - put back every F18A register TXA changes, before a quit.
+* The console's reset rewrites VR0-VR7 only; anything else survives the
+* reset and leaves the TI title screen (or the next program) wrong:
+* 30-row mode in particular stays on (seen on real F18As).
+F18RST .enter
+       LI   R1,F18RTB
+       BL   @F18REG
+       .leave
+       RT
+F18RTB DATA >B100              VR49 = 0: 24 rows, no tile layer 2, no ECM
+       DATA >9F00              VR31 = 0: bitmap layer off
+       DATA >AF00              VR47 = 0: palette data-port mode off
+       DATA >8F00              VR15 = 0: status register 0
+       DATA >8000              VR0  = 0: 80-column mode bit off
+       DATA 0
