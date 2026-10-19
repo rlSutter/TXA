@@ -1,0 +1,368 @@
+! lamplight.txa - "Lamplight", the TXA sample game.
+!
+! Dusk on a small island harbour.  The lighthouse lamp has gone out, the
+! keeper is old and can't find his spectacles, and a ship is due.  Fifteen
+! rooms; it shows most of the standard library: light and darkness, a
+! locked door and its key, containers and supporters, a character who
+! answers questions and takes things, a tide (a daemon) that floods the
+! causeway (an exit that decides for itself), a floating object (the sea)
+! in five rooms, scoring, and an ending.  The tutorial builds it up.
+
+INCLUDE "DSK1.STDLIB"
+
+GLOBAL tide_in              ! 1 while the causeway is under water
+GLOBAL tide_turns = 6       ! turns until the tide turns
+GLOBAL lamp_fuelled         ! the great lamp has oil
+
+! ---- the village ----------------------------------------------------------
+ROOM HarbourRoad "Harbour Road"
+  DESC "A cobbled road above the harbour. The keeper's cottage is north, its door ajar; a boat shed stands to the west. The quay is east, and steps lead down to the beach to the south."
+  HAS light
+  N Kitchen
+  E Quay
+  S Beach
+  DOWN Beach
+  W ShedDoor
+END
+ROOM Kitchen "Cottage Kitchen"
+  DESC "A low kitchen warm from the stove. A dresser stands against one wall, and a ladder climbs to the room above."
+  HAS light
+  S HarbourRoad
+  OUTSIDE HarbourRoad
+  UP Bedroom
+END
+ROOM Bedroom "Loft Bedroom"
+  DESC "A narrow loft under the eaves, just room for a bed and a nightstand."
+  HAS light
+  DOWN Kitchen
+END
+ROOM BoatShed "Boat Shed"
+  DESC "Nets and oars hang from the rafters. The door is east."
+  HAS light
+  E ShedDoor
+  OUTSIDE ShedDoor
+END
+ROOM Beach "Beach"
+  DESC "Shingle runs down to the water. The road is up the steps to the north, and a dark cave opens in the cliff to the west."
+  HAS light
+  N HarbourRoad
+  UP HarbourRoad
+  W Cave
+  INSIDE Cave
+END
+ROOM Cave "Sea Cave"
+  DESC "A dripping cave, the sea's breathing loud in the dark. Daylight is east."
+  E Beach
+  OUTSIDE Beach
+END
+
+! ---- the crossing ----------------------------------------------------------
+ROOM Quay "Quay"
+  DESC "Stone steps and mooring rings. A causeway of flat stones runs east across the bay to the lighthouse rock; the road is west."
+  HAS light
+  W HarbourRoad
+  E
+    RETURN Crossing(Causeway)
+  END
+END
+ROOM Causeway "Causeway"
+  DESC "Flat stones, slick with weed, with the sea on both sides. The quay is west and the lighthouse rock east."
+  HAS light
+  W Quay
+  E Rocks
+END
+ROOM Rocks "Lighthouse Rock"
+  DESC "Black rock round the foot of the lighthouse, whose door is north. The causeway leads back west."
+  HAS light
+  N Base
+  INSIDE Base
+  W
+    RETURN Crossing(Causeway)
+  END
+END
+
+! ---- the lighthouse ---------------------------------------------------------
+ROOM Base "Lighthouse Base"
+  DESC "A round room of whitewashed stone. A spiral stair climbs into darkness; a store room is east, and the door out is south."
+  HAS light
+  S Rocks
+  OUTSIDE Rocks
+  E StoreRoom
+  UP Stair
+END
+ROOM StoreRoom "Store Room"
+  DESC "Shelves of tins and a smell of paraffin."
+  W Base
+  OUTSIDE Base
+END
+ROOM Stair "Spiral Stair"
+  DESC "The iron stair winds up and up. Down is the base; up, the watch room."
+  UP WatchRoom
+  DOWN Base
+END
+ROOM WatchRoom "Watch Room"
+  DESC "The keeper's watch room: a desk under the window, a stool, and the last of the light over the sea. The stair goes down, and a short ladder up to the lamp."
+  HAS light
+  DOWN Stair
+  UP LampRoom
+END
+ROOM LampRoom "Lamp Room"
+  DESC "The great lens fills the room, its glass catching what light is left. A door leads out to the gallery."
+  HAS light
+  DOWN WatchRoom
+  OUTSIDE Gallery
+END
+ROOM Gallery "Gallery"
+  DESC "A railed gallery around the top of the tower, the wind tugging at your coat. Far out, a ship's lights move against the dark."
+  HAS light
+  INSIDE LampRoom
+END
+
+! ---- things -------------------------------------------------------------------
+OBJECT ShedDoor "shed door"
+  NAME "shed" "door"
+  HAS door openable lockable locked static scenery
+  WITH_KEY ShedKey
+  DOOR_TO HarbourRoad BoatShed
+  FOUND_IN HarbourRoad BoatShed
+END
+
+OBJECT Sea "sea"
+  NAME "sea" "water" "waves" "bay" "tide"
+  HAS scenery
+  FOUND_IN Quay Causeway Rocks Beach Gallery
+  DESC
+    IF tide_in
+      PRINT "Grey water, high against the stones."
+    ELSE
+      PRINT "Grey water, drawn back from the causeway."
+    END
+    RETURN TRUE
+  END
+END
+
+OBJECT Dresser "dresser" IN Kitchen
+  NAME "dresser" "cupboard"
+  HAS static scenery supporter
+END
+OBJECT Drawer "drawer" IN Dresser
+  NAME "drawer"
+  HAS container openable static
+END
+OBJECT Matches "box of matches" IN Drawer
+  NAME "box" "matches" "match"
+  DESC "Half full, and dry."
+END
+OBJECT Lantern "storm lantern" IN Kitchen
+  NAME "storm" "lantern" "lamp"
+  HAS switchable
+  INITIAL "A storm lantern hangs on a hook by the door."
+  DESC
+    IF self HAS on
+      PRINT "It burns with a steady yellow flame."
+    ELSE
+      PRINT "Trimmed and full, but unlit."
+    END
+    RETURN TRUE
+  END
+  AFTER
+    SwitchOn: GIVE self light
+    SwitchOff: GIVE self NOT light
+  END
+END
+OBJECT Keeper "Brannock" IN Kitchen
+  NAME "brannock" "keeper" "old" "man"
+  HAS animate proper male
+  INITIAL "Old Brannock, the keeper, sits by the stove, squinting at nothing."
+  DESC "White-whiskered and half-blind without his spectacles."
+  LIFE
+    Ask, Tell:
+      IF WordIs('lamp') OR WordIs('light') OR WordIs('lighthouse')
+        PRINT "~Gone out, has it? I can't climb that stair, not with my eyes. There's oil in the boat shed. Matches in the drawer.~"
+      ELSEIF WordIs('key') OR WordIs('shed')
+        IF ShedKey IN self
+          PRINT "~The shed key? I've got it somewhere. Find my spectacles and I'll find the key.~"
+        ELSE
+          PRINT "~You've got it, lad.~"
+        END
+      ELSEIF WordIs('spectacles') OR WordIs('glasses')
+        PRINT "~Upstairs, likely. I put them down and the room moved.~"
+      ELSEIF WordIs('tide')
+        PRINT "~Turns every few minutes this time of year. Don't get caught on the stones.~"
+      ELSE
+        PRINT "Brannock just hums."
+      END
+      RETURN TRUE
+    Give, Show:
+      IF noun = Spectacles
+        MOVE Spectacles TO self
+        GIVE Spectacles worn
+        MOVE ShedKey TO player
+        score = score + 5
+        PRINT "Brannock puts the spectacles on and beams at you. ~That's better.~ He fishes a key from his pocket and presses it into your hand."
+        RETURN TRUE
+      END
+      PRINT "~Very nice,~ says Brannock, without looking."
+      RETURN TRUE
+  END
+END
+OBJECT ShedKey "iron key" IN Keeper
+  NAME "iron" "key" "shed"
+END
+OBJECT Bed "bed" IN Bedroom
+  NAME "bed"
+  HAS static scenery supporter enterable
+END
+OBJECT Nightstand "nightstand" IN Bedroom
+  NAME "nightstand" "table" "stand"
+  HAS static scenery supporter
+END
+OBJECT Spectacles "pair of spectacles" IN Nightstand
+  NAME "pair" "spectacles" "glasses"
+  HAS wearable
+  DESC "Round, wire-rimmed, and very thick."
+END
+OBJECT OilCan "oil can" IN BoatShed
+  NAME "oil" "can" "paraffin"
+  DESC "A dented can of lamp oil, nearly full."
+END
+OBJECT Nets "nets" IN BoatShed
+  NAME "nets" "net" "oars" "oar" "rafters"
+  HAS scenery plural
+END
+OBJECT Float "glass float" IN Cave
+  NAME "glass" "float" "ball"
+  INITIAL "Something round and green gleams among the stones."
+  DESC "A fisherman's float of green glass, old and lovely."
+  AFTER
+    Take: IF self HASNT general
+            GIVE self general
+            score = score + 5
+          END
+  END
+END
+OBJECT Tins "tins" IN StoreRoom
+  NAME "tins" "tin" "shelves"
+  HAS scenery plural
+  DESC "Paint, putty, wick: nothing you need."
+END
+OBJECT Desk "desk" IN WatchRoom
+  NAME "desk"
+  HAS static scenery supporter
+END
+OBJECT Logbook "logbook" IN Desk
+  NAME "log" "logbook" "book"
+  DESC "The last entry, in a shaky hand: ~Wick trimmed. Oil low - fetch from shed.~"
+END
+OBJECT Lens "great lens" IN LampRoom
+  NAME "great" "lens" "lamp" "light" "wick"
+  HAS static scenery
+  DESC
+    IF lamp_fuelled
+      PRINT "The reservoir is full and the wick is ready."
+    ELSE
+      PRINT "A tower of glass prisms around a wick. The oil reservoir is dry."
+    END
+    RETURN TRUE
+  END
+  BEFORE
+    Burn:
+      IF NOT lamp_fuelled
+        PRINT "The wick is dry; it won't take a flame."
+        RETURN TRUE
+      END
+      IF Matches NOTIN player
+        PRINT "You have nothing to light it with."
+        RETURN TRUE
+      END
+      score = score + 10
+      PRINT "You strike a match and touch it to the wick. The flame catches, steadies, and the great lens takes it, throwing a slow beam out across the water. Far out, a ship's horn answers."
+      deadflag = 2
+      RETURN TRUE
+  END
+END
+OBJECT Tide "tide"
+  NAME "tide"
+  DAEMON
+    tide_turns = tide_turns - 1
+    IF tide_turns <= 0
+      tide_turns = 6
+      tide_in = 1 - tide_in
+      IF location = Quay OR location = Causeway OR location = Rocks
+        IF tide_in
+          PRINT "The tide is coming in over the causeway."
+        ELSE
+          PRINT "The tide draws back, and the causeway stones show again."
+        END
+      END
+    END
+  END
+END
+
+! the causeway: crossable only at low tide
+ROUTINE Crossing dest
+  IF tide_in
+    PRINT "The causeway is under water. You'll have to wait for the tide."
+    RETURN 1
+  END
+  RETURN dest
+END
+
+! was word w in the topic of ASK or TELL?
+ROUTINE WordIs w
+  LOCAL k
+  WHILE k < topiclen
+    IF WordAt(topicwn + k) = w
+      RETURN TRUE
+    END
+    k = k + 1
+  END
+  RETURN FALSE
+END
+
+! ---- new verbs -------------------------------------------------------------
+VERB "pour"
+  held "into" noun -> Pour
+  held "in" noun -> Pour
+  held "on" noun -> Pour
+END
+EXTEND "fill"
+  noun "with" held -> FillWith
+END
+VERB "light"
+  noun -> Burn
+  noun "with" held -> Burn
+END
+
+ROUTINE PourSub
+  IF noun <> OilCan
+    PRINT "You can't pour that."
+  ELSEIF second <> Lens
+    PRINT "That would only waste the oil."
+  ELSEIF lamp_fuelled
+    PRINT "The reservoir is already full."
+  ELSE
+    lamp_fuelled = 1
+    score = score + 5
+    PRINT "You fill the reservoir from the can, and the wick darkens as it drinks."
+  END
+END
+
+ROUTINE FillWithSub
+  noun = second            ! FILL LENS WITH OIL is POUR OIL INTO LENS
+  second = Lens
+  PourSub()
+END
+
+ROUTINE Initialise
+  location = HarbourRoad
+  max_score = 25
+  StartDaemon(Tide)
+  PRINT
+  PRINT "The wind has turned cold, and out across the bay the lighthouse stands dark against the last of the sunset. It should have been lit an hour ago."
+  PRINT
+  STYLE(1)
+  PRINT "LAMPLIGHT"
+  STYLE(0)
+  PRINT "A TXA sample game"
+END

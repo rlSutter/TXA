@@ -994,7 +994,9 @@ END
 
 ! ---- carrying out the action ----------------------------------------------
 ROUTINE RunAction
-  LOCAL k
+  LOCAL k, wasdark, here
+  wasdark = NOT IsLit()
+  here = location
   IF multislot AND nmulti > 0
     k = 0
     WHILE k < nmulti AND deadflag = 0
@@ -1013,6 +1015,16 @@ ROUTINE RunAction
     END
   ELSE
     Perform()
+  END
+  IF location = here AND deadflag = 0   ! the light changed where the player stands
+    BuildScope()
+    IF wasdark AND IsLit()
+      PRINT
+      DescribeRoom(TRUE)
+    ELSEIF NOT wasdark AND NOT IsLit()
+      PRINT
+      PRINT "It is now pitch dark in here!"
+    END
   END
   IF NOT IsMeta(action) AND deadflag = 0
     EndTurn()

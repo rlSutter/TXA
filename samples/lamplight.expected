@@ -1,0 +1,186 @@
+
+The wind has turned cold, and out across the bay the lighthouse stands dark against the last of the sunset. It should have been lit an hour ago.
+
+LAMPLIGHT
+A TXA sample game
+
+Harbour Road
+A cobbled road above the harbour. The keeper's cottage is north, its door ajar; a boat shed stands to the west. The quay is east, and steps lead down to the beach to the south.
+
+>look
+Harbour Road
+A cobbled road above the harbour. The keeper's cottage is north, its door ajar; a boat shed stands to the west. The quay is east, and steps lead down to the beach to the south.
+
+>n
+Cottage Kitchen
+A low kitchen warm from the stove. A dresser stands against one wall, and a ladder climbs to the room above.
+A storm lantern hangs on a hook by the door.
+Old Brannock, the keeper, sits by the stove, squinting at nothing.
+On the dresser is a drawer.
+
+>x keeper
+White-whiskered and half-blind without his spectacles.
+
+>ask brannock about lamp
+"Gone out, has it? I can't climb that stair, not with my eyes. There's oil in the boat shed. Matches in the drawer."
+
+>ask him about key
+"The shed key? I've got it somewhere. Find my spectacles and I'll find the key."
+
+>take lantern
+Taken.
+
+>open drawer
+You open the drawer.
+
+>take matches
+Taken.
+
+>u
+Loft Bedroom
+A narrow loft under the eaves, just room for a bed and a nightstand.
+On the nightstand is a pair of spectacles.
+
+>take spectacles
+Taken.
+
+>d
+Cottage Kitchen
+Old Brannock, the keeper, sits by the stove, squinting at nothing.
+On the dresser is a drawer.
+
+>give spectacles to brannock
+Brannock puts the spectacles on and beams at you. "That's better." He fishes a key from his pocket and presses it into your hand.
+
+[Your score has just gone up by 5 points.]
+
+>s
+Harbour Road
+
+>unlock door with key
+You unlock the shed door.
+
+>open door
+You open the shed door.
+
+>w
+Boat Shed
+Nets and oars hang from the rafters. The door is east.
+You can see an oil can here.
+
+>take can
+Taken.
+
+>e
+Harbour Road
+
+>s
+Beach
+Shingle runs down to the water. The road is up the steps to the north, and a dark cave opens in the cliff to the west.
+
+>w
+Darkness
+It is pitch dark, and you can't see a thing.
+
+>turn on lantern
+You switch the storm lantern on.
+
+Sea Cave
+A dripping cave, the sea's breathing loud in the dark. Daylight is east.
+Something round and green gleams among the stones.
+
+>take float
+Taken.
+
+[Your score has just gone up by 5 points.]
+
+>e
+Beach
+
+>n
+Harbour Road
+
+>e
+Quay
+Stone steps and mooring rings. A causeway of flat stones runs east across the bay to the lighthouse rock; the road is west.
+
+>wait
+Time passes.
+
+>wait
+Time passes.
+
+>wait
+Time passes.
+
+>wait
+Time passes.
+
+>wait
+Time passes.
+The tide is coming in over the causeway.
+
+>e
+The causeway is under water. You'll have to wait for the tide.
+
+>x sea
+Grey water, high against the stones.
+
+>wait
+Time passes.
+
+>wait
+Time passes.
+
+>wait
+Time passes.
+
+>wait
+Time passes.
+The tide draws back, and the causeway stones show again.
+
+>e
+Causeway
+Flat stones, slick with weed, with the sea on both sides. The quay is west and the lighthouse rock east.
+
+>e
+Lighthouse Rock
+Black rock round the foot of the lighthouse, whose door is north. The causeway leads back west.
+
+>n
+Lighthouse Base
+A round room of whitewashed stone. A spiral stair climbs into darkness; a store room is east, and the door out is south.
+
+>u
+Spiral Stair
+The iron stair winds up and up. Down is the base; up, the watch room.
+
+>u
+Watch Room
+The keeper's watch room: a desk under the window, a stool, and the last of the light over the sea. The stair goes down, and a short ladder up to the lamp.
+On the desk is a logbook.
+
+>read log
+The last entry, in a shaky hand: "Wick trimmed. Oil low - fetch from shed."
+
+>u
+Lamp Room
+The great lens fills the room, its glass catching what light is left. A door leads out to the gallery.
+
+>x lens
+A tower of glass prisms around a wick. The oil reservoir is dry.
+
+>light lens with matches
+The wick is dry; it won't take a flame.
+
+>pour oil into lens
+You fill the reservoir from the can, and the wick darkens as it drinks.
+
+[Your score has just gone up by 5 points.]
+
+>light lens with matches
+You strike a match and touch it to the wick. The flame catches, steadies, and the great lens takes it, throwing a slow beam out across the water. Far out, a ship's horn answers.
+
+*** You have won ***
+
+In that game you scored 25 out of a possible 25, in 47 turns.

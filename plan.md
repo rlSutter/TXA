@@ -342,10 +342,32 @@ Part 3 done (19 October 2026):
   engine benchmark median 0.74 s, worst 3.32 s (before M3: 0.68 s,
   2.98 s with a library half the size).
 
+Part 4 done (19 October 2026): samples/lamplight.txa, "Lamplight",
+the sample game (later the tutorial).  Fifteen rooms; light and dark
+(the stair and the sea cave need the lantern), a locked shed and the
+keeper's key (given for his spectacles), a character answering ASK
+about topics, the tide (a daemon) flooding the causeway (exit routines),
+the sea as one floating object in five rooms, a hidden treasure, POUR
+and LIGHT verbs added by the game (VERB, EXTEND), 25 points and an
+ending.  tests/sample_test.py: the 47-command walkthrough on the Python
+VM against a reviewed transcript, then on the engine, identically.
+Cartridge: lamplight8.bin.
+
+Library additions found by writing it: a turn that brings light into a
+dark room describes the room ("You switch the storm lantern on." then
+the cave); one that takes it away says "It is now pitch dark in here!";
+the end of a scored game reports "In that game you scored 25 out of a
+possible 25, in 47 turns."
+
+**M3 is complete.**
+
 ## Next
 
-1. M3 part 4: the sample game (about 15 rooms), later the tutorial.
-2. Rebecca's timing of the demos when she can.
+1. M4: saving, restoring and UNDO (platform-independent save format;
+   GSYNC/GLOAD around them; the scratchpad block after disk calls);
+   loading stories from disk; pictures and sound (MUSIC/SOUND, silent
+   where unsupported); the standalone game writer (EA5 + data files).
+2. Rebecca's play-test and timing of lamplight8.bin.
 
 ## (done) M3 part 3: the verb set.  Part 4: the sample game.
 3. Rebecca's timing of txa-m2demo8.bin when she can.
@@ -382,6 +404,7 @@ text output, word wrap and [MORE]; bold and underline glyph sets.
 
 ## History
 
+- 2026-10-19 M3 complete: part 4, the sample game Lamplight; light-change descriptions; final score; parser speed with the full verb set.
 - 2026-10-19 M3 part 3: the verb set (73 verbs), QUIT/RESTART confirmation, REPLACE and EXTEND.
 - 2026-10-19 M3 part 2: doors, floating objects, locks and keys, containers in depth, inventory contents, EMPTY, ENTER/EXIT.
 - 2026-10-19 M3 part 1: action sequence and hooks, end of turn (daemons, timers, EACH_TURN, score notification), light, room descriptions and modes, status line in the engine.

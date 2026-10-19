@@ -30,4 +30,12 @@ ROUTINE Main
     PRINT
     PRINT "*** You have won ***"
   END
+  IF max_score > 0 AND deadflag < 3
+    PRINT
+    WRITE "In that game you scored ", score, " out of a possible ", max_score, ", in ", turns + 1, " turn"
+    IF turns <> 0
+      WRITE "s"
+    END
+    PRINT "."
+  END
 END

@@ -51,6 +51,7 @@ owns it; Claude builds it. The engine comes first; the story later.
 | `src/input.a99` | line editor, KEYGT2, READ, TOKENIZE (+LOOKUP), ALOADV/ASTOREV/HASATTRV/FRESH, ISNAME, FILTERN |
 | `demos/m1demo.txa`, `demos/m2demo.txa` | the demonstration stories |
 | `lib/` | the standard library in TXA: stdlib (Main), libdefs, parser, verbs, turn (end of turn, daemons, timers, scoring, status) |
+| `samples/lamplight.txa` | "Lamplight", the sample game, with its walkthrough (.walk) and reviewed transcript (.expected) |
 | `tests/txa/m3/` | the M3 test worlds, each with .cmds and a reviewed .expected |
 | `tests/txa/m2/` | the parser test world, its 45 commands and the reviewed reference transcript |
 | `src/txaprobe.a99` | the M0 build file: probe at >A000, kernel at >2000 (KENTRY first) |
@@ -67,8 +68,9 @@ owns it; Claude builds it. The engine comes first; the story later.
 3. `git clone https://github.com/endlos99/xdt99` next to it (tested at commit a77bd31).
 4. `cd txa && python3 tools/build.py` and run the tests (each ends ALL PASS):
    `tests/m0_test.py`, `txc_parse_test.py`, `txc_sema_test.py`,
-   `txc_run_test.py`, `m2_parser_test.py`, `m3_world_test.py`; the slow
-   engine ones, `m1_vm_test.py`, `m2_engine_test.py`, `m3_engine_test.py`, run 1-3 minutes each (start
+   `txc_run_test.py`, `m2_parser_test.py`, `m3_world_test.py`,
+   `sample_test.py --quick`; the slow engine ones, `m1_vm_test.py`,
+   `m2_engine_test.py`, `m3_engine_test.py`, `sample_test.py`, run 1-3 minutes each (start
    them in the background with output to a file: the tool stops any
    command after 300 s).
 5. Read `plan.md` (status, decisions, next) and the spec Claude Doc.
@@ -97,6 +99,8 @@ owns it; Claude builds it. The engine comes first; the story later.
   between [MORE] waits, so WAITKY clears KEYLST first.
 - Simulator harnesses must offer key presses inside the polling loops
   (WK21, WKY1), not at a routine's entry.
+- Never build cartridges while engine tests run in the background: they
+  share build/ and the generated files.
 - TXA names ignore case: a routine IsName collides with the built-in
   ISNAME, a parameter "room" with the keyword ROOM.
 
