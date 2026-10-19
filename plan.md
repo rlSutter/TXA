@@ -192,6 +192,12 @@ Done (Python side):
 - tests/m2_parser_test.py: a 45-command script on a test world,
   compared with a reviewed reference transcript, plus 19 named checks.
 
+Portability rules (spec, 2026-10-19): two current items must come into
+line by M4.  The PICTURE and SOUND placeholders print "[picture n]" and
+"[sound n]" on both VMs; rule 2 says optional features degrade silently,
+so M4 makes them silent where unsupported (and real on the TI).  Save
+files get their platform-independent format in M4 (rule 6).
+
 Next in M2 (the TI side): the line editor and READ, TOKENIZE, and the
 four small opcodes in assembly; then the engine must play the same
 script with the same transcript (m1_vm_test lists the five opcodes it is
@@ -214,6 +220,7 @@ text output, word wrap and [MORE]; bold and underline glyph sets.
 | 2026-10-18 | Full spec as a Claude Doc before coding |
 | 2026-10-19 | M0 started from The Lantern Coast 1.13 bundle |
 | 2026-10-19 | Authoring language approved as proposed: uppercase keywords, terse property names, BEFORE ... END rule blocks, name TXA |
+| 2026-10-19 | Portability is an explicit goal: the spec's "Portability rules" (eight rules) are checked for every later decision |
 | 2026-10-19 | The parser lives in the TXA standard library; the engine supplies READ and TOKENIZE in assembly |
 | 2026-10-19 | Every ROOM gets all twelve exits automatically (NOTHING where not given), so any exit can be changed while the game runs |
 | 2026-10-19 | Approved: the built-in functions (reserved names) and -32768 only with its minus sign |
