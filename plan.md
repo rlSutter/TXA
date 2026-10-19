@@ -15,6 +15,13 @@ checks for an F18A and 512K of SAMS (counting the card's pages), then
 shows the split screen: status line, a 256 x 96 picture on the bitmap
 layer, and 80-column text under it.
 
+### Rebecca's results so far (19 October 2026)
+
+Confirmed working: the picture over 80-column text with all four corners
+and eight ticks; moving and resizing (E S D X, W Z); fat pixels with 16
+colours and a round moon (F); 30 rows (R).  Still to report: the text
+test (T), the full-screen view (V), Quit (Q), the SAMS size, SR14/SR12.
+
 ### What M0 must answer (Rebecca's report)
 
 1. Does 80-column mode come up, in 24 and 30 rows (R)?
