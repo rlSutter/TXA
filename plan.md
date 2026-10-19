@@ -139,8 +139,12 @@ PROPF also uses).  `tests/txa/dynmap.txa` checks it on both VMs.  Note
 for the manual: keywords ignore case, so a name like `room` cannot be
 used for a variable (it is the keyword ROOM).
 
-M1 remaining: bold and underline glyph sets (STYLE), and Rebecca's
-js99er check of the demo cartridge.
+Rebecca ran `txa-m1demo8.bin` in js99er (2026-10-19): the room
+description and contents list, the log book, the lantern's BEFORE/AFTER
+rules, the die roll, the wrapped paragraph, scrolling with [MORE], and
+the end-of-story return to the title screen all worked.
+
+M1 remaining: bold and underline glyph sets (STYLE).
 
 ## Next: M2 (the parser)
 
