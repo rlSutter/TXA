@@ -19,6 +19,13 @@ VERB "inventory" "i" "inv"
   -> Inv
 END
 VERB "take" "get" "carry"
+  "in" noun -> Enter
+  "into" noun -> Enter
+  "on" noun -> Enter
+  "out" -> Exit
+  "off" -> Exit
+  "off" noun -> Exit
+  "out" "of" noun -> Exit
   multi -> Take
   "up" multi -> Take
   multi "up" -> Take
@@ -53,12 +60,43 @@ VERB "tell"
 END
 VERB "open"
   noun -> Open
+  noun "with" held -> Unlock
+END
+VERB "unlock"
+  noun "with" held -> Unlock
+END
+VERB "lock"
+  noun "with" held -> Lock
+END
+VERB "empty"
+  noun -> Empty
+  noun "out" -> Empty
+END
+VERB "enter"
+  noun -> Enter
+END
+VERB "exit" "leave"
+  -> Exit
+  noun -> Exit
+END
+VERB "stand"
+  -> Exit
+  "up" -> Exit
 END
 VERB "close" "shut"
   noun -> Close
 END
 VERB "go" "walk" "run"
   noun -> Go
+  "through" noun -> Enter
+  "into" noun -> Enter
+  "in" noun -> Enter
+  "out" -> Exit
+END
+VERB "sit" "lie"
+  "on" noun -> Enter
+  "in" noun -> Enter
+  "down" "on" noun -> Enter
 END
 VERB "wait" "z"
   -> Wait
@@ -139,8 +177,12 @@ ROUTINE DescribeRoom full
     PRINT "It is pitch dark, and you can't see a thing."
     RETURN
   END
-  PRINT (name) location
+  WRITE (name) location
   STYLE(0)
+  IF PARENT(player) <> location
+    WRITE " (", (string) InOrOn(PARENT(player)), " ", (the) PARENT(player), ")"
+  END
+  PRINT
   IF full OR lookmode = 2 OR (lookmode = 1 AND location HASNT visited)
     IF location.DESC()
       FRESHLINE()
@@ -279,14 +321,43 @@ ROUTINE SearchSub
 END
 
 ROUTINE InvSub
-  LOCAL c
   IF CHILD(player) = 0
     PRINT "You are empty-handed."
     RETURN
   END
   PRINT "You are carrying:"
-  FOR EACH c IN player
-    PRINT "  ", (a) c
+  InvList(player, 1)
+END
+
+! one line an object, indented by depth; what is in or on it below it
+ROUTINE InvList obj, depth
+  LOCAL c, k
+  FOR EACH c IN obj
+    k = 0
+    WHILE k < depth
+      WRITE "  "
+      k = k + 1
+    END
+    WRITE (a) c
+    IF c HAS worn
+      WRITE " (being worn)"
+    END
+    IF c HAS container AND c HAS openable
+      IF c HAS open
+        IF CHILD(c) = 0
+          WRITE " (which is open but empty)"
+        END
+      ELSE
+        WRITE " (which is closed)"
+      END
+    END
+    IF c HAS light AND c HAS switchable
+      WRITE " (providing light)"
+    END
+    PRINT
+    IF c HAS supporter OR (c HAS container AND (c HAS open OR c HAS transparent))
+      InvList(c, depth + 1)
+    END
   END
 END
 
@@ -299,8 +370,12 @@ ROUTINE TakeSub
     PRINT "I don't suppose ", (the) noun, " would care for that."
   ELSEIF noun HAS static OR noun HAS scenery
     PRINT "That's fixed in place."
-  ELSEIF PARENT(noun) HAS animate
+  ELSEIF PARENT(noun) HAS animate AND PARENT(noun) <> player
     PRINT "That seems to belong to ", (the) PARENT(noun), "."
+  ELSEIF noun = PARENT(player)
+    PRINT "You'll have to get off ", (the) noun, " first."
+  ELSEIF IsInside(player, noun)
+    PRINT "You can't take something you're in."
   ELSE
     MOVE noun TO player
     GIVE noun moved
@@ -334,8 +409,14 @@ END
 ROUTINE InsertSub
   IF noun NOTIN player
     PRINT "You haven't got ", (the) noun, "."
-  ELSEIF second HAS container AND second HASNT open
+  ELSEIF second HASNT container
+    PRINT "That can't contain things."
+  ELSEIF second HASNT open
     PRINT (The) second, " is closed."
+  ELSEIF noun = second OR IsInside(second, noun)
+    PRINT "You can't put something inside itself."
+  ELSEIF Full(second)
+    PRINT "There is no more room in ", (the) second, "."
   ELSE
     MOVE noun TO second
     IF AfterRules()
@@ -350,12 +431,64 @@ ROUTINE PutOnSub
     PRINT "You haven't got ", (the) noun, "."
   ELSEIF second HASNT supporter
     PRINT "Putting things on ", (the) second, " would achieve nothing."
+  ELSEIF noun = second OR IsInside(second, noun)
+    PRINT "You can't put something on top of itself."
+  ELSEIF Full(second)
+    PRINT "There is no more room on ", (the) second, "."
   ELSE
     MOVE noun TO second
     IF AfterRules()
       RETURN
     END
     PRINT "You put ", (the) noun, " on ", (the) second, "."
+  END
+END
+
+! is a somewhere inside b (in it, or in something in it ...)?
+ROUTINE IsInside a, b
+  LOCAL p
+  p = PARENT(a)
+  WHILE p
+    IF p = b
+      RETURN TRUE
+    END
+    p = PARENT(p)
+  END
+  RETURN FALSE
+END
+
+! has container c as many things as its CAPACITY allows?  (no CAPACITY:
+! never full)
+ROUTINE Full c
+  LOCAL n, x
+  IF PROPLEN(c, CAPACITY) = 0
+    RETURN FALSE
+  END
+  FOR EACH x IN c
+    n = n + 1
+  END
+  RETURN n >= c.CAPACITY
+END
+
+ROUTINE EmptySub
+  LOCAL x, n
+  IF noun HASNT container AND noun HASNT supporter
+    PRINT (The) noun, " can't contain things."
+  ELSEIF noun HAS container AND noun HASNT open
+    PRINT (The) noun, " is closed."
+  ELSEIF CHILD(noun) = 0
+    PRINT (The) noun, " is empty already."
+  ELSE
+    x = CHILD(noun)
+    WHILE x
+      n = SIBLING(x)
+      MOVE x TO PARENT(player)
+      x = n
+    END
+    IF AfterRules()
+      RETURN
+    END
+    PRINT "You empty ", (the) noun, "."
   END
 END
 
@@ -393,6 +526,40 @@ ROUTINE OpenSub
       RETURN
     END
     PRINT "You open ", (the) noun, "."
+  END
+END
+
+ROUTINE UnlockSub
+  IF noun HASNT lockable
+    PRINT "That doesn't seem to be something you can unlock."
+  ELSEIF noun HASNT locked
+    PRINT "It's unlocked at the moment."
+  ELSEIF noun.WITH_KEY <> second
+    PRINT "That doesn't seem to fit the lock."
+  ELSE
+    GIVE noun NOT locked
+    IF AfterRules()
+      RETURN
+    END
+    PRINT "You unlock ", (the) noun, "."
+  END
+END
+
+ROUTINE LockSub
+  IF noun HASNT lockable
+    PRINT "That doesn't seem to be something you can lock."
+  ELSEIF noun HAS locked
+    PRINT "It's locked at the moment."
+  ELSEIF noun HAS open
+    PRINT "First you'll have to close ", (the) noun, "."
+  ELSEIF noun.WITH_KEY <> second
+    PRINT "That doesn't seem to fit the lock."
+  ELSE
+    GIVE noun locked
+    IF AfterRules()
+      RETURN
+    END
+    PRINT "You lock ", (the) noun, "."
   END
 END
 
@@ -461,10 +628,126 @@ ROUTINE GoSub
     FRESHLINE()
     RETURN
   END
+  GoTo(dest)
+END
+
+! Through door d (or to room dest if it is not a door): a closed door
+! stops the player; otherwise DOOR_TO says where it leads.
+ROUTINE GoTo dest
+  IF PARENT(player) <> location
+    PRINT "You'll have to get ", (string) OffOrOut(PARENT(player)), " ", (the) PARENT(player), " first."
+    RETURN
+  END
+  IF dest HAS door
+    IF dest HASNT open
+      IF dest HAS locked
+        PRINT (The) dest, " seems to be locked."
+      ELSE
+        PRINT "You can't, since ", (the) dest, " is closed."
+      END
+      RETURN
+    END
+    dest = DoorLeads(dest)
+    IF dest <= 1
+      FRESHLINE()
+      RETURN
+    END
+  END
   MOVE player TO dest
   location = dest
+  MoveFloating()
   BuildScope()
   DescribeRoom(FALSE)
+END
+
+! where door d leads from here: DOOR_TO with two rooms gives the one the
+! player is not in; one room, or a routine, says itself
+ROUTINE DoorLeads d
+  IF PROPLEN(d, DOOR_TO) = 2
+    IF PROPWORD(d, DOOR_TO, 0) = location
+      RETURN PROPWORD(d, DOOR_TO, 1)
+    END
+    RETURN PROPWORD(d, DOOR_TO, 0)
+  END
+  RETURN d.DOOR_TO()
+END
+
+ROUTINE OffOrOut o
+  IF o HAS supporter
+    RETURN "off"
+  END
+  RETURN "out of"
+END
+
+! Floating objects (with FOUND_IN) come into the room when the player
+! does, and leave the rooms they are not listed for.
+ROUTINE MoveFloating
+  LOCAL o, k, n, here
+  o = 1
+  WHILE o <= LASTOBJ
+    n = PROPLEN(o, FOUND_IN)
+    IF n
+      here = FALSE
+      k = 0
+      WHILE k < n
+        IF PROPWORD(o, FOUND_IN, k) = location
+          here = TRUE
+        END
+        k = k + 1
+      END
+      IF here
+        IF o NOTIN location
+          MOVE o TO location
+        END
+      ELSEIF PARENT(o) <> 0 AND PARENT(o) <> player
+        REMOVE o
+      END
+    END
+    o = o + 1
+  END
+END
+
+ROUTINE EnterSub
+  IF noun HAS door
+    GoTo(noun)
+    RETURN
+  END
+  IF noun HASNT enterable
+    PRINT "That's not something you can enter."
+  ELSEIF PARENT(player) = noun
+    PRINT "But you're already ", (string) InOrOn(noun), " ", (the) noun, "."
+  ELSEIF noun HAS container AND noun HASNT open
+    PRINT (The) noun, " is closed."
+  ELSEIF PARENT(player) <> location
+    PRINT "You'll have to get ", (string) OffOrOut(PARENT(player)), " ", (the) PARENT(player), " first."
+  ELSE
+    MOVE player TO noun
+    IF AfterRules()
+      RETURN
+    END
+    PRINT "You get ", (string) InOrOn(noun), "to ", (the) noun, "."
+  END
+END
+
+ROUTINE InOrOn o
+  IF o HAS supporter
+    RETURN "on"
+  END
+  RETURN "in"
+END
+
+ROUTINE ExitSub
+  LOCAL p
+  p = PARENT(player)
+  IF p = location
+    PRINT "But you aren't in anything at the moment."
+    RETURN
+  END
+  MOVE player TO location
+  IF AfterRules()
+    RETURN
+  END
+  PRINT "You get ", (string) OffOrOut(p), " ", (the) p, "."
 END
 
 ROUTINE WaitSub

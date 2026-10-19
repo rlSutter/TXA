@@ -1,0 +1,67 @@
+! world2.txa - M3 part 2: doors, locks, floating objects, containers, entering.
+INCLUDE "DSK1.STDLIB"
+
+ROOM Hall "Hall"
+  DESC "A narrow hall. The front door is north."
+  HAS light
+  N FrontDoor
+  E Meadow
+END
+ROOM Garden "Garden"
+  DESC "A walled garden. The front door is south."
+  HAS light
+  S FrontDoor
+END
+ROOM Meadow "Meadow"
+  DESC "Long grass runs down to a stream."
+  HAS light
+  W Hall
+  E Bank
+END
+ROOM Bank "Far Bank"
+  DESC "The stream's far bank, all reeds."
+  HAS light
+  W Meadow
+END
+OBJECT FrontDoor "front door"
+  NAME "front" "door"
+  HAS door openable lockable locked static scenery
+  WITH_KEY BrassKey
+  DOOR_TO Hall Garden
+  FOUND_IN Hall Garden
+END
+OBJECT Stream "stream"
+  NAME "stream" "water"
+  HAS scenery
+  DESC "Cold, clear and quick."
+  FOUND_IN Meadow Bank
+END
+OBJECT BrassKey "brass key" IN Hall
+  NAME "brass" "key"
+END
+OBJECT Crate "crate" IN Hall
+  NAME "crate"
+  HAS container open static
+END
+OBJECT Chest "small chest" IN Crate
+  NAME "small" "chest"
+  HAS container openable
+  CAPACITY 2
+END
+OBJECT Apple "apple" IN Hall
+  NAME "apple"
+END
+OBJECT Pear "pear" IN Hall
+  NAME "pear"
+END
+OBJECT Plum "plum" IN Hall
+  NAME "plum"
+END
+OBJECT Bench "bench" IN Garden
+  NAME "bench"
+  HAS supporter enterable static
+END
+
+ROUTINE Initialise
+  location = Hall
+END

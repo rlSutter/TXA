@@ -8,11 +8,15 @@ ATTRIBUTE light lit open openable locked lockable container supporter
 ATTRIBUTE transparent scenery static worn wearable edible animate
 ATTRIBUTE concealed visited switchable on plural proper female male neuter
 ATTRIBUTE moved general     ! moved: has been carried (INITIAL no longer shows); general: the game's own
+ATTRIBUTE enterable door    ! enterable: ENTER puts the player in or on it; door: see DOOR_TO
 
 PROPERTY DESC INITIAL N S E W NE NW SE SW UP DOWN INSIDE OUTSIDE
 PROPERTY DOOR_TO WITH_KEY CAPACITY BEFORE AFTER LIFE ORDERS
+! DOOR_TO on a door: two rooms (it leads to whichever the player is not
+! in), or one room, or a routine that returns the room.
 PROPERTY DIR            ! on a compass object: its number, 1-12 (see GoSub)
 PROPERTY CANT_GO        ! a room: said instead of "You can't go that way."
+PROPERTY FOUND_IN       ! the rooms a floating object (a door, a river) is in
 PROPERTY EACH_TURN      ! a room: run (or printed) at the end of every turn there
 PROPERTY DAEMON         ! a routine run every turn while StartDaemon is in force
 PROPERTY TIME_LEFT      ! a timer's turns to go (give the object TIME_LEFT 0)

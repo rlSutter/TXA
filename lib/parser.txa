@@ -151,6 +151,9 @@ END
 ROUTINE BuildScope
   nscope = 0
   ScopeTree(location)
+  IF PARENT(player) <> location AND PARENT(player) <> 0
+    ScopeTree(PARENT(player))       ! (in a closed box: its own contents)
+  END
   ScopeTree(player)
   IF NOT IsLit()
     nscope = 0

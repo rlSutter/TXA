@@ -1,0 +1,160 @@
+
+Hall
+A narrow hall. The front door is north.
+You can see a brass key, a crate, an apple, a pear and a plum here.
+In the crate is a small chest.
+
+>look
+Hall
+A narrow hall. The front door is north.
+You can see a brass key, a crate, an apple, a pear and a plum here.
+In the crate is a small chest.
+
+>n
+The front door seems to be locked.
+
+>open door
+It seems to be locked.
+
+>unlock door with apple
+That doesn't seem to fit the lock.
+
+>take key
+Taken.
+
+>unlock door with key
+You unlock the front door.
+
+>lock door with key
+You lock the front door.
+
+>unlock door with key
+You unlock the front door.
+
+>open door
+You open the front door.
+
+>n
+Garden
+A walled garden. The front door is south.
+You can see a bench here.
+
+>look
+Garden
+A walled garden. The front door is south.
+You can see a bench here.
+
+>s
+Hall
+You can see a crate, an apple, a pear and a plum here.
+In the crate is a small chest.
+
+>take all
+small chest: Taken.
+apple: Taken.
+pear: Taken.
+plum: Taken.
+
+>i
+You are carrying:
+  a plum
+  a pear
+  an apple
+  a small chest (which is closed)
+  a brass key
+
+>open chest
+You open the small chest.
+
+>put apple in chest
+You put the apple into the small chest.
+
+>put pear in chest
+You put the pear into the small chest.
+
+>put plum in chest
+There is no more room in the small chest.
+
+>put chest in chest
+You can't put something inside itself.
+
+>take chest
+You already have the small chest.
+
+>i
+You are carrying:
+  a plum
+  a small chest
+    a pear
+    an apple
+  a brass key
+
+>empty chest
+You empty the small chest.
+
+>look
+Hall
+A narrow hall. The front door is north.
+You can see an apple, a pear and a crate here.
+
+>put chest in crate
+You put the small chest into the crate.
+
+>look
+Hall
+A narrow hall. The front door is north.
+You can see an apple, a pear and a crate here.
+In the crate is a small chest.
+
+>e
+Meadow
+Long grass runs down to a stream.
+
+>x stream
+Cold, clear and quick.
+
+>e
+Far Bank
+The stream's far bank, all reeds.
+
+>x water
+Cold, clear and quick.
+
+>w
+Meadow
+
+>w
+Hall
+You can see an apple, a pear and a crate here.
+In the crate is a small chest.
+
+>n
+Garden
+You can see a bench here.
+
+>sit on bench
+You get onto the bench.
+
+>look
+Garden (on the bench)
+A walled garden. The front door is south.
+You can see a bench here.
+
+>take bench
+That's fixed in place.
+
+>n
+You can't go that way.
+
+>get off bench
+You get off the bench.
+
+>get off bench
+But you aren't in anything at the moment.
+
+>s
+Hall
+You can see an apple, a pear and a crate here.
+In the crate is a small chest.
+
+>q

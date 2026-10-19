@@ -294,13 +294,31 @@ Part 1 done (19 October 2026):
 Library names that collide with built-ins (names ignore case): the
 status routine is ShowStatus, not Status.
 
+Part 2 done (19 October 2026):
+- floating objects: FOUND_IN lists rooms; MoveFloating brings them into
+  the room with the player and removes them from rooms not listed.
+- doors: the door attribute; an exit may name a door object; a closed
+  door stops the player ("You can't, since the front door is closed." /
+  "... seems to be locked."); DOOR_TO with two rooms leads to whichever
+  the player is not in, or one room, or a routine.  ENTER / GO THROUGH
+  a door.
+- locks: lockable, locked, WITH_KEY; UNLOCK/LOCK X WITH Y, OPEN X WITH Y.
+- containers: "That can't contain things.", closed, CAPACITY ("There is
+  no more room in ..."), nothing inside itself; supporters the same;
+  EMPTY; inventory lists contents (indented), "(which is closed)",
+  "(which is open but empty)", "(providing light)", "(being worn)".
+- entering: the enterable attribute; ENTER / SIT ON / GET IN; EXIT /
+  GET OFF / GET OUT / STAND UP; "Garden (on the bench)"; leaving the
+  room or taking what you're on asks you to get off first.
+- tests: world2 (reference + 8 named checks); the engine plays world1
+  and world2 identically.
+
+Library names that collide (names ignore case): IsInside, not Inside
+(the INSIDE exit property).
+
 ## Next
 
-1. M3 part 2: doors (an object in two rooms: FOUND_IN, DOOR_TO, locked
-   doors and keys: LOCK, UNLOCK, WITH_KEY), containers in depth
-   (capacity, PUT IN checks, nested containers in scope and listing),
-   EMPTY, inventory showing contents.
-2. M3 part 3: the verb set.  Part 4: the sample game.
+1. M3 part 3: the verb set.  Part 4: the sample game.
 3. Rebecca's timing of txa-m2demo8.bin when she can.
 
 ## (was) Next before M3
@@ -335,6 +353,7 @@ text output, word wrap and [MORE]; bold and underline glyph sets.
 
 ## History
 
+- 2026-10-19 M3 part 2: doors, floating objects, locks and keys, containers in depth, inventory contents, EMPTY, ENTER/EXIT.
 - 2026-10-19 M3 part 1: action sequence and hooks, end of turn (daemons, timers, EACH_TURN, score notification), light, room descriptions and modes, status line in the engine.
 - 2026-10-19 Engine speed work: scratchpad block, globals in RAM, unrolled VDP reads, LOAD/STORE paths: 8.13M -> 5.50M instructions on the script.
 - 2026-10-19 M2: the TI side (line editor, READ, TOKENIZE, ISNAME, FILTERN), engine plays the parser script identically; checkpoint-m2.

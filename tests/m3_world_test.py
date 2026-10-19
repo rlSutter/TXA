@@ -53,5 +53,20 @@ check('meta commands take no time; SCORE', after('score') == 'You have scored 5 
 check('superbrief: names only', after('n', 1, nth=2) == 'Parlour' and after('s', 1, nth=2) == 'Porch')
 check('the status line: room, score, moves', vm.status == ('Porch', 5, 26), vm.status)
 
+out, vm = play('world2')
+check('a locked door blocks the way and the lock', after('n') == 'The front door seems to be locked.' and after('open door') == 'It seems to be locked.')
+check('the wrong key; UNLOCK, LOCK, UNLOCK', after('unlock door with apple') == "That doesn't seem to fit the lock."
+      and after('lock door with key') == 'You lock the front door.')
+check('through an open door to the other side, and back (DOOR_TO with two rooms)', after('n', 1, nth=2) == 'Garden' and after('s') == 'Hall')
+check('a floating object in two rooms (FOUND_IN)', after('x stream') == 'Cold, clear and quick.' and after('x water') == 'Cold, clear and quick.')
+check('CAPACITY; nothing inside itself', after('put plum in chest') == 'There is no more room in the small chest.'
+      and after('put chest in chest') == "You can't put something inside itself.")
+check('inventory shows what is inside things, and closed containers', '  a small chest (which is closed)' in after('i', 7)
+      and '    a pear' in after('i', 6, nth=2))
+check('EMPTY', after('empty chest') == 'You empty the small chest.')
+check('ENTER (sit on) and EXIT (get off), and being on something', after('sit on bench') == 'You get onto the bench.'
+      and after('look', 1, nth=5) == 'Garden (on the bench)' and after('get off bench') == 'You get off the bench.'
+      and after('get off bench', nth=2) == "But you aren't in anything at the moment.")
+
 print('ALL PASS' if not fails else f'{fails} FAILED')
 sys.exit(1 if fails else 0)

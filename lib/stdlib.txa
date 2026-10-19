@@ -11,6 +11,7 @@ INCLUDE "DSK1.TURN"
 ROUTINE Main
   Initialise()
   MOVE player TO location
+  MoveFloating()
   PRINT
   BuildScope()
   LookSub()
