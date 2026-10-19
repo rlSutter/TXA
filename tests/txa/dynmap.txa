@@ -1,0 +1,54 @@
+! dynmap.txa - maps that change while the game runs.
+INCLUDE "DSK1.STDLIB"
+GLOBAL tide_in = 1
+ROOM Shore "Shore"
+  N
+    IF tide_in
+      PRINT "The water is too deep."
+      RETURN NOTHING
+    END
+    RETURN Causeway
+  END
+END
+ROOM Causeway "Causeway"
+END
+ROOM Cave "Cave"
+END
+ROOM Cliff "Cliff"
+END
+ROUTINE Secret
+  PRINT "(a hidden way)"
+  RETURN Cave
+END
+ROUTINE Go place, dir
+  LOCAL dest
+  dest = 0
+  IF dir = 1
+    dest = place.N()
+  ELSEIF dir = 2
+    dest = place.DOWN()
+  END
+  IF dest
+    PRINT "-> ", (name) dest
+  ELSE
+    PRINT "-> no way"
+  END
+END
+ROUTINE Main
+  Go(Shore, 1)
+  tide_in = 0
+  Go(Shore, 1)
+  Shore.N = Cave
+  Go(Shore, 1)
+  Shore.N = Secret
+  Go(Shore, 1)
+  Shore.N = "A wall of fog."
+  Go(Shore, 1)
+  PRINT
+  Go(Cliff, 2)
+  Cliff.DOWN = Cave
+  Go(Cliff, 2)
+  Cliff.DOWN = NOTHING
+  Go(Cliff, 2)
+  PRINT "Exits on Cave: ", Cave.N, Cave.OUTSIDE, " (all present)"
+END

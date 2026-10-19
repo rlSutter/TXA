@@ -130,6 +130,15 @@ between waits.  Each wait now forgets the last key.
 SAMS layout change from the spec: pages 28-31 hold a pristine copy of
 the dynamic area for RESTART, so the undo ring is pages 16-27 (48K).
 
+Maps that change (Rebecca's question, 2026-10-19): every ROOM now gets
+all twelve exits automatically, and PUTPROP records the kind of value
+stored (a routine name, a string, or anything else), so a routine exit
+assigned a room becomes a plain exit and the reverse.  Found and fixed
+an engine bug while testing it (PUTPROP lost the kind in a scratch word
+PROPF also uses).  `tests/txa/dynmap.txa` checks it on both VMs.  Note
+for the manual: keywords ignore case, so a name like `room` cannot be
+used for a variable (it is the keyword ROOM).
+
 M1 remaining: bold and underline glyph sets (STYLE), and Rebecca's
 js99er check of the demo cartridge.
 
@@ -154,6 +163,7 @@ text output, word wrap and [MORE]; bold and underline glyph sets.
 | 2026-10-18 | Full spec as a Claude Doc before coding |
 | 2026-10-19 | M0 started from The Lantern Coast 1.13 bundle |
 | 2026-10-19 | Authoring language approved as proposed: uppercase keywords, terse property names, BEFORE ... END rule blocks, name TXA |
+| 2026-10-19 | Every ROOM gets all twelve exits automatically (NOTHING where not given), so any exit can be changed while the game runs |
 | 2026-10-19 | Approved: the built-in functions (reserved names) and -32768 only with its minus sign |
 | 2026-10-19 | Approved: `(string) x`; `obj.prop()` as print-or-run; `##Name` for action numbers; Inform's return defaults (ROUTINE TRUE, property routines and rule cases FALSE); INSIDE and OUTSIDE as the in/out direction properties |
 

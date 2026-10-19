@@ -143,7 +143,8 @@ class Gen:
             if isinstance(t, A.Name):
                 self.expr(s.value); c.op('STORE', self.var_number(t.id, self.scope))
             elif isinstance(t, A.PropRef):
-                self.expr(t.obj); self.expr(s.value); c.op('PUTPROP', self.prop_number(t.prop))
+                self.expr(t.obj); self.expr(s.value)
+                c.op('PUTPROP', self.prop_number(t.prop), self.value_kind(s.value))
             else:
                 arr = self.p.sym(t.func.id)
                 self.expr(t.args[0]); self.expr(s.value); c.op('ASTORE', arr.number)
@@ -209,6 +210,19 @@ class Gen:
             self.expr(s.value); c.op('PICTURE')
         else:
             self.err(s, f'cannot compile {type(s).__name__}')    # pragma: no cover
+
+    def value_kind(self, e):
+        """The property kind a value gets when assigned: a string literal is
+        a string, a routine's name a routine, anything else a value.  (A
+        routine or string held in a variable is not known to be one when
+        compiling, and is stored as a value.)"""
+        if isinstance(e, A.Str):
+            return PROP_STR
+        if isinstance(e, A.Name) and e.id.upper() not in self.scope:
+            s = self.p.sym(e.id)
+            if s and s.kind == 'routine':
+                return PROP_ROUTINE
+        return PROP_VALUES
 
     def p_fold(self, e):
         from .sema import Sema

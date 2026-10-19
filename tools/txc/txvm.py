@@ -221,10 +221,12 @@ class VM:
         elif name == 'GETPROP':
             n = b(); pr = self.prop(pop(), n); push(self.rw(pr[2]) if pr else 0)
         elif name == 'PUTPROP':
-            n = b(); v = pop(); o = pop(); pr = self.prop(o, n)
+            n = b(); kind = b(); v = pop(); o = pop(); pr = self.prop(o, n)
             if not pr:
                 raise VMError(f'object {o} has no property {n} to change')
             self.ww(pr[2], v & 0xFFFF)
+            hdr = pr[2] - 2                         # the entry's header byte: number and kind
+            self.img[hdr] = (self.img[hdr] & 0x3F) | kind
         elif name == 'PROPLEN':
             n = b(); pr = self.prop(pop(), n); push(pr[1] if pr else 0)
         elif name == 'GETPROPN':

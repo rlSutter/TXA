@@ -139,6 +139,9 @@ END
 ''')
 same('random numbers, 16-bit wrap, signed division, comparisons', img)
 
+img = compile_file(os.path.join(T, 'dynmap.txa'), LIB, date=DATE)[0]
+same('dynamic map: exits changed while running (PUTPROP kinds)', img)
+
 for name, body, part in [
     ('division by zero', 'LOCAL z\n  PRINT 1 / z', 'division'),
     ('array index', 'a(3) = 1', 'outside'),

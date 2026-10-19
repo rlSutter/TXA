@@ -38,6 +38,10 @@ check('actions in the order met: Rub (grammar), then the rule cases', p.actions 
 check('dictionary: names and verb words, lower case', {'trapdoor', 'trap', 'door', 'brass', 'lamp', 'lantern', 'rub', 'polish'} <= p.dictionary)
 check('NAME words on the object', lamp.names == ['brass', 'lamp', 'lantern'])
 check('no warnings for the example', p.warnings == [], p.warnings)
+exits = [P[x] for x in ['N', 'S', 'E', 'W', 'NE', 'NW', 'SE', 'SW', 'UP', 'DOWN', 'INSIDE', 'OUTSIDE']]
+check('every ROOM has all twelve exits; those not given are NOTHING',
+      all(n in kit.props for n in exits) and kit.props[P['N']] == ('values', [('num', 0)]) and kit.props[P['DOWN']] == ('values', [('obj', trap.number)]))
+check('objects that are not rooms get none', P['N'] not in lamp.props)
 
 def compile_src(src, lib=True):
     d = tempfile.mkdtemp()

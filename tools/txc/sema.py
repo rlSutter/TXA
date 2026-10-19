@@ -35,6 +35,10 @@ DICT_LEN = 12
 SLOT_TOKENS = {'noun', 'held', 'multi', 'multiheld', 'multiexcept', 'multiinside',
                'creature', 'number', 'topic', 'scope'}
 RULE_PROPS = {'BEFORE', 'AFTER', 'LIFE', 'ORDERS'}
+# Every ROOM gets all twelve exits (Rebecca's decision, 2026-10-19), so
+# any exit can be opened while the game runs: those it was not given are
+# added with the value NOTHING.  These are the library's names for them.
+EXITS = ['N', 'S', 'E', 'W', 'NE', 'NW', 'SE', 'SW', 'UP', 'DOWN', 'INSIDE', 'OUTSIDE']
 # Built-in functions: name -> (opcode, arguments, gives a value).  Their
 # names are reserved.  Those that give no value give 0 in an expression.
 BUILTINS = {
@@ -224,6 +228,11 @@ class Sema:
                 self.apply_body(o, cls, inherited=cls is not d)
             if d.parent:
                 self.set_parent(o, d.parent, d)
+            if o.kind == 'ROOM':
+                for x in EXITS:
+                    sx = p.sym(x)
+                    if sx and sx.kind == 'property' and sx.number not in o.props:
+                        o.props[sx.number] = ('values', [('num', 0)])
         for o in p.objects:                                     # children in declaration order
             if o.parent:
                 par = p.objects[o.parent - 1]

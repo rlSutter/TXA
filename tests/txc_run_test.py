@@ -87,6 +87,14 @@ out = run_image(img)
 check('rule cases: no case falls through to the action; a case returns TRUE',
       out == 'You rub the brass lamp. Nothing happens.\nThe glass is too hot to rub.\n(stopped)\nafter: 0 lit: 0\nafter: 0 lit: 1\n', out)
 
+# maps that change: routine exits replaced by rooms and back, exits opened on rooms that had none
+img, _ = compile_file(os.path.join(T, 'dynmap.txa'), LIB, date=DATE)
+out = run_image(img)
+check('dynamic map: routine exit, then a room, a routine again, a string; an exit opened and closed',
+      out == ('The water is too deep.\n-> no way\n-> Causeway\n-> Cave\n(a hidden way)\n-> Cave\n'
+             'A wall of fog.-> Shore\n'            # a string prints (no new line) and gives 1: object 1
+             '\n-> no way\n-> Cave\n-> no way\nExits on Cave: 00 (all present)\n'), out)
+
 # run-time errors
 for name, body, part in [
     ('division by zero', 'LOCAL z\n  PRINT 1 / z', 'division by zero'),

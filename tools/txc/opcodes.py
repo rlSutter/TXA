@@ -75,7 +75,7 @@ OPS = [
     (0x37, 'SETATTR',  'b', 'o ->',       'Give o attribute b.'),
     (0x38, 'CLRATTR',  'b', 'o ->',       'Take attribute b from o.'),
     (0x39, 'GETPROP',  'b', 'o -> v',     "First word of o's property b; 0 if o has none. A string or routine gives its packed address."),
-    (0x3A, 'PUTPROP',  'b', 'o v ->',     "Set the first word of o's property b; a run-time error if o has none."),
+    (0x3A, 'PUTPROP',  'bb', 'o v ->',    "Set the first word of o's property b1 and its kind to b2 (>00 a value, >40 a string, >80 a routine), so a routine exit given a room becomes a value and the reverse; a run-time error if o has none."),
     (0x3B, 'PROPLEN',  'b', 'o -> n',     "Number of words in o's property b; 0 if none."),
     (0x3C, 'RUNPROP',  'b', 'o -> r',     "Property b of o: a routine is called with SELF = o and its result pushed; a string is printed and 1 pushed; a value is pushed; none pushes 0."),
     (0x3D, 'CALLPROP', 'bb', 'o args -> r', 'Call the routine in property b1 of o with b2 arguments and SELF = o; 0 if o has no such routine.'),
