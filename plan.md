@@ -161,7 +161,7 @@ js99er and it worked (2026-10-19).
 
 ## M2 (the parser): under way
 
-**Design change, for Rebecca's confirmation:** the parser is written in
+**Design change, confirmed by Rebecca (2026-10-19):** the parser is written in
 TXA as part of the standard library (lib/parser.txa), not in assembly.
 It runs identically on both VMs, so the transcript tests cover it for
 free, and a game can replace any part of it.  The engine supplies the
@@ -214,6 +214,7 @@ text output, word wrap and [MORE]; bold and underline glyph sets.
 | 2026-10-18 | Full spec as a Claude Doc before coding |
 | 2026-10-19 | M0 started from The Lantern Coast 1.13 bundle |
 | 2026-10-19 | Authoring language approved as proposed: uppercase keywords, terse property names, BEFORE ... END rule blocks, name TXA |
+| 2026-10-19 | The parser lives in the TXA standard library; the engine supplies READ and TOKENIZE in assembly |
 | 2026-10-19 | Every ROOM gets all twelve exits automatically (NOTHING where not given), so any exit can be changed while the game runs |
 | 2026-10-19 | Approved: the built-in functions (reserved names) and -32768 only with its minus sign |
 | 2026-10-19 | Approved: `(string) x`; `obj.prop()` as print-or-run; `##Name` for action numbers; Inform's return defaults (ROUTINE TRUE, property routines and rule cases FALSE); INSIDE and OUTSIDE as the in/out direction properties |
