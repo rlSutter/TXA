@@ -115,6 +115,7 @@ def symbols(equ):
 
 def main():
     os.makedirs(B, exist_ok=True)
+    os.makedirs(os.path.join(ROOT, 'src/gen'), exist_ok=True)   # generated files (not in git)
     env = dict(os.environ, PYTHONPATH=os.path.join(ROOT, 'tools'))
     subprocess.run([sys.executable, 'tools/mkfont.py'], cwd=ROOT, check=True)
     subprocess.run([sys.executable, 'tools/mkpics.py'], cwd=ROOT, check=True, env=env, capture_output=True)
