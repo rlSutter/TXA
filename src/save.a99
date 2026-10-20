@@ -527,9 +527,11 @@ ORS11  BL   @VGET
 ORS12  MOV  @SVREG,R4          the PC back
        MOV  @SVREG+2,R5
        BL   @SPRZER
+       BL   @UNDONE            windows: B unknown first (it shows the pristine
+*                              copy now, and GLOAD reads through B), A on the PC
        BL   @GLOAD             the globals from the restored area
        BL   @UINIT             no undo past a restore
-       BL   @UNDONE            window A on the restored PC's page
+       BL   @UNDONE            (UINIT used A and B)
        LI   R0,2               SAVE's result, the second time
        MOV  R0,*R6+
        B    @NEXT

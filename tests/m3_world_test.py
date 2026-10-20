@@ -80,8 +80,8 @@ check('SHOW both ways round goes to the character (LIFE)', after('show note to g
       == '"That\'s the note, that is," the gardener says.')
 check('REPLACE: the game\'s SingSub instead of the library\'s', after('sing') == 'You hum a tune the ferns seem to like.')
 check('EXTEND: a new grammar line on a library verb', after('smell the air') == 'Nothing smells out of the ordinary.')
-check('SAVE and RESTORE fail honestly until they arrive; UNDO works', after('save') == 'Save failed.' and after('restore') == 'Restore failed.'
-      and after('undo') == '[Previous turn undone.]')
+check('SAVE asks for a file and saves; RESTORE brings it back and clears UNDO', after('save', 2) == 'Save to which file? (Enter for SAVE1) \nSaved.'
+      and 'Restored.' in after('restore', 2) and after('undo') == "You can't undo that.")   # a restore clears the undo history
 check('RESTART and QUIT ask first', after('restart', 3) == 'Do you really want to start again?\n> no\nCarrying on, then.'
       and after('quit', 3) == 'Do you really want to stop?\n> no\nCarrying on, then.')
 

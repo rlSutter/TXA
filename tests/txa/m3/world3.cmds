@@ -31,7 +31,9 @@ wave note
 yes
 sorry
 save
+
 restore
+
 undo
 restart
 no

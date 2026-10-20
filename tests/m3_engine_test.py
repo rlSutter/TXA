@@ -27,7 +27,8 @@ for w in worlds:
     cmds = open(os.path.join(D, w + '.cmds')).read().split('\n')[:-1]
     vm = txvm.VM(img, cmds); want = vm.run()
     t0 = time.time()
-    got, m, why, per = play(img, cmds[:-1] if cmds[-1] == 'q' else cmds)
+    import tempfile
+    got, m, why, per = play(img, cmds[:-1] if cmds[-1] == 'q' else cmds, disk=tempfile.mkdtemp())   # a disk for SAVE
     if cmds[-1] == 'q':
         want = want[:want.rindex('>q\n') + 1]      # stop at the last prompt (the engine is left waiting)
     ok = got == want

@@ -105,13 +105,15 @@ That wasn't a question.
 No need to apologise.
 
 >save
-Save failed.
+Save to which file? (Enter for SAVE1) 
+Saved.
 
 >restore
-Restore failed.
+Restore which file? (Enter for SAVE1) 
+Restored.
 
 >undo
-[Previous turn undone.]
+You can't undo that.
 
 >restart
 Do you really want to start again?

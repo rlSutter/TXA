@@ -25,7 +25,9 @@ def check(name, ok, detail=''):
     fails += 0 if ok else 1
 
 img, _ = compile_file(os.path.join(ROOT, 'samples/lamplight.txa'), [os.path.join(ROOT, 'lib')], title='LAMPLIGHT')
-cmds = ['n', 'take lantern', 'save', '', 'drop lantern', 'i', 'restore', '', 'i', 'look', 'q', 'y']
+# (moving between rooms changes globals: location, and the restore must bring
+# the saved ones back, not the story's starting values)
+cmds = ['n', 'take lantern', 'save', '', 'drop lantern', 's', 'e', 'i', 'restore', '', 'i', 'look', 'q', 'y']
 
 pydir = tempfile.mkdtemp(); vm = txvm.VM(img, cmds); vm.save_dir = pydir
 want = vm.run()
