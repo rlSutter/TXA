@@ -77,7 +77,8 @@ CHO9   .leave
        RT
 
 * EMITLN - write LBUF (LLEN characters) on row CROW, blank to the
-* right, and move down a row; scroll first if CROW is below the window.
+* right (or centred, while STYLE 8 is on), and move down a row; scroll
+* first if CROW is below the window.
 * Counts lines toward [MORE].
 EMITLN .enter
        BL   @ROWFIT            CROW onto the screen (scrolling)
@@ -85,6 +86,33 @@ EMITLN .enter
        MPY  @D80,R0            R1 = row * 80
        MOV  R1,R0
        MOV  R0,R14             row start, kept
+       MOV  @CENTRD,R0         centred (STYLE 8)?
+       JEQ  EML0
+       MOV  R14,R0             the whole row blank first ...
+       LI   R1,>2000
+       LI   R2,COLS
+       BL   @VFILL
+       MOV  R14,R0
+       AI   R0,ATRTAB
+       LI   R1,ATNORM*256
+       LI   R2,COLS
+       BL   @VFILL
+       LI   R0,COLS            ... then the line, (80 - length) / 2 in
+       S    @LLEN,R0
+       SRL  R0,1
+       A    R0,R14
+       LI   R1,LBUF
+       MOV  R14,R0
+       MOV  @LLEN,R2
+       JEQ  EML2
+       BL   @VMBW
+       MOV  R14,R0
+       AI   R0,ATRTAB
+       LI   R1,ABUF
+       MOV  @LLEN,R2
+       BL   @VMBW
+       JMP  EML2
+EML0   MOV  R14,R0
        LI   R1,LBUF
        MOV  @LLEN,R2
        JEQ  EML1
@@ -475,3 +503,17 @@ STN3   DEC  R3
        JNE  STN3
        MOV  R0,@STPTR
        RT
+
+* CLS - the text window cleared (rows TXTTOP to the bottom), the next
+* line at its top; a partly written line is written first.
+OPCLS  BL   @FLUSH
+       MOV  @TXTTOP,@UTMP
+CLS1   MOV  @UTMP,R0
+       C    R0,@ROWS
+       JHE  CLS2
+       BL   @ECLR
+       INC  @UTMP
+       JMP  CLS1
+CLS2   MOV  @TXTTOP,@CROW
+       CLR  @MORECT
+       B    @NEXT

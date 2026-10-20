@@ -517,6 +517,8 @@ class VM:
                 pc = r
                 self.stack.append(2)
         elif name in ('PICTURE', 'SOUND'): self.write(f'[{name.lower()} {pop()}]')
+        elif name == 'CLS':
+            pass                                      # (the screen, not the text)
         elif name == 'STATUS':
             mv = pop(); sc = pop(); r = pop()
             self.status = ('Darkness' if r == 0 else self.short_name(r), sc, mv)

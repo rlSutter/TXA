@@ -41,12 +41,12 @@ OPTAB  DATA OPNOP,OPPSHB,OPPSHW,OPPSH0,OPPSH1,OPPOP,OPDUP,OPSELF  >00
        DATA OPPRS,OPPRV,OPPRN,OPPRO,OPPRC,OPNL,OPSTYL,OPPRA
        DATA OPREAD,OPRKEY,OPTOKN,OPFRSH,BADOP,BADOP,BADOP,BADOP
        DATA OPRAND,OPQUIT,OPRST,OPSAVE,OPREST,OPUSAV,OPUNDO,OPPIC
-       DATA OPSTAT,OPSND,BADOP,BADOP,BADOP,BADOP,BADOP,BADOP
+       DATA OPSTAT,OPSND,OPCLS,BADOP,BADOP,BADOP,BADOP,BADOP
 * >68->FF: no opcodes.  A full table lets NEXT skip the range check.
        BSS  0
 OPTPAD EQU  >100-(>68)
        COPY "gen/badops.a99"
-OPLAST EQU  >61
+OPLAST EQU  >62
 
 * ---- constants, stack, variables -----------------------------------------
 OPNOP  B    @NEXT
@@ -832,7 +832,12 @@ STY1   MOV  R0,R2
        SOC  R2,R1
        ANDI R1,>FF
 STY2   MOV  R1,@CURAT
-       CLR  @CURUL
+       CLR  @CENTRD            8: centred lines
+       MOV  R0,R2
+       ANDI R2,8
+       JEQ  STY2A
+       INC  @CENTRD
+STY2A  CLR  @CURUL
        ANDI R0,2
        JEQ  STY3
        LI   R0,>80

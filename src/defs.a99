@@ -257,3 +257,4 @@ SVR7   EQU  RAMVAR+>366        R7 kept across a disk call
 SVR8   EQU  RAMVAR+>368        R8 kept across a disk call
 DSKRES EQU  RAMVAR+>36A        DSKCAL: the DSR call's result
 FRCNT  EQU  RAMVAR+>36E        RESTORE: frames still to read
+CENTRD EQU  RAMVAR+>242        1 while STYLE 8 (centred lines) is on

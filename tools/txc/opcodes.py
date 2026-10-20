@@ -97,7 +97,7 @@ OPS = [
     (0x4B, 'PRINTO',   '',  'o ->',       "Print o's short name."),
     (0x4C, 'PRINTC',   '',  'c ->',       'Print one character.'),
     (0x4D, 'NEWLINE',  '',  '',           'End the line.'),
-    (0x4E, 'STYLE',    '',  'n ->',       'Text style from now on: 0 roman, 1 bold, 2 underline, 4 reverse, added together to combine.'),
+    (0x4E, 'STYLE',    '',  'n ->',       'Text style from now on: 0 roman, 1 bold, 2 underline, 4 reverse, 8 centred lines (each line written in the middle of the screen; the engine knows its width), added together to combine.  An engine without a style shows plain text.'),
     (0x4F, 'PRINTA',   'b', 'o ->',       "Print o's name with an article: 0 'the', 1 'The', 2 'a', 3 'A' (plural, proper and vowel rules)."),
     # ---- input
     (0x50, 'READ',     '',  't p -> n',   'Read a command line into text array t (t(0) = length, then one character per element, lower case) and TOKENIZE it into parse array p; push the word count.'),
@@ -115,6 +115,7 @@ OPS = [
     (0x5F, 'PICTURE',  '',  'n ->',       'Show picture n (0 hides the pane).'),
     (0x60, 'STATUS',   '',  'r s m ->',   'Draw the status line: room r\'s short name (0: "Darkness") on the left; on the right "Score: s  Moves: m", or "Moves: m" when s is -1. An engine without a status line ignores it.'),
     (0x61, 'SOUND',    '',  'n ->',       'Play sound effect n.'),
+    (0x62, 'CLS',      '',  '',           'Clear the text window (a partly written line is written first); the next line starts at its top.  An engine without a screen may just start a new line.'),
 ]
 
 BY_NAME = {o[1]: o for o in OPS}

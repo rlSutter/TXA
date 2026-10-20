@@ -51,7 +51,7 @@ BUILTINS = {
     'READ': ('READ', 2, True), 'TOKENIZE': ('TOKENIZE', 2, True),
     'HASATTR': ('HASATTRV', 2, True), 'FRESHLINE': ('FRESH', 0, False),
     'AGET': ('ALOADV', 2, True), 'APUT': ('ASTOREV', 3, False),
-    'ISNAME': ('ISNAME', 2, True), 'FILTERN': ('FILTERN', 4, True), 'ACOPY': ('ACOPY', 3, False),
+    'ISNAME': ('ISNAME', 2, True), 'CLS': ('CLS', 0, False), 'FILTERN': ('FILTERN', 4, True), 'ACOPY': ('ACOPY', 3, False),
     # the second argument of these two is a property name, not a value
     'PROPLEN': ('PROPLEN', 2, True), 'PROPWORD': ('GETPROPN', 3, True),
 }

@@ -89,7 +89,7 @@ handler_for = {'NOP': 'OPNOP', 'PUSHB': 'OPPSHB', 'PUSHW': 'OPPSHW', 'PUSH0': 'O
     'PRINTA': 'OPPRA', 'READ': 'OPREAD', 'READKEY': 'OPRKEY', 'RANDOM': 'OPRAND', 'QUIT': 'OPQUIT', 'RESTART': 'OPRST',
     'SAVE': 'OPSAVE', 'RESTORE': 'OPREST', 'UNDOSAVE': 'OPUSAV', 'UNDO': 'OPUNDO', 'PICTURE': 'OPPIC', 'STATUS': 'OPSTAT',
     'SOUND': 'OPSND', 'HASATTRV': 'OPHASV', 'ALOADV': 'OPALDV', 'ASTOREV': 'OPASTV', 'TOKENIZE': 'OPTOKN',
-    'FRESH': 'OPFRSH', 'ISNAME': 'OPISNM', 'FILTERN': 'OPFLTN', 'ACOPY': 'OPACPY'}
+    'FRESH': 'OPFRSH', 'ISNAME': 'OPISNM', 'FILTERN': 'OPFLTN', 'ACOPY': 'OPACPY', 'CLS': 'OPCLS'}
 bad = [(hex(i), e, names.get(i)) for i, e in enumerate(entries) if (names.get(i) and handler_for[names[i]] != e) or (not names.get(i) and e != 'BADOP')]
 check(f'OPTAB matches opcodes.py ({len(names)} opcodes)', not bad and len(entries) >= max(names) + 1, bad)
 

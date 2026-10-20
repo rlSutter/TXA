@@ -358,11 +358,6 @@ ROUTINE Initialise
   location = HarbourRoad
   max_score = 25
   StartDaemon(Tide)
-  PRINT
+  TitlePage("LAMPLIGHT", "A TXA sample game", "A lighthouse gone dark, an old keeper who has lost his spectacles, a tide that will not wait, and a ship that is coming whether the lamp is lit or not.")
   PRINT "The wind has turned cold, and out across the bay the lighthouse stands dark against the last of the sunset. It should have been lit an hour ago."
-  PRINT
-  STYLE(1)
-  PRINT "LAMPLIGHT"
-  STYLE(0)
-  PRINT "A TXA sample game"
 END

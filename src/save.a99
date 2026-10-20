@@ -494,14 +494,8 @@ ORS5B  DEC  @FRCNT
 ORS6   MOV  R14,@FREND
        LI   R0,PRPAGE-STPAGE   the dynamic area: the story's start ...
        MOV  R0,@UBBASE
-       CLR  @UPOS
-       SETO @UPAGE
-ORS7   C    @UPOS,@H.DYN
-       JHE  ORS8
-       BL   @UPMAP
-       MOVB @WINB(R1),@WINA(R1)
-       INC  @UPOS
-       JMP  ORS7
+       LI   R0,1
+       BL   @PGCOPY
 ORS8   CLR  @UPOS              ... XOR the difference
 ORS9   BL   @VGET
        CI   R0,>7F

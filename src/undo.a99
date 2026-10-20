@@ -156,41 +156,66 @@ USV4   C    R14,@FREND
        SRL  R0,8
        BL   @RGPUT
        JMP  USV4
-USV5   CLR  @UPOS              the difference, byte by byte
-       SETO @UPAGE
-       CLR  @UZRUN
+* The difference, a page at a time: windows A (now) and B (LAST) are
+* mapped once per page, and a tight loop compares a word at a time,
+* counting unchanged bytes in R9 (most of the area does not change from
+* turn to turn).  A changed word drops into byte handling (literals, LAST
+* brought up to date).  R14 walks window A, R13 window B, R15 counts
+* words left in the page.
+USV5   CLR  @UZRUN
        CLR  @ULITN
-USV6   C    @UPOS,@H.DYN
-       JHE  USV9
-       BL   @UPMAP
-       MOVB @WINA(R1),R0       now
-       MOVB @WINB(R1),R2       then (LAST)
-       MOVB R0,@WINB(R1)       LAST becomes now
-       XOR  R2,R0              (high bytes; the low halves don't matter)
-       SRL  R0,8
-       JNE  USV7
-       BL   @ULFLSH            unchanged: literals out, count the skip
-       INC  @UZRUN
-       MOV  @UZRUN,R0
-       CI   R0,127
-       JL   USV8
-       LI   R0,126             127 unchanged bytes: write the skip
-       BL   @RGPUT
-       CLR  @UZRUN
-       JMP  USV8
-USV7   MOV  R0,@UTMP2          changed: any skip out, keep the literal
+       CLR  R9                 unchanged bytes waiting
+       CLR  @UPOS              the page's first byte
+USP1   C    @UPOS,@H.DYN
+       JL   USP1A
+       B    @USV9
+USP1A  MOV  @UPOS,R2           map the page in A and B
+       SRL  R2,12
+       MOV  R2,@UPAGE
+       LI   R3,MAPRGA
+       BL   @MAPWIN
+       MOV  @UPAGE,R2
+       A    @UBBASE,R2
+       LI   R3,MAPRGB
+       BL   @MAPWIN
+       MOV  @H.DYN,R15         words in this page: min(4096, left) / 2
+       S    @UPOS,R15
+       CI   R15,4096
+       JLE  USP1B
+       LI   R15,4096
+USP1B  SRL  R15,1
+       LI   R14,WINA
+       LI   R13,WINB
+USP2   C    *R14,*R13          the tight loop: unchanged words
+       JNE  USP4
+       INCT R9
+       INCT R14
+       INCT R13
+       DEC  R15
+       JNE  USP2
+       JMP  USP8
+USP4   MOV  R9,@UZRUN          a changed word: its two bytes
+       BL   @UBYTE
+       INC  R14
+       INC  R13
+       BL   @UBYTE
+       INC  R14
+       INC  R13
+       MOV  @UZRUN,R9
+       DEC  R15
+       JEQ  USP8
+       C    *R14,*R13          more changes follow: keep the literals
+       JNE  USP4
+       BL   @ULFLSH            unchanged next: the literals out first
+       MOV  @UZRUN,R9
+       JMP  USP2
+USP8   MOV  R9,@UZRUN          the next page (the skip count carries on)
+       MOV  @UPOS,R0
+       AI   R0,4096
+       MOV  R0,@UPOS
+       B    @USP1
+USV9   MOV  R9,@UZRUN          the rest, and the end
        BL   @UZFLSH
-       MOV  @ULITN,R1
-       MOV  @UTMP2,R0
-       SWPB R0
-       MOVB R0,@ULIT(R1)
-       INC  @ULITN
-       CI   R1,111
-       JL   USV8
-       BL   @ULFLSH            112 waiting (ULIT is full): write them
-USV8   INC  @UPOS
-       JMP  USV6
-USV9   BL   @UZFLSH            the rest, and the end
        BL   @ULFLSH
        LI   R0,>7F
        BL   @RGPUT
@@ -201,11 +226,44 @@ USV9   BL   @UZFLSH            the rest, and the end
        MOV  R0,*R6+
        B    @NEXT
 
+* UBYTE - the byte at R14 (now) against R13 (LAST): LAST brought up to
+* date; an unchanged byte counted in UZRUN (literals out first), a
+* changed one kept as a literal (any skip out first).  Keeps R13-R15.
+UBYTE  .enter
+       MOVB *R14,R0
+       MOVB *R13,R2
+       MOVB R0,*R13            LAST becomes now
+       XOR  R2,R0
+       SRL  R0,8
+       JNE  UBY1
+       BL   @ULFLSH
+       INC  @UZRUN
+       JMP  UBY9
+UBY1   MOV  R0,@UTMP2
+       BL   @UZFLSH
+       MOV  @ULITN,R1
+       MOV  @UTMP2,R0
+       SWPB R0
+       MOVB R0,@ULIT(R1)
+       INC  @ULITN
+       CI   R1,111
+       JL   UBY9
+       BL   @ULFLSH            112 waiting (ULIT is full): write them
+UBY9   .leave
+       RT
+
 * UZFLSH - write a waiting skip.  ULFLSH - write waiting literals.
 UZFLSH .enter
-       MOV  @UZRUN,R0
+UZF1   MOV  @UZRUN,R0          (runs of 127 while more are waiting)
        JEQ  UZF9
-       DEC  R0
+       CI   R0,127
+       JLE  UZF2
+       AI   R0,-127
+       MOV  R0,@UZRUN
+       LI   R0,126
+       BL   @RGPUT
+       JMP  UZF1
+UZF2   DEC  R0
        BL   @RGPUT
        CLR  @UZRUN
 UZF9   .leave
@@ -274,14 +332,8 @@ UND4   C    R14,@FREND
        SWPB R0
        MOVB R0,*R14+
        JMP  UND4
-UND5   CLR  @UPOS              the dynamic area = LAST, page by page
-       SETO @UPAGE
-UND6   C    @UPOS,@H.DYN
-       JHE  UND7
-       BL   @UPMAP
-       MOVB @WINB(R1),@WINA(R1)
-       INC  @UPOS
-       JMP  UND6
+UND5   LI   R0,1               the dynamic area = LAST
+       BL   @PGCOPY
 UND7   CLR  @UPOS              LAST = LAST XOR the difference
 UND8   BL   @RGGET
        CI   R0,>7F
@@ -317,14 +369,48 @@ UINIT  .enter
        MOV  R0,@UBBASE
        CLR  @UCNT
        CLR  @UTOP
+       CLR  R0                 LAST = the dynamic area
+       BL   @PGCOPY
+       SETO @CURBH
+       .leave
+       RT
+
+* PGCOPY - copy the whole dynamic area between the story's pages (A) and
+* the pages UBBASE names (B), a page at a time, a word at a time: R0 = 0
+* copies A to B, 1 copies B to A.  Leaves UPAGE unknown.
+PGCOPY .enter
+       MOV  R0,@UTMP
        CLR  @UPOS
-       SETO @UPAGE
-UIN1   C    @UPOS,@H.DYN
-       JHE  UIN2
-       BL   @UPMAP
-       MOVB @WINA(R1),@WINB(R1)
-       INC  @UPOS
-       JMP  UIN1
-UIN2   SETO @CURBH
+PGC1   C    @UPOS,@H.DYN
+       JHE  PGC9
+       MOV  @UPOS,R2
+       SRL  R2,12
+       MOV  R2,@UPAGE
+       LI   R3,MAPRGA
+       BL   @MAPWIN
+       MOV  @UPAGE,R2
+       A    @UBBASE,R2
+       LI   R3,MAPRGB
+       BL   @MAPWIN
+       MOV  @H.DYN,R2          words: min(4096, left) / 2
+       S    @UPOS,R2
+       CI   R2,4096
+       JLE  PGC2
+       LI   R2,4096
+PGC2   SRL  R2,1
+       LI   R0,WINA
+       LI   R1,WINB
+       MOV  @UTMP,R3
+       JEQ  PGC3
+       LI   R0,WINB
+       LI   R1,WINA
+PGC3   MOV  *R0+,*R1+
+       DEC  R2
+       JNE  PGC3
+       MOV  @UPOS,R0
+       AI   R0,4096
+       MOV  R0,@UPOS
+       JMP  PGC1
+PGC9   SETO @UPAGE
        .leave
        RT

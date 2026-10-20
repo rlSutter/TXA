@@ -124,3 +124,37 @@ ROUTINE ShowStatus
   END
   STATUS(r, s, turns)
 END
+
+! TitlePage(title, byline, blurb): a title page before the game.  The
+! screen cleared, the title in bold, the byline and blurb under it, all
+! centred (STYLE 8: the engine knows the screen's width), "Press any key
+! to begin." at the foot; a key clears the screen again.  Call it from
+! Initialise.  byline or blurb may be 0 to leave them out.  (When
+! pictures and music arrive, the title page will show and play the
+! game's title picture and music if it names them.)
+ROUTINE TitlePage title, byline, blurb
+  LOCAL k
+  CLS()
+  WHILE k < 8
+    PRINT
+    k = k + 1
+  END
+  STYLE(9)
+  PRINT (string) title
+  STYLE(8)
+  IF byline
+    PRINT
+    PRINT (string) byline
+  END
+  IF blurb
+    PRINT
+    PRINT (string) blurb
+  END
+  PRINT
+  PRINT
+  PRINT
+  PRINT "Press any key to begin."
+  STYLE(0)
+  READKEY()
+  CLS()
+END

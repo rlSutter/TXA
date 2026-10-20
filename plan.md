@@ -439,6 +439,21 @@ Part 3 done (20 October 2026): stories on disk, and the game writer.
 - tests/m4_disk_test.py (5 checks).
 - Still to do: the device the game was loaded from (now always DSK1).
 
+Title page (20 October 2026, Rebecca's request): the library's
+TitlePage(title, byline, blurb) clears the screen, shows the title in
+bold and the rest centred, waits for a key, clears again.  Engine: STYLE
+8 = centred lines (the engine knows the width: portability rule 4) and a
+CLS instruction (clear the text window).  Lamplight uses it.  Pictures
+and music will join the title page in parts 4 and 5.
+
+UNDO's cost found and cut on the way: the snapshot taken before every
+command encoded the whole dynamic area a byte at a time (Lamplight: about
+2 s a command on the estimate).  Now a word-at-a-time scan per page with
+byte handling only where something changed, and page copies for UNDO,
+UINIT and RESTORE: Lamplight's estimate 3.3 s -> 1.6 s a command (1.2 s
+before UNDO; the rest is the stacks and globals copied a byte at a time
+into each snapshot: room to tighten later).
+
 ## Next
 
 1. M4 part 4 (pictures) and part 5 (sound and music).
