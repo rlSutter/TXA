@@ -1,0 +1,539 @@
+*======================================================================
+* save.a99 - SAVE and RESTORE: the save file (opcodes.py says the format;
+* it is the same on every engine).
+*
+* SAVE builds the file straight into VRAM at FBUF, a byte at a time (the
+* VDP's address increments), then one DSR SAVE writes it.  RESTORE loads
+* the file into FBUF with one DSR LOAD, reads it through once to check
+* everything (format, story, release, sizes, its own checksum), and only
+* then reads it again to apply it: a bad file changes nothing.
+*
+* Positions in the file are story addresses (page * 4096 + offset), not
+* the TI's window addresses, so another engine can read them.
+*======================================================================
+
+* FNAME - FNBUF = the file name in text array R14 (t(0) = length, then
+* characters): upper case, and DSK1. in front when it names no device.
+FNAME  .enter
+       BL   @ARRAY             VT1 = t's first element, VT2 its length
+       MOV  @VT1,R1
+       BL   @RDW
+       MOV  @VT2,R1
+       DEC  R1
+       C    R0,R1
+       JLE  FNM1
+       MOV  R1,R0
+FNM1   CI   R0,24
+       JLE  FNM2
+       LI   R0,24
+FNM2   MOV  R0,@UTMP           characters to copy
+       CLR  @UTMP2             a full stop seen?
+       CLR  R15
+FNM3   C    R15,@UTMP          look for one
+       JHE  FNM5
+       MOV  R15,R1
+       INC  R1
+       SLA  R1,1
+       A    @VT1,R1
+       BL   @RDW
+       CI   R0,'.'
+       JNE  FNM4
+       SETO @UTMP2
+FNM4   INC  R15
+       JMP  FNM3
+FNM5   LI   R2,FNBUF+1         (only now: RDW above uses R2)
+       MOV  @UTMP2,R0
+       JNE  FNM6
+       LI   R1,DSK1PF          no device: DSK1. first
+       LI   R3,5
+FNM5A  MOVB *R1+,*R2+
+       DEC  R3
+       JNE  FNM5A
+FNM6   CLR  R15                the characters, in upper case
+FNM7   C    R15,@UTMP
+       JHE  FNM9
+       MOV  R15,R1
+       INC  R1
+       SLA  R1,1
+       A    @VT1,R1
+       MOV  R2,@UTMP3        (RDW keeps R1 but uses R2)
+       BL   @RDW
+       MOV  @UTMP3,R2
+       CI   R0,'a'
+       JL   FNM8
+       CI   R0,'z'
+       JH   FNM8
+       AI   R0,-32
+FNM8   SWPB R0
+       MOVB R0,*R2+
+       INC  R15
+       JMP  FNM7
+FNM9   AI   R2,-FNBUF-1        the length byte
+       SWPB R2
+       MOVB R2,@FNBUF
+       .leave
+       RT
+DSK1PF TEXT 'DSK1.'
+       EVEN
+
+* ---- writing the file into VRAM ---------------------------------------------
+* VPUT - R0's low byte to the file (counted, summed; dropped and SVBAD
+* set once the file would pass DSKMAX).  VPUTW - R0 as a word.
+VPUT   C    @SVCNT,@DSKMX
+       JHE  VPUT8
+       ANDI R0,>FF
+       A    R0,@SVSUM
+       INC  @SVCNT
+       SWPB R0
+       MOVB R0,@VDPWD
+       RT
+VPUT8  SETO @SVBAD
+       RT
+VPUTW  MOV  R11,@UTMP
+       MOV  R0,@UTMP2
+       SRL  R0,8
+       BL   @VPUT
+       MOV  @UTMP2,R0
+       BL   @VPUT
+       MOV  @UTMP,R11
+       RT
+DSKMX  DATA DSKMAX-2           (the checksum word follows)
+
+* VADDR - a story address as the file's long: R0 = page * 4096 + offset
+* from window address R1 and page R2 (high word in R0, low in R1).
+VADDR  MOV  R2,R0
+       SRL  R0,4               high word: page / 16
+       SLA  R2,12              low word: (page mod 16) * 4096 + offset
+       AI   R1,-WINA
+       SOC  R2,R1
+       RT
+
+OPSAVE DECT R6
+       MOV  *R6,R14            the name's array
+       BL   @FNAME
+       BL   @GSYNC             the globals into the dynamic area
+       CLR  @SVSUM
+       CLR  @SVCNT
+       CLR  @SVBAD
+       LI   R0,FBUF
+       BL   @VWAD
+       LI   R0,'T'             the magic and the header
+       BL   @VPUT
+       LI   R0,'X'
+       BL   @VPUT
+       LI   R0,'S'
+       BL   @VPUT
+       LI   R0,'1'
+       BL   @VPUT
+       LI   R0,1               format version
+       BL   @VPUTW
+       MOV  @H.CSUM,R0
+       BL   @VPUTW
+       MOV  @HDRCPY+6,R0       release
+       BL   @VPUTW
+       MOV  @H.DYN,R0
+       BL   @VPUTW
+       MOV  R4,R1              the PC (just after this SAVE)
+       MOV  R5,R2
+       BL   @VADDR
+       MOV  R1,@UTMP3
+       BL   @VPUTW
+       MOV  @UTMP3,R0
+       BL   @VPUTW
+       MOV  R8,R0              SELF
+       BL   @VPUTW
+       MOV  R6,R0              the value stack: depth, then the words
+       AI   R0,-VSTK
+       SRL  R0,1
+       BL   @VPUTW
+       LI   R14,VSTK
+OSV1   C    R14,R6
+       JHE  OSV2
+       MOV  *R14+,R0
+       BL   @VPUTW
+       JMP  OSV1
+OSV2   CLR  R15                the frames: count them ...
+       LI   R14,FRAMES
+OSV3   C    R14,@FREND
+       JHE  OSV4
+       INC  R15
+       MOV  @8(R14),R0
+       SLA  R0,1
+       A    R0,R14
+       AI   R14,FRHDR
+       JMP  OSV3
+OSV4   MOV  R15,R0
+       BL   @VPUTW
+       LI   R14,FRAMES         ... then each, outermost first
+OSV5   C    R14,@FREND
+       JHE  OSV8
+       MOV  *R14,R2            return page: -1 ends the game
+       CI   R2,-1
+       JNE  OSV6
+       SETO R0
+       BL   @VPUTW
+       SETO R0
+       BL   @VPUTW
+       JMP  OSV7
+OSV6   MOV  @2(R14),R1
+       BL   @VADDR
+       MOV  R1,@UTMP3
+       BL   @VPUTW
+       MOV  @UTMP3,R0
+       BL   @VPUTW
+OSV7   MOV  @4(R14),R0         the caller's stack depth
+       AI   R0,-VSTK
+       SRL  R0,1
+       BL   @VPUTW
+       MOV  @6(R14),R0         the caller's SELF
+       BL   @VPUTW
+       MOV  @8(R14),R15        the locals
+       MOV  R15,R0
+       BL   @VPUTW
+       AI   R14,FRHDR
+OSV7A  MOV  R15,R15
+       JEQ  OSV5
+       MOV  *R14+,R0
+       BL   @VPUTW
+       DEC  R15
+       JMP  OSV7A
+OSV8   LI   R0,PRPAGE-STPAGE   the difference from the story's start
+       MOV  R0,@UBBASE         (window B: the pristine copy)
+       CLR  @UPOS
+       SETO @UPAGE
+       CLR  @UZRUN
+       CLR  @ULITN
+OSV9   C    @UPOS,@H.DYN
+       JHE  OSV12
+       BL   @UPMAP
+       MOVB @WINA(R1),R0
+       MOVB @WINB(R1),R2
+       XOR  R2,R0
+       SRL  R0,8
+       JNE  OSV10
+       BL   @SLFLSH            unchanged
+       INC  @UZRUN
+       MOV  @UZRUN,R0
+       CI   R0,127
+       JL   OSV11
+       LI   R0,126
+       BL   @VPUT
+       CLR  @UZRUN
+       JMP  OSV11
+OSV10  MOV  R0,@UTMP3        changed
+       BL   @SZFLSH
+       MOV  @ULITN,R1
+       MOV  @UTMP3,R0
+       SWPB R0
+       MOVB R0,@ULIT(R1)
+       INC  @ULITN
+       CI   R1,111
+       JL   OSV11
+       BL   @SLFLSH
+OSV11  INC  @UPOS
+       JMP  OSV9
+OSV12  BL   @SZFLSH
+       BL   @SLFLSH
+       LI   R0,>7F
+       BL   @VPUT
+       MOV  @SVSUM,R0          the checksum: every byte so far
+       BL   @VPUTW
+       BL   @UNDONE            windows back (A on the PC's page)
+       MOV  @SVBAD,R0
+       JNE  OSV98              too big for one file
+       LI   R0,6               the DSR's SAVE
+       MOV  @SVCNT,R1
+       BL   @DSKCAL
+       MOV  R0,@UTMP
+       BL   @SPRZER
+       MOV  @UTMP,R0
+       JNE  OSV99
+       LI   R0,1
+       MOV  R0,*R6+
+       B    @NEXT
+OSV98  BL   @SPRZER
+OSV99  CLR  *R6+               failed: 0
+       B    @NEXT
+
+* SZFLSH / SLFLSH - a waiting skip, or waiting literals, into the file.
+SZFLSH .enter
+       MOV  @UZRUN,R0
+       JEQ  SZF9
+       DEC  R0
+       BL   @VPUT
+       CLR  @UZRUN
+SZF9   .leave
+       RT
+SLFLSH .enter
+       MOV  @ULITN,R0
+       JEQ  SLF9
+       AI   R0,>7F
+       BL   @VPUT
+       CLR  @UTMP3
+SLF1   MOV  @UTMP3,R1
+       MOVB @ULIT(R1),R0
+       SRL  R0,8
+       BL   @VPUT
+       INC  @UTMP3
+       C    @UTMP3,@ULITN
+       JL   SLF1
+       CLR  @ULITN
+SLF9   .leave
+       RT
+
+* ---- reading the file back ---------------------------------------------------
+* VGET - R0 = the file's next byte (summed, counted; past DSKMAX: SVBAD).
+* VGETW - R0 = the next word.
+VGET   CLR  R0
+       C    @SVCNT,@DSKMX2
+       JHE  VGET8
+       MOVB @VDPRD,R0
+       SRL  R0,8
+       A    R0,@SVSUM
+       INC  @SVCNT
+       RT
+VGET8  SETO @SVBAD
+       RT
+VGETW  MOV  R11,@UTMP
+       BL   @VGET
+       SWPB R0
+       MOV  R0,@UTMP2
+       BL   @VGET
+       SOC  @UTMP2,R0
+       MOV  @UTMP,R11
+       RT
+DSKMX2 DATA DSKMAX
+
+* RDCHK - read the whole file once: R0 = 0 if it is a good save of this
+* story, else non-zero.  Changes nothing.
+RDCHK  .enter
+       CLR  @SVSUM
+       CLR  @SVCNT
+       CLR  @SVBAD
+       LI   R0,FBUF
+       BL   @VRAD
+       BL   @VGETW             'TX'
+       CI   R0,'TX'
+       JNE  RCK9
+       BL   @VGETW             'S1'
+       CI   R0,'S1'
+       JNE  RCK9
+       BL   @VGETW
+       CI   R0,1               format version
+       JNE  RCK9
+       BL   @VGETW
+       C    R0,@H.CSUM         this story ...
+       JNE  RCK9
+       BL   @VGETW
+       C    R0,@HDRCPY+6       ... this release ...
+       JNE  RCK9
+       BL   @VGETW
+       C    R0,@H.DYN          ... this dynamic area
+       JNE  RCK9
+       BL   @VGETW             the PC, SELF
+       BL   @VGETW
+       BL   @VGETW
+       BL   @VGETW             the stack: at most what VSTK holds
+       CI   R0,(VSTKND-VSTK)/2
+       JH   RCK9
+       MOV  R0,R15
+RCK1   MOV  R15,R15
+       JEQ  RCK2
+       BL   @VGETW
+       DEC  R15
+       JMP  RCK1
+RCK2   BL   @VGETW             the frames: they must fit FRAMES
+       MOV  R0,R15
+       LI   R14,FRAMES
+RCK3   MOV  R15,R15
+       JEQ  RCK5
+       BL   @VGETW             return address, depth, SELF
+       BL   @VGETW
+       BL   @VGETW
+       BL   @VGETW
+       BL   @VGETW             locals: at most 16
+       CI   R0,16
+       JH   RCK9
+       MOV  R0,@UPOS           (a counter here)
+       SLA  R0,1
+       A    R0,R14
+       AI   R14,FRHDR
+       CI   R14,FRMEND
+       JH   RCK9
+RCK4   MOV  @UPOS,R0
+       JEQ  RCK4A
+       BL   @VGETW
+       DEC  @UPOS
+       JMP  RCK4
+RCK4A  DEC  R15
+       JMP  RCK3
+RCK5   CLR  R14                the difference: inside the dynamic area
+RCK6   BL   @VGET
+       MOV  @SVBAD,R1
+       JNE  RCK9
+       CI   R0,>7F
+       JEQ  RCK8
+       JH   RCK7
+       INC  R0
+       A    R0,R14
+       C    R14,@H.DYN
+       JH   RCK9
+       JMP  RCK6
+RCK7   AI   R0,->7F
+       A    R0,R14
+       C    R14,@H.DYN
+       JH   RCK9
+       MOV  R0,R15
+RCK7A  BL   @VGET
+       DEC  R15
+       JNE  RCK7A
+       JMP  RCK6
+RCK8   MOV  @SVSUM,@UTMP3    the checksum: the sum before it
+       BL   @VGETW
+       MOV  @SVBAD,R1
+       JNE  RCK9
+       C    R0,@UTMP3
+       JNE  RCK9
+       CLR  R0
+       JMP  RCK99
+RCK9   SETO R0
+RCK99  .leave
+       RT
+
+* RDLONG - R5 (page) and R4 (window address) from the file's long.
+* (Used for the PC only; frames go through RDRET.)
+RDLONG .enter
+       BL   @VGETW
+       MOV  R0,R5
+       SLA  R5,4
+       BL   @VGETW
+       MOV  R0,R1
+       SRL  R1,12
+       SOC  R1,R5
+       ANDI R0,>0FFF
+       AI   R0,WINA
+       MOV  R0,R4
+       .leave
+       RT
+
+OPREST DECT R6
+       MOV  *R6,R14            the name's array
+       BL   @FNAME
+       LI   R0,5               the DSR's LOAD
+       LI   R1,DSKMAX
+       BL   @DSKCAL
+       MOV  R0,R0
+       JEQ  ORS0
+       B    @ORS98
+ORS0   BL   @RDCHK             a good save of this story?
+       MOV  R0,R0
+       JEQ  ORS0A
+       B    @ORS98
+ORS0A  CLR  @SVCNT             yes: apply it
+       CLR  @SVSUM
+       LI   R0,FBUF+12         (past the magic and the header)
+       BL   @VRAD
+       BL   @RDLONG            the PC
+       BL   @VGETW             SELF
+       MOV  R0,R8
+       BL   @VGETW             the value stack
+       MOV  R0,R15
+       LI   R6,VSTK
+ORS1   MOV  R15,R15
+       JEQ  ORS2
+       BL   @VGETW
+       MOV  R0,*R6+
+       DEC  R15
+       JMP  ORS1
+ORS2   MOV  R4,@SVREG          (the PC, kept: frames reuse R4 and R5)
+       MOV  R5,@SVREG+2
+       BL   @VGETW             the frames (counted in FRCNT: VGETW uses UTMP)
+       MOV  R0,@FRCNT
+       LI   R14,FRAMES
+       LI   R7,FRAMES          (the frame pointer before Main's, as VMRUN)
+ORS3   MOV  @FRCNT,R0
+       JEQ  ORS6
+       BL   @VGETW             return address: page and window address
+       MOV  R0,R5
+       BL   @VGETW
+       CI   R5,-1
+       JNE  ORS4
+       CI   R0,-1
+       JNE  ORS4
+       SETO *R14               -1: the end of the game
+       CLR  @2(R14)
+       JMP  ORS5
+ORS4   MOV  R0,R1
+       SRL  R1,12
+       SLA  R5,4
+       SOC  R1,R5
+       MOV  R5,*R14
+       ANDI R0,>0FFF
+       AI   R0,WINA
+       MOV  R0,@2(R14)
+ORS5   BL   @VGETW             the caller's stack depth
+       SLA  R0,1
+       AI   R0,VSTK
+       MOV  R0,@4(R14)
+       BL   @VGETW             the caller's SELF
+       MOV  R0,@6(R14)
+       BL   @VGETW             the locals
+       MOV  R0,@8(R14)
+       MOV  R0,R15
+       MOV  R7,@10(R14)        the caller's frame
+       AI   R14,FRHDR
+       MOV  R14,R7             this frame's locals
+ORS5A  MOV  R15,R15
+       JEQ  ORS5B
+       BL   @VGETW
+       MOV  R0,*R14+
+       DEC  R15
+       JMP  ORS5A
+ORS5B  DEC  @FRCNT
+       JMP  ORS3
+ORS6   MOV  R14,@FREND
+       LI   R0,PRPAGE-STPAGE   the dynamic area: the story's start ...
+       MOV  R0,@UBBASE
+       CLR  @UPOS
+       SETO @UPAGE
+ORS7   C    @UPOS,@H.DYN
+       JHE  ORS8
+       BL   @UPMAP
+       MOVB @WINB(R1),@WINA(R1)
+       INC  @UPOS
+       JMP  ORS7
+ORS8   CLR  @UPOS              ... XOR the difference
+ORS9   BL   @VGET
+       CI   R0,>7F
+       JEQ  ORS12
+       JH   ORS10
+       INC  R0
+       A    R0,@UPOS
+       JMP  ORS9
+ORS10  AI   R0,->7F
+       MOV  R0,R15
+ORS11  BL   @VGET
+       MOV  R0,@UTMP3
+       BL   @UPMAP
+       MOV  @UTMP3,R0
+       SWPB R0
+       MOVB @WINA(R1),R2
+       XOR  R0,R2
+       MOVB R2,@WINA(R1)
+       INC  @UPOS
+       DEC  R15
+       JNE  ORS11
+       JMP  ORS9
+ORS12  MOV  @SVREG,R4          the PC back
+       MOV  @SVREG+2,R5
+       BL   @SPRZER
+       BL   @GLOAD             the globals from the restored area
+       BL   @UINIT             no undo past a restore
+       BL   @UNDONE            window A on the restored PC's page
+       LI   R0,2               SAVE's result, the second time
+       MOV  R0,*R6+
+       B    @NEXT
+ORS98  BL   @SPRZER            failed: nothing changed
+       BL   @UNDONE
+       CLR  *R6+
+       B    @NEXT

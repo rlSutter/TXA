@@ -108,8 +108,8 @@ OPS = [
     (0x58, 'RANDOM',   '',  'n -> r',     'A random number from 1 to n; n <= 0 reseeds (0 at random, -s with s) and pushes 0.'),
     (0x59, 'QUIT',     '',  '',           'End the game: back to the title screen.'),
     (0x5A, 'RESTART',  '',  '',           'Reload the dynamic area and start again.'),
-    (0x5B, 'SAVE',     '',  '-> f',       'Save the game (asks for a file name); 1 if saved.'),
-    (0x5C, 'RESTORE',  '',  '-> f',       'Restore a saved game; 0 if it failed (on success execution continues after the SAVE).'),
+    (0x5B, 'SAVE',     '',  't -> f',     'Save the game to the file named in text array t (t(0) = length, then characters); push 1 if saved, 0 if not.  When a RESTORE later loads the file, execution continues here with 2 pushed instead.  The file is in the save format below, the same on every engine.'),
+    (0x5C, 'RESTORE',  '',  't -> f',     'Restore the game saved in the file named in text array t: execution continues after the SAVE that wrote it, which pushes 2.  If the file is missing, damaged, or from another story or release, push 0 and change nothing.'),
     (0x5D, 'UNDOSAVE', '',  '-> f',       'Take an undo snapshot (the dynamic area, the stacks, the PC and SELF) and push 1.  When an UNDO later goes back to it, execution continues here with 2 pushed instead.'),
     (0x5E, 'UNDO',     '',  '-> f',       'Go back to the newest snapshot, removing it (so a second UNDO goes further back): execution continues after its UNDOSAVE, which pushes 2.  If there is none, push 0 and carry on.  An engine keeps at least one snapshot; the TI keeps 28K of differences (over a hundred typical turns), starting again when they fill.'),
     (0x5F, 'PICTURE',  '',  'n ->',       'Show picture n (0 hides the pane).'),
@@ -159,3 +159,24 @@ HDR = {
 # routines and strings may lie anywhere in the 256K, by packed address.
 OBJ_ENTRY = 14             # parent, sibling, child, 6 bytes of attributes, property table offset
 PROP_STR, PROP_ROUTINE, PROP_VALUES = 0x40, 0x80, 0x00   # kind bits in a property entry's first byte
+
+# ---- the save file (portability rule 6: the same bytes on every engine) ------
+# All words big-endian; "long" = high word then low word.
+#   'TXS1'
+#   word  format version (SAVE_VERSION)
+#   word  the story's checksum (header)      word  its release
+#   word  the dynamic area's length
+#   long  the PC: the byte after the SAVE instruction (a story address)
+#   word  SELF
+#   word  n, the value stack's depth in words; then n words
+#   word  m, the number of call frames; then each, outermost (Main) first:
+#     long  return address (>FFFFFFFF: returning ends the game)
+#     word  the caller's stack depth, in words, once the arguments are taken
+#     word  the caller's SELF
+#     word  k, the local count; then k words
+#   the dynamic area, as XOR against the story's original dynamic area,
+#   run-length coded: >00->7E n: n+1 unchanged bytes; >80->FF n: n->7F
+#   changed bytes follow (XOR values); >7F: the end
+#   word  the sum of every byte before it, mod 65536
+SAVE_MAGIC = b'TXS1'
+SAVE_VERSION = 1

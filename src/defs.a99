@@ -87,7 +87,7 @@ PANEON EQU  RAMVAR+>14         0 = pane hidden, 1 = shown
 SR14V  EQU  RAMVAR+>16         F18A status register 14 (version), high byte
 SR12V  EQU  RAMVAR+>18         status register 12 after VR58 = 0 (PICO9918)
 KEYLST EQU  RAMVAR+>1A         last key reported (KEYGET's edge detection)
-KEYMAP EQU  RAMVAR+>1C         six keyboard column bytes (KSCAN), to >21
+KEYMAP EQU  RAMVAR+>1C         6 bytes: the keyboard's column bytes (KSCAN)
 SAVWRD EQU  RAMVAR+>22         8 words: >xFFE of windows 2,3,A-F (AMSSIZ)
 NUMBUF EQU  RAMVAR+>40         8 bytes: number formatting
 ROWBUF EQU  RAMVAR+>80         80 bytes: one text row (scrolling)
@@ -228,5 +228,32 @@ ULITN  EQU  RAMVAR+>37C        literal bytes waiting in ULIT
 UPAGE  EQU  RAMVAR+>37E        the dynamic-area page mapped (-1 none)
 UTMP   EQU  RAMVAR+>380        scratch
 UTMP2  EQU  RAMVAR+>382        scratch
+UTMP3  EQU  RAMVAR+>36C        scratch (save.a99)
 ULIT   EQU  RAMVAR+>390        112 bytes: literal bytes waiting (written in runs of up to 112)
 URECS  EQU  RAMVAR+>5E0        256 bytes: where each snapshot's record starts (128 words)
+* ---- disk (disk.a99) and the save file (save.a99) ---------------------
+FBUF   EQU  >2000              VRAM: a file's bytes (over the sprite patterns,
+*                              zeroed again after each disk call)
+PABADR EQU  >37A0              VRAM: the PAB, just under the disk controller's
+*                              buffers (>37D8 up)
+DSKMAX EQU  >1700              the largest file: 23 sectors (the TI controller
+*                              refuses a LOAD whose byte count's high byte is
+*                              below the file's sector count)
+SAVR10 EQU  RAMVAR+>6E0        DSRLNK: R10 (a DSR may use every register)
+DSRCRU EQU  RAMVAR+>6E2        DSRLNK: the controller's CRU base
+DSR54  EQU  RAMVAR+>6E4        DSRLNK: scratchpad >8354 kept across power-up
+DSR56  EQU  RAMVAR+>6E6        DSRLNK: >8356
+DSRD0  EQU  RAMVAR+>6E8        DSRLNK: >83D0
+DSRD2  EQU  RAMVAR+>6EA        DSRLNK: >83D2
+DSRENT EQU  RAMVAR+>6EC        DSRLNK: the routine to call
+NAMBUF EQU  RAMVAR+>6F0        8 bytes: the device name being looked for
+FNBUF  EQU  RAMVAR+>0D0        32 bytes: a file name, with its length byte
+SVSUM  EQU  RAMVAR+>384        the save file: running byte sum
+SVCNT  EQU  RAMVAR+>386        the save file: bytes so far
+SVBAD  EQU  RAMVAR+>388        the save file: 1 if it would not fit
+SVREG  EQU  RAMVAR+>38A        4 bytes: R4 and R5 kept across a disk call
+UBBASE EQU  RAMVAR+>364        UPMAP: window B's base page, less STPAGE (LAST or the pristine copy)
+SVR7   EQU  RAMVAR+>366        R7 kept across a disk call
+SVR8   EQU  RAMVAR+>368        R8 kept across a disk call
+DSKRES EQU  RAMVAR+>36A        DSKCAL: the DSR call's result
+FRCNT  EQU  RAMVAR+>36E        RESTORE: frames still to read

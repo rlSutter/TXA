@@ -133,6 +133,7 @@ RDA2   MOV  @RDTARR,R14
 * (ILEN), then echo it through CHOUT and end the line.
 RDLINE .enter
        CLR  @MORECT            the player is reading: no [MORE] soon
+       BL   @KEYFRE            a key let go of while the game was busy
        BL   @ROWFIT
        MOV  @ROWS,R0           two rows for typing: scroll if the prompt
        DEC  R0                 would be on the bottom row
@@ -342,6 +343,36 @@ CRS1   MOV  R1,R2              (VSBW changes R0: work it out each time)
        AI   R0,ATRTAB
        MOV  R2,R1
        BL   @VSBW
+       .leave
+       RT
+
+* KEYFRE - if no key is down now, forget the last key.  KEYGT2 reports a
+* key only when it differs from the last one it saw, and nothing scans
+* while the game is busy between two lines: without this, ENTER pressed
+* twice (an empty answer after a command) would read as one long press.
+* A key still held from before stays remembered, so it does not repeat.
+* Uses R0-R5.
+KEYFRE .enter
+       DECT R10
+       MOV  R4,*R10
+       DECT R10
+       MOV  R5,*R10
+       BL   @KSCAN
+       LI   R1,KEYMAP
+       LI   R3,6
+KFR1   MOVB *R1+,R2
+       INV  R2
+       ANDI R2,>FF00
+       C    R3,@D6             column 0: only = SPACE ENTER count (rows 0-2)
+       JNE  KFR2
+       ANDI R2,>0700
+KFR2   MOV  R2,R2
+       JNE  KFR9               a key is down: keep the last key
+       DEC  R3
+       JNE  KFR1
+       CLR  @KEYLS2            none: the next press is new
+KFR9   MOV  *R10+,R5
+       MOV  *R10+,R4
        .leave
        RT
 

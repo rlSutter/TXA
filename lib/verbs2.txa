@@ -438,18 +438,41 @@ ROUTINE RestartSub
   PRINT "Carrying on, then."
 END
 
-! SAVE, RESTORE and UNDO: the engine does them in M4; until then the
-! built-ins return 0 and these say so honestly.
+! SAVE and RESTORE ask for a file name (ENTER: save1); the engine adds
+! its own device or folder (DSK1. on the TI).  When RESTORE loads a file,
+! the game carries on from inside SaveSub, where SAVE now gives 2.
+ROUTINE AskFile
+  READ(text2, parse2)
+  IF text2(0) = 0             ! "save1", as character codes ('s' would
+    text2(0) = 5               ! be the dictionary word, not the letter)
+    text2(1) = 115
+    text2(2) = 97
+    text2(3) = 118
+    text2(4) = 101
+    text2(5) = 49
+  END
+END
+
 ROUTINE SaveSub
-  IF SAVE()
+  LOCAL r
+  WRITE "Save to which file? (Enter for SAVE1) "
+  AskFile()
+  r = SAVE(text2)
+  IF r = 0
+    PRINT "Save failed."
+  ELSEIF r = 1
     PRINT "Saved."
   ELSE
-    PRINT "Save failed."
+    PRINT "Restored."
+    BuildScope()
+    ShowStatus()
   END
 END
 
 ROUTINE RestoreSub
-  IF RESTORE() = 0
+  WRITE "Restore which file? (Enter for SAVE1) "
+  AskFile()
+  IF RESTORE(text2) = 0
     PRINT "Restore failed."
   END
 END

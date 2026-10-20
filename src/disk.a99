@@ -1,0 +1,203 @@
+*======================================================================
+* disk.a99 - files through the disk DSR: PROGRAM-file LOAD and SAVE.
+*
+* DSRLNK is The Lantern Coast's (1.13), proven on js99er and on the TI
+* disk controller: it finds the controller by scanning the peripheral ROMs
+* for the device name, re-runs the controller's power-up before each call
+* (the engine uses the top of VRAM, where the controller keeps its
+* buffers), and calls the DSR the way the console does, from the GPL
+* workspace.
+*
+* Files go through VRAM: FBUF (>2000, over the sprite patterns) holds the
+* bytes, the PAB sits at PABADR (>37A0), just under the controller's
+* buffers (>37D8 up).  A file may be DSKMAX bytes (23 sectors).
+*
+* A DSR tramples the scratchpad from >834A, where the engine's fast block
+* lives, and VRAM from FBUF: DSKCAL puts both back afterwards (the fast
+* block copied in again, the sprite patterns zeroed), and keeps the VM's
+* registers R4-R8 across the call.
+*======================================================================
+
+* DSKCAL - the PAB for opcode R0 (5 LOAD, 6 SAVE) and byte count R1, the
+* file named in FNBUF; call the DSR.  R0 = 0 if it worked, else the DSR's
+* error code (1-7) or >FF if no controller answered.
+DSKCAL .enter
+       MOV  R4,@SVREG          the VM's registers: DSRLNK uses R0-R9
+       MOV  R5,@SVREG+2
+       MOV  R6,@SVREG+4
+       MOV  R7,@SVR7
+       MOV  R8,@SVR8
+       LI   R2,ROWBUF          the PAB, built in ROWBUF
+       SWPB R0
+       MOVB R0,*R2+            opcode
+       CLR  R3
+       MOVB R3,*R2+            flags
+       LI   R0,FBUF
+       MOVB R0,*R2+            buffer address
+       MOVB @WS+1,*R2+
+       MOVB R3,*R2+            record length, character count: unused
+       MOVB R3,*R2+
+       MOVB R1,*R2+            byte count
+       MOVB @WS+3,*R2+
+       MOVB R3,*R2+            status
+       LI   R1,FNBUF           the name, with its length byte
+       MOVB *R1,R0
+       SRL  R0,8
+       INC  R0
+DKC1   MOVB *R1+,*R2+
+       DEC  R0
+       JNE  DKC1
+       LI   R0,PABADR
+       LI   R1,ROWBUF
+       MOV  R2,R2              (length: R2 - ROWBUF)
+       AI   R2,-ROWBUF
+       BL   @VMBW
+       LI   R0,PABADR+9        >8356: the PAB's name length
+       MOV  R0,@>8356
+       BL   @DSRLNK
+       MOV  R0,@DSKRES         (the result, kept past the restoring below)
+       LI   R1,FSTSRC          the fast block back into the scratchpad
+       LI   R2,NEXT
+       LI   R3,(FASTND-NEXT)/2
+DKC2   MOV  *R1+,*R2+
+       DEC  R3
+       JNE  DKC2
+       MOV  @SVREG,R4
+       MOV  @SVREG+2,R5
+       MOV  @SVREG+4,R6
+       MOV  @SVR7,R7
+       MOV  @SVR8,R8
+       MOV  @DSKRES,R0
+       .leave
+       RT
+
+* SPRZER - the sprite patterns (where FBUF lies) zeroed again: sprites
+* must stay invisible.
+SPRZER .enter
+       LI   R0,SPRPAT
+       CLR  R1
+       LI   R2,>800
+       BL   @VFILL
+       .leave
+       RT
+
+DSRLNK .enter
+       MOV  R10,@SAVR10        the DSR may use every register
+       MOV  @>8356,R0
+       BL   @VRAD
+       MOVB @VDPRD,R3          full name length
+       SRL  R3,8
+       JNE  $+6                (out of JMP range)
+       B    @DLNONE
+       LI   R4,NAMBUF
+       CLR  R5                 device name length
+DKL1   MOVB @VDPRD,R6
+       CB   R6,@DOT
+       JEQ  DKL2
+       MOVB R6,*R4+
+       INC  R5
+       DEC  R3
+       JNE  DKL1
+DKL2   MOV  R5,R5
+       JNE  $+6                (out of JMP range)
+       B    @DLNONE
+       MOV  R5,@>8354          the DSR reads the device length from >8355
+       MOV  R5,R0              and >8356 must point at the '.' after the device
+       INC  R0                 name, as the standard DSRLNK leaves it: the DSR
+       A    R0,@>8356          finds the PAB at (>8356) - (>8354) - 10
+       LI   R12,>0F00
+DLNEXT MOV  R12,R12
+       JEQ  DLN1
+       SBZ  0                  previous ROM off
+DLN1   AI   R12,>0100
+       CLR  @>83D0
+       CI   R12,>2000
+       JNE  $+6                (out of JMP range)
+       B    @DLNONE
+       MOV  R12,@>83D0         CRU base for the DSR
+       SBO  0                  ROM on at >4000
+       LI   R2,>4000
+       CB   *R2,@HAA           a valid ROM starts with >AA
+       JNE  DLNEXT
+       LI   R2,>4008           DSR list pointer
+DLGO2  MOV  *R2,R2
+       JEQ  DLNEXT             end of list
+       MOV  R2,@>83D2          remember the entry
+       INCT R2
+       MOV  *R2+,R9            entry address
+       MOVB *R2+,R6
+       SRL  R6,8
+       C    R6,R5              name length must match ...
+       JNE  DLGO1
+       LI   R6,NAMBUF
+       MOV  R5,R7
+DLNM1  CB   *R6+,*R2+          ... and every character
+       JNE  DLGO1
+       DEC  R7
+       JNE  DLNM1
+* found: re-run the controller's power-up once (VRAM buffers, >8370)
+       MOV  R12,@DSRCRU
+*                              (every call: the engine's own VRAM use, the
+*                               picture pane, overwrites the controller's buffers)
+       LI   R0,>3FFF
+       MOV  R0,@>8370          top of VRAM, as the console sets it
+       MOV  @>8354,@DSR54      the power-up routine may use the scratchpad the
+       MOV  @>8356,@DSR56      DSR finds its PAB through (a real TI controller
+       MOV  @>83D0,@DSRD0      does: it writes >8354 and >8356), so keep them
+       MOV  @>83D2,@DSRD2      and put them back before the call itself
+       LI   R2,>4004           power-up list pointer
+       MOV  *R2,R2
+       JEQ  DLCALL
+       INCT R2
+       MOV  *R2,@DSRENT
+       LWPI GPLWS              power-up and DSR are GPL-called code: they run
+       BL   @DLGPL             in the GPL workspace (see DLGPL)
+       JMP  DLPU1              (either return lands safely)
+DLPU1  LWPI WS
+       MOV  @DSR54,@>8354
+       MOV  @DSR56,@>8356
+       MOV  @DSRD0,@>83D0
+       MOV  @DSRD2,@>83D2
+       MOV  @DSRCRU,R12        (and the CRU base: it may have moved too)
+       SBO  0                  (the power-up may have turned the ROM off)
+DLCALL MOV  R9,@DSRENT
+       LWPI GPLWS
+       BL   @DLGPL
+       JMP  DLER0              DSR came back to R11: not its device
+       LWPI WS
+       SETO R5                 skip return: it handled the call, but a missing
+       JMP  DLRD               file is still an error, in the PAB's flag byte
+DLER0  LWPI WS
+       JMP  DLERR
+DLGO1  MOV  @>83D2,R2          next list entry
+       JMP  DLGO2
+DLERR  CLR  R5
+DLRD   SBZ  0
+       LI   R0,PABADR+1        the PAB's flag byte (read from where we put the
+*                               PAB: a DSR may move the >8356 pointer)
+       BL   @VRAD
+       MOVB @VDPRD,R0
+       SRL  R0,13              error code in bits 7-5: 0 = none
+       JNE  DLOUT
+       MOV  R5,R5              code 0 is success only on the skip return
+       JNE  DLOUT
+       INC  R0
+       JMP  DLOUT
+DLNONE LI   R0,>00FF
+DLOUT  MOV  @SAVR10,R10
+       .leave
+       RT
+* DLGPL - in the GPL workspace (>83E0): call DSRENT as the console calls a
+* DSR, with R12 the card's CRU base, R13 the GROM read port (>9800) and R15
+* the VDP write address port (>8C02), which DSRs use directly.  Returns as
+* the DSR does: to R11, or to R11+2 when it handled the call.  R11 here is
+* GPLWS R11, so the DSR's return comes straight back to DLGPL's caller.
+DLGPL  MOV  @DSRCRU,R12
+       LI   R13,>9800
+       LI   R15,>8C02
+       MOV  @DSRENT,R9
+       B    *R9
+
+HAA    BYTE >AA
+DOT    BYTE '.'
+       EVEN

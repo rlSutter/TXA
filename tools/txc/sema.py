@@ -44,7 +44,7 @@ EXITS = ['N', 'S', 'E', 'W', 'NE', 'NW', 'SE', 'SW', 'UP', 'DOWN', 'INSIDE', 'OU
 BUILTINS = {
     'PARENT': ('PARENT', 1, True), 'CHILD': ('CHILD', 1, True), 'SIBLING': ('SIBLING', 1, True),
     'RANDOM': ('RANDOM', 1, True), 'READKEY': ('READKEY', 0, True),
-    'SAVE': ('SAVE', 0, True), 'RESTORE': ('RESTORE', 0, True),
+    'SAVE': ('SAVE', 1, True), 'RESTORE': ('RESTORE', 1, True),
     'UNDOSAVE': ('UNDOSAVE', 0, True), 'UNDO': ('UNDO', 0, True),
     'QUIT': ('QUIT', 0, False), 'RESTART': ('RESTART', 0, False),
     'STATUS': ('STATUS', 3, False), 'SOUND': ('SOUND', 1, False), 'STYLE': ('STYLE', 1, False),

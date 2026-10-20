@@ -92,8 +92,8 @@ UPMAP  .enter
        MOV  R1,R2              A: the story's page
        LI   R3,MAPRGA
        BL   @MAPWIN
-       MOV  @UPAGE,R2          B: LAST's page
-       AI   R2,UNDLST-STPAGE
+       MOV  @UPAGE,R2          B: LAST's page (or the pristine copy's, for
+       A    @UBBASE,R2         the save file: UBBASE says which)
        LI   R3,MAPRGB
        BL   @MAPWIN
 UPM1   MOV  @UPOS,R1
@@ -103,6 +103,8 @@ UPM1   MOV  @UPOS,R1
 
 * ---- UNDOSAVE ---------------------------------------------------------------
 OPUSAV BL   @GSYNC             the globals into the dynamic area
+       LI   R0,UNDLST-STPAGE   (window B: LAST)
+       MOV  R0,@UBBASE
        MOV  @UCNT,R0           start again if full: 128 records, or not
        CI   R0,128             enough room for the worst case (header,
        JHE  USV0               stacks, every byte changed: dyn + dyn/128)
@@ -236,7 +238,9 @@ OPUNDO MOV  @UCNT,R0
        JNE  UND1
        CLR  *R6+               nothing to go back to: 0
        B    @NEXT
-UND1   DEC  @UCNT
+UND1   LI   R0,UNDLST-STPAGE   (window B: LAST)
+       MOV  R0,@UBBASE
+       DEC  @UCNT
        MOV  @UCNT,R1
        SLA  R1,1
        MOV  @URECS(R1),@UDOFF
@@ -309,6 +313,8 @@ UND11  BL   @UNDONE            windows back
 * UINIT - LAST = the dynamic area as the story starts (after loading),
 * and no records.  Also after RESTART and RESTORE.
 UINIT  .enter
+       LI   R0,UNDLST-STPAGE   (window B: LAST)
+       MOV  R0,@UBBASE
        CLR  @UCNT
        CLR  @UTOP
        CLR  @UPOS

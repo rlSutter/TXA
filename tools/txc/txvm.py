@@ -8,7 +8,7 @@ code does the wrapping.
 
   python3 -m txc.txvm story.txa.img [commands...]
 """
-from .opcodes import BY_CODE, HDR, HEADER_SIZE, MAGIC, OBJ_ENTRY, PROP_STR, PROP_ROUTINE
+from .opcodes import BY_CODE, HDR, HEADER_SIZE, MAGIC, OBJ_ENTRY, PROP_STR, PROP_ROUTINE, SAVE_MAGIC as MAGIC_SAVE, SAVE_VERSION
 
 class VMError(Exception):
     pass
@@ -34,6 +34,8 @@ class VM:
         self.steps = 0
         self.status = None
         self.undo = []                # snapshots (no limit in the reference VM)
+        self.save_dir = None          # where SAVE writes (None: an in-memory dict)
+        self.saves = {}
         h = self.hw
         self.objects, self.nobj = h('objects'), h('object_count')
         self.globals, self.arrays = h('globals'), h('arrays')
@@ -174,6 +176,93 @@ class VM:
             raise Quit()
         self.stack.append(s16(v))
         return ret_to
+
+    # ---- saving (opcodes.py: the save file)
+    def text_arg(self, t):
+        ts, tl = self.array(t)
+        n = s16(self.rw(ts))
+        return ''.join(chr(self.rw(ts + 2 * (i + 1)) & 0xFF) for i in range(max(0, min(n, tl - 1))))
+
+    def put_file(self, name, data):
+        import os
+        if self.save_dir:
+            open(os.path.join(self.save_dir, name), 'wb').write(data)
+        else:
+            self.saves[name] = data
+
+    def get_file(self, name):
+        import os
+        if self.save_dir:
+            p = os.path.join(self.save_dir, name)
+            return open(p, 'rb').read() if os.path.exists(p) else None
+        return self.saves.get(name)
+
+    @staticmethod
+    def rle_xor(new, old):
+        out, i, n = bytearray(), 0, len(new)
+        zrun, lit = 0, bytearray()
+        def flush_z():
+            nonlocal zrun
+            if zrun:
+                out.append(zrun - 1); zrun = 0
+        def flush_l():
+            if lit:
+                out.append(0x7F + len(lit)); out.extend(lit); lit.clear()
+        for k in range(n):
+            x = new[k] ^ old[k]
+            if x == 0:
+                flush_l(); zrun += 1
+                if zrun == 127:
+                    out.append(126); zrun = 0
+            else:
+                flush_z(); lit.append(x)
+                if len(lit) == 112:
+                    flush_l()
+        flush_z(); flush_l(); out.append(0x7F)
+        return bytes(out)
+
+    def save_bytes(self, pc):
+        w = lambda v: (v & 0xFFFF).to_bytes(2, 'big')
+        l = lambda v: (v & 0xFFFFFFFF).to_bytes(4, 'big')
+        dyn = self.hw('dynamic_len')
+        out = bytearray(MAGIC_SAVE) + w(SAVE_VERSION) + w(self.hw('checksum')) + w(self.hw('release')) + w(dyn)
+        out += l(pc) + w(self.self_) + w(len(self.stack)) + b''.join(w(v) for v in self.stack)
+        out += w(len(self.frames))
+        for ret_to, locals_, height, self_ in self.frames:
+            out += l(0xFFFFFFFF if ret_to is None else ret_to) + w(height) + w(self_) + w(len(locals_))
+            out += b''.join(w(v) for v in locals_)
+        out += self.rle_xor(self.img[:dyn], self.orig[:dyn])
+        out += w(sum(out))
+        return bytes(out)
+
+    def restore_bytes(self, d):
+        """Apply a save file; the PC to continue at, or None (nothing changed)."""
+        try:
+            if d[:4] != MAGIC_SAVE or len(d) < 22 or int.from_bytes(d[-2:], 'big') != sum(d[:-2]) & 0xFFFF:
+                return None
+            r = lambda i: int.from_bytes(d[i:i + 2], 'big')
+            if (r(4), r(6), r(8), r(10)) != (SAVE_VERSION, self.hw('checksum'), self.hw('release'), self.hw('dynamic_len')):
+                return None
+            pc = (r(12) << 16) | r(14); self_ = r(16); i = 18
+            n = r(i); i += 2; stack = [s16(r(i + 2 * k)) for k in range(n)]; i += 2 * n
+            m = r(i); i += 2; frames = []
+            for _ in range(m):
+                ret = (r(i) << 16) | r(i + 2); h = r(i + 4); sf = r(i + 6); k = r(i + 8); i += 10
+                frames.append((None if ret == 0xFFFFFFFF else ret, [s16(r(i + 2 * j)) for j in range(k)], h, sf)); i += 2 * k
+            dyn = self.hw('dynamic_len'); area = bytearray(self.orig[:dyn]); p = 0
+            while d[i] != 0x7F:
+                c = d[i]; i += 1
+                if c < 0x7F:
+                    p += c + 1
+                else:
+                    for _ in range(c - 0x7F):
+                        area[p] ^= d[i]; i += 1; p += 1
+        except IndexError:
+            return None
+        self.img[:dyn] = area
+        self.stack[:] = stack; self.frames[:] = frames; self.self_ = self_
+        self.undo.clear()
+        return pc
 
     def run(self, max_steps=5_000_000):
         pc = self.call(self.hw('entry'), [], None)
@@ -413,7 +502,20 @@ class VM:
                 st[:] = stk; self.frames[:] = fr; self.self_ = sf
                 pc = upc
                 st.append(2)
-        elif name in ('SAVE', 'RESTORE'): push(0)    # M4 part 2
+        elif name == 'SAVE':
+            t = pop(); fname = self.text_arg(t)
+            data = self.save_bytes(pc)
+            self.put_file(fname, data)
+            push(1)
+        elif name == 'RESTORE':
+            t = pop(); fname = self.text_arg(t)
+            data = self.get_file(fname)
+            r = self.restore_bytes(data) if data is not None else None
+            if r is None:
+                push(0)
+            else:
+                pc = r
+                self.stack.append(2)
         elif name in ('PICTURE', 'SOUND'): self.write(f'[{name.lower()} {pop()}]')
         elif name == 'STATUS':
             mv = pop(); sc = pop(); r = pop()

@@ -42,10 +42,12 @@ def keys_for(line):
     out.append({S.key_pos('\r')})
     return out
 
-def play(image, lines, max_steps=400_000_000, hold=12_000, gap=12_000):
+def play(image, lines, max_steps=400_000_000, hold=12_000, gap=12_000, disk=None):
     cart, _ = build.engine_cart(image, 'TXA M2 TEST')
     sy = build.symbols(os.path.join(ROOT, 'build/engine.equ'))
     m = S.Machine(cart, f18a=True, pages=128); cpu = S.CPU(m)
+    if disk:
+        m.disk_dir = disk                      # the simulator's disk controller: files in disk/DSK1/
     cpu.pc = m.rw(m.rw(0x6006) + 2)
     queue = [k for line in lines for k in keys_for(line)]
     per_cmd, cmd_t0 = [], None
