@@ -55,6 +55,8 @@ def run(dsk_files, cmds, max_steps=150_000_000):
                 for _ in range(400_000):
                     cpu.step()
             return ''.join(outp), m, 'halt' if pc == sy['VMHALT'] else 'nofile'
+        if pc == sy['WKY1'] and not hold and steps >= free:      # a single-key wait (the title page, [MORE]): any key
+            m.held = keys_for(' ')[0]; hold = steps + 12_000
         if pc == sy['WK21'] and not hold and steps >= free:
             if not queue:
                 return ''.join(outp), m, 'waiting'
