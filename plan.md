@@ -400,8 +400,50 @@ Part 1 done (20 October 2026): UNDO.
 - tests: world4 (reference + 5 named checks); the engine plays it
   identically.
 
+Part 2 done (20 October 2026): SAVE and RESTORE.
+- SAVE(t) / RESTORE(t) take a file name in a text array; the library
+  asks "Save to which file? (Enter for SAVE1)"; on the TI a name with no
+  device gets DSK1. in front.
+- The save file (opcodes.py, "the save file"): magic TXS1, version,
+  story checksum and release, dynamic length, the PC and frames as story
+  addresses, the value stack, the dynamic area as XOR against the
+  story's original (run-length coded), a checksum.  The same bytes on
+  every engine: the test checks the TI's file is byte for byte the
+  Python VM's, and each VM restores the other's.
+- RESTORE reads the whole file once to check it (format, story,
+  release, sizes, checksum) before changing anything.
+- TI: src/disk.a99 (The Lantern Coast's DSRLNK and PAB call; the fast
+  block copied back and the sprite patterns zeroed after each call; the
+  VM registers kept), src/save.a99 (the file built straight into VRAM
+  at >2000, at most 23 sectors / 5888 bytes; a Lamplight save is 435).
+- Bugs found and fixed: a second ENTER while the game was busy was lost
+  (KEYFRE: a new line forgets the last key if none is down); the file
+  name pointer was clobbered by RDW; RESTORE's frame count was in a
+  scratch word VGETW uses; RESTORE reloaded the globals through a stale
+  data window (getting the story's starting values: the save test now
+  changes globals between saving and restoring).
+- tests/m4_save_test.py (7 checks).
+
+Part 3 done (20 October 2026): stories on disk, and the game writer.
+- tools/txa_game.py story.txa --prefix LAMP [--title] [--cart]: the
+  engine as E/A 5 files (LAMP1..3), the story as 4K PROGRAM files
+  (LAMPS01..), a DSSD disk image with all of them, and optionally the
+  cartridge.  Lamplight: 3 engine files, 8 story files, 189 sectors.
+- The engine (STMODE in gen/storysrc.a99) loads the story from
+  DSK1.<prefix>Snn into SAMS with "Loading" and a dot a file, then
+  checks the whole story's checksum; a missing file stops with its name.
+  Story files are 4K (not 8K) because a file passes through the 5888-byte
+  VRAM buffer.
+- build.py: write_storysrc() and assemble_engine() shared by the
+  cartridge build and the game writer.
+- tests/m4_disk_test.py (5 checks).
+- Still to do: the device the game was loaded from (now always DSK1).
+
 ## Next
 
+1. M4 part 4 (pictures) and part 5 (sound and music).
+
+## (was) Next
 1. M4: saving, restoring and UNDO (platform-independent save format;
    GSYNC/GLOAD around them; the scratchpad block after disk calls);
    loading stories from disk; pictures and sound (MUSIC/SOUND, silent

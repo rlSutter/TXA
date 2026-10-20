@@ -67,7 +67,12 @@ STR3   LI   R0,30              the screen
        JHE  STR4
        LI   R1,SNOSMS
        B    @FATAL
-STR4   BL   @LOADST            the story into SAMS
+STR4   MOV  @STMODE,R0         the story into SAMS: from the cartridge,
+       JNE  STR4A              or from disk files
+       BL   @LOADST
+       JMP  STR4B
+STR4A  BL   @LOADDK
+STR4B
        BL   @CHKST             header and checksum
        BL   @KEEPDY            the pristine dynamic area
        BL   @GLOAD             the globals into RAM
@@ -145,6 +150,94 @@ LDS2   MOV  *R0+,*R1+
        SETO @CURBH
        .leave
        RT
+
+* LOADDK - the story from disk: files STNAME01, STNAME02 ... (STNAME
+* from storysrc.a99, e.g. DSK1.LAMPS), 4K each, one SAMS page apiece,
+* through the file buffer in VRAM.  "Loading" and a dot a file on the
+* screen; a file that cannot be read stops with its name.
+LOADDK .enter
+       LI   R0,2
+       LI   R1,2
+       BL   @TXAT
+       LI   R1,SLOAD
+       CLR  R2
+       BL   @TXSTR
+       MOV  @STLENH,R0         files = (length + 4095) / 4096
+       MOV  @STLENL,R1
+       AI   R1,>0FFF
+       JNC  LDK0
+       INC  R0
+LDK0   SRL  R1,12
+       SLA  R0,4
+       SOC  R0,R1
+       MOV  R1,@VT1
+       CLR  @VT2               file index
+LDK1   LI   R1,STNAME          the name: STNAME and two digits
+       LI   R2,FNBUF
+       MOVB *R1,R3
+       SRL  R3,8
+       MOV  R3,R0
+       INC  R0
+LDK2   MOVB *R1+,*R2+
+       DEC  R0
+       JNE  LDK2
+       MOV  @VT2,R1            index + 1, in two digits
+       INC  R1
+       CLR  R0
+       DIV  @D10,R0
+       AI   R0,'0'
+       SWPB R0
+       MOVB R0,*R2+
+       AI   R1,'0'
+       SWPB R1
+       MOVB R1,*R2+
+       INCT R3
+       SWPB R3
+       MOVB R3,@FNBUF
+       LI   R0,5               the DSR's LOAD
+       LI   R1,DSKMAX
+       BL   @DSKCAL
+       MOV  R0,R0
+       JNE  LDK9
+       MOV  @VT2,R2            its page into window B ...
+       LI   R3,MAPRGB
+       BL   @MAPWIN
+       LI   R0,FBUF            ... and the 4K from VRAM into it
+       LI   R1,WINB
+       LI   R2,4096
+       BL   @VMBR
+       MOV  @VT2,R0            a dot for it
+       AI   R0,(2*COLS)+10
+       LI   R1,'.'*256
+       BL   @VSBW
+       INC  @VT2
+       C    @VT2,@VT1
+       JL   LDK1
+       BL   @SPRZER
+       SETO @CURBH
+       LI   R0,2               the loading line cleared
+       BL   @ECLR
+       .leave
+       RT
+LDK9   BL   @SPRZER            stop, naming the file
+       LI   R0,4
+       LI   R1,2
+       BL   @TXAT
+       LI   R1,SNOFIL
+       CLR  R2
+       BL   @TXSTR
+       LI   R1,FNBUF
+       CLR  R2
+       BL   @TXSTR
+       BL   @WAITKY
+       B    @QUIT
+SLOAD  BYTE SLOADX-SLOAD-1
+       TEXT 'Loading'
+SLOADX
+SNOFIL BYTE SNOFLX-SNOFIL-1
+       TEXT 'Cannot read the story file '
+SNOFLX
+       EVEN
 
 * CHKST - the header into HDRCPY, then check the magic and the
 * checksum (all bytes after the header, mod 65536).
