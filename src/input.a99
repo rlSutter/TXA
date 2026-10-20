@@ -9,8 +9,11 @@
 * splits it into array p.
 *
 * Editing keys: letters, digits, space and punctuation type; FCTN S
-* (left arrow) rubs out; ENTER ends.  The line holds what fits on the
-* screen row after the prompt.  A reverse-video cell is the cursor.
+* (left arrow) rubs out; FCTN E and FCTN X (up and down arrows) step
+* back and forward through the last 16 commands; ENTER ends.  The line
+* holds up to 160 characters, running from after the prompt onto the
+* next screen row (the window scrolls first if the prompt is on the
+* bottom row).  A reverse-video cell is the cursor.
 *
 * TOKENIZE t p follows opcodes.py exactly: words are runs of characters
 * other than space, comma and full stop; a comma or full stop is a word
@@ -88,6 +91,8 @@ KG29   .leave
 D6     DATA 6
 * modifier, key, result
 MODTAB DATA >1000,'S',8
+       DATA >1000,'E',11       FCTN E: the up arrow (history back)
+       DATA >1000,'X',12       FCTN X: the down arrow (history forward)
        DATA >1000,'I','?'
        DATA >1000,'O',>27
        DATA >1000,'P','"'
@@ -129,6 +134,17 @@ RDA2   MOV  @RDTARR,R14
 RDLINE .enter
        CLR  @MORECT            the player is reading: no [MORE] soon
        BL   @ROWFIT
+       MOV  @ROWS,R0           two rows for typing: scroll if the prompt
+       DEC  R0                 would be on the bottom row
+       C    @CROW,R0
+       JL   RDL00
+       BL   @WSCRL
+       DEC  @CROW
+RDL00  MOV  @CROW,R0           both rows blank
+       BL   @ECLR
+       MOV  @CROW,R0
+       INC  R0
+       BL   @ECLR
        MOV  @CROW,R0           the prompt, shown where the line will go
        MPY  @D80,R0
        MOV  R1,R14
@@ -142,10 +158,10 @@ RDLINE .enter
        LI   R1,ABUF
        MOV  @LLEN,R2
        BL   @VMBW
-RDL0   MOV  @LLEN,R0           typing starts after it
-       A    R14,R0
-       MOV  R0,@ICOL
-       LI   R0,COLS-1          the most that fits: the row, less a cell
+RDL0   MOV  @LLEN,R0           typing starts after it (and may run on
+       A    R14,R0             into the next row: the name table's rows
+       MOV  R0,@ICOL           follow each other)
+       LI   R0,2*COLS-1        the most that fits: two rows, less a cell
        S    @LLEN,R0           for the cursor ...
        MOV  @RDTARR,R14        ... and no more than the array holds
        BL   @ARRAY
@@ -159,11 +175,27 @@ RDL1   CI   R0,160
        LI   R0,160
 RDL1A  MOV  R0,@IMAX
        CLR  @ILEN
+       MOV  @HISCNT,@HISPOS    (the history's "now": a new, empty line)
        BL   @CURSON
 RDL2   BL   @WAITK2
        CI   R0,13
        JEQ  RDL6
-       CI   R0,8
+       CI   R0,11
+       JNE  RDL2A
+       MOV  @HISPOS,R0         up arrow: an older command
+       JEQ  RDL2
+       DEC  @HISPOS
+       BL   @SHOWHS
+       JMP  RDL2
+RDL2A  CI   R0,12
+       JNE  RDL2B
+       MOV  @HISPOS,R0         down arrow: a newer one, or the empty line
+       C    R0,@HISCNT
+       JHE  RDL2
+       INC  @HISPOS
+       BL   @SHOWHS
+       JMP  RDL2
+RDL2B  CI   R0,8
        JNE  RDL3
        MOV  @ILEN,R0           rub out
        JEQ  RDL2
@@ -193,6 +225,7 @@ RDL3   CI   R0,' '
        BL   @CURSON
        JMP  RDL2
 RDL6   BL   @CURSOF
+       BL   @SAVEHS            into the history
        CLR  @VT3               the line through CHOUT, then a new line
 RDL7   MOV  @VT3,R1
        C    R1,@ILEN
@@ -204,6 +237,91 @@ RDL7   MOV  @VT3,R1
        JMP  RDL7
 RDL8   LI   R0,10
        BL   @CHOUT
+       .leave
+       RT
+
+* ---- the command history ----------------------------------------------
+* HISMAX entries of HISLEN bytes in SAMS page HISPG, oldest first: a
+* length byte, then the characters.  Window D shows it while READ runs
+* (nothing prints a story string meanwhile; PRSTR maps D again itself).
+
+* MAPHS - window D onto the history page.  Uses R2, R3, R12.
+MAPHS  LI   R2,HISPG-STPAGE    (MAPWIN adds STPAGE)
+       LI   R3,MAPRGD
+       B    @MAPWIN
+
+* SAVEHS - the typed line (IBUF, ILEN) becomes the newest entry; when
+* the history is full the oldest goes.  Nothing is kept for an empty line.
+SAVEHS .enter
+       MOV  @ILEN,R0
+       JEQ  SVH9
+       BL   @MAPHS
+       C    @HISCNT,@DHMAX
+       JL   SVH2
+       LI   R0,WIND+HISLEN     full: entries 1.. down one place
+       LI   R1,WIND
+       LI   R2,(HISMAX-1)*HISLEN/2
+SVH1   MOV  *R0+,*R1+
+       DEC  R2
+       JNE  SVH1
+       DEC  @HISCNT
+SVH2   MOV  @HISCNT,R1         the entry's address
+       LI   R0,HISLEN
+       MPY  R0,R1              R1:R2 = HISCNT * HISLEN
+       AI   R2,WIND
+       MOV  @ILEN,R0
+       SWPB R0
+       MOVB R0,*R2+            length, then the characters
+       CLR  R1
+SVH3   MOVB @IBUF(R1),*R2+
+       INC  R1
+       C    R1,@ILEN
+       JL   SVH3
+       INC  @HISCNT
+SVH9   .leave
+       RT
+DHMAX  DATA HISMAX
+
+* SHOWHS - replace the line being typed with history entry HISPOS (or an
+* empty line when HISPOS = HISCNT).
+SHOWHS .enter
+       BL   @CURSOF            blank what is shown, and the cursor
+       MOV  @ICOL,R0
+       LI   R1,>2000
+       MOV  @ILEN,R2
+       INC  R2
+       BL   @VFILL
+       MOV  @ICOL,R0
+       AI   R0,ATRTAB
+       LI   R1,ATNORM*256
+       MOV  @ILEN,R2
+       INC  R2
+       BL   @VFILL
+       CLR  @ILEN
+       C    @HISPOS,@HISCNT
+       JHE  SHH8               the empty line
+       BL   @MAPHS
+       MOV  @HISPOS,R1
+       LI   R0,HISLEN
+       MPY  R0,R1
+       AI   R2,WIND
+       MOVB *R2+,R0            its length, no more than fits here
+       SRL  R0,8
+       C    R0,@IMAX
+       JLE  SHH1
+       MOV  @IMAX,R0
+SHH1   MOV  R0,@ILEN
+       JEQ  SHH8
+       CLR  R1
+SHH2   MOVB *R2+,@IBUF(R1)
+       INC  R1
+       C    R1,@ILEN
+       JL   SHH2
+       MOV  @ICOL,R0           onto the screen
+       LI   R1,IBUF
+       MOV  @ILEN,R2
+       BL   @VMBW
+SHH8   BL   @CURSON
        .leave
        RT
 

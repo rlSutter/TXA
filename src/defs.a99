@@ -93,9 +93,10 @@ NUMBUF EQU  RAMVAR+>40         8 bytes: number formatting
 ROWBUF EQU  RAMVAR+>80         80 bytes: one text row (scrolling)
 
 * ---- the story VM (engine) --------------------------------------------
-* SAMS pages: 0-15 the identity-mapped 32K and overlays; 16-27 the undo
-* ring (M4); 28-31 a pristine copy of the dynamic area (RESTART); 32 on,
-* the story image: story byte address a lives in page 32 + a/4096.
+* SAMS pages: 0-15 the identity-mapped 32K and overlays; 16-26 the undo
+* ring (M4); 27 the command history (READ); 28-31 a pristine copy of the
+* dynamic area (RESTART); 32 on, the story image: story byte address a
+* lives in page 32 + a/4096.
 STPAGE EQU  32                 first SAMS page of the story image
 PRPAGE EQU  28                 first page of the pristine dynamic copy
 MAPRGA EQU  AMSREG+>1C         mapper register of window >E000 (A: code)
@@ -208,3 +209,8 @@ STSCR  EQU  RAMVAR+>322        STATUS: the score (-1 = none)
 STMOV  EQU  RAMVAR+>324        STATUS: the moves
 STPTR  EQU  RAMVAR+>326        STATUS: the next free byte of STBUF
 STBUF  EQU  RAMVAR+>330        48 bytes: "Score: n  Moves: m", or a room name
+HISPG  EQU  27                 SAMS page of the command history (window D during READ)
+HISMAX EQU  16                 commands kept
+HISLEN EQU  162                bytes an entry: a length byte, 160 characters, a pad
+HISCNT EQU  RAMVAR+>340        commands in the history
+HISPOS EQU  RAMVAR+>342        the one being shown (HISCNT = the new line)

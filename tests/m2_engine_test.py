@@ -31,6 +31,10 @@ def keys_for(line):
     for ch in line:
         if ch == '\b':
             out.append({FCTN, S.key_pos('S')})
+        elif ch == '\x0b':                       # FCTN E: up arrow (history back)
+            out.append({FCTN, S.key_pos('E')})
+        elif ch == '\x0c':                       # FCTN X: down arrow (history forward)
+            out.append({FCTN, S.key_pos('X')})
         elif ch.isupper():
             out.append({SHIFT, S.key_pos(ch)})
         else:
@@ -94,6 +98,19 @@ if PNG:
 got, m, why, _ = play(img, ['take xx\b\btin LAMP', 'q'])
 check('rub out (FCTN S) and SHIFT: "take xx<-<-tin LAMP" reads as "take tin lamp"',
       '>take tin lamp\nTaken.' in got, got[-200:])
+
+# command history and the two-row line: the engine's transcript (typed
+# with arrows) must equal the Python VM's (given the recalled commands)
+def same_as(typed, meant, name):
+    want = run_image(img, meant + ['q', 'y'])
+    got, m, why, _ = play(img, typed + ['q', 'y'])
+    i = next((k for k in range(min(len(got), len(want))) if got[k] != want[k]), min(len(got), len(want)))
+    check(name, got == want and why == 'halt', f'{why} at {i}: {want[max(0,i-60):i+60]!r} / {got[max(0,i-60):i+60]!r}')
+same_as(['look', '\x0b'], ['look', 'look'], 'history: the up arrow brings back the last command')
+same_as(['i', 'x ada', '\x0b\x0b\x0c'], ['i', 'x ada', 'x ada'], 'history: up, up, down lands on the newer command')
+same_as(['i', 'look', '\x0b\x0b\x0c\x0c'], ['i', 'look', ''], 'history: down past the newest gives an empty line')
+long = 'take the tin lamp and the wooden box. look. open the wooden box. look in the box. x the oak table. i'
+same_as([long], [long], f'a {len(long)}-character command running onto a second row')
 
 # typing, seen on the screen before ENTER: the letters in normal colours,
 # only the cursor cell in reverse (a bug once left every typed letter in

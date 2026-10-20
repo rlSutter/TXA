@@ -219,9 +219,13 @@ Done (the TI side):
   the Python VM's exactly; plus a rub-out/SHIFT test.
 - demos/m2demo.txa, cartridge txa-m2demo8.bin: the test world, playable.
 
-**M2 is complete** apart from Rebecca's js99er check and timing, and
-two follow-ups: command history (FCTN E/X) and a 160-character, two-row
-input line (now: what fits on the row after the prompt).
+**M2 is complete.**  Its two follow-ups were done on 20 October 2026:
+command history (FCTN E and FCTN X, the up and down arrows, through the
+last 16 commands, kept in SAMS page 27 and shown through window D while
+READ runs) and a 160-character input line running onto a second row
+(the window scrolls first if the prompt is on the bottom row).  The
+undo ring is now pages 16-26.  m2_engine_test checks both against the
+Python VM.
 
 ## Engine speed work (19 October 2026)
 
@@ -411,6 +415,7 @@ text output, word wrap and [MORE]; bold and underline glyph sets.
 
 ## History
 
+- 2026-10-20 M2 follow-ups: command history (FCTN E/X) and the two-row, 160-character input line.
 - 2026-10-19 M3 complete: part 4, the sample game Lamplight; light-change descriptions; final score; parser speed with the full verb set.
 - 2026-10-19 M3 part 3: the verb set (73 verbs), QUIT/RESTART confirmation, REPLACE and EXTEND.
 - 2026-10-19 M3 part 2: doors, floating objects, locks and keys, containers in depth, inventory contents, EMPTY, ENTER/EXIT.
