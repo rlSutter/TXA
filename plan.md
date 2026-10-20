@@ -365,6 +365,9 @@ possible 25, in 47 turns."
 
 **M3 is complete.**
 
+(The happy-path Claude Doc linked below was deleted on 20 October 2026 at
+Rebecca's request: LAMPLIGHT-TESTING.md replaces it.)
+
 Fixed after Rebecca's report (19 October 2026; she confirmed the symptom: each
 letter in reverse video until ENTER): typed letters stayed in
 reverse video until ENTER (the cursor cell's colours were never reset
