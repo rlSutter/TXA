@@ -1,0 +1,24 @@
+! world4.txa - M4: UNDO.
+INCLUDE "DSK1.STDLIB"
+ROOM Yard "Yard"
+  DESC "A muddy yard. A barn is east."
+  HAS light
+  E Barn
+END
+ROOM Barn "Barn"
+  DESC "Straw and shadows."
+  HAS light
+  W Yard
+END
+OBJECT Egg "egg" IN Yard
+  NAME "egg"
+  HAS edible
+END
+OBJECT Pail "pail" IN Barn
+  NAME "pail" "bucket"
+  HAS container open
+END
+ROUTINE Initialise
+  location = Yard
+  max_score = 3
+END

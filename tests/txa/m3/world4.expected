@@ -1,0 +1,76 @@
+
+Yard
+A muddy yard. A barn is east.
+You can see an egg here.
+
+>undo
+You can't undo that.
+
+>take egg
+Taken.
+
+>i
+You are carrying:
+  an egg
+
+>undo
+[Previous turn undone.]
+
+>i
+You are carrying:
+  an egg
+
+>look
+Yard
+A muddy yard. A barn is east.
+
+>take egg
+You already have the egg.
+
+>e
+Barn
+Straw and shadows.
+You can see a pail here.
+
+>put egg in pail
+You put the egg into the pail.
+
+>eat egg
+You eat the egg. It does the job.
+
+>undo
+[Previous turn undone.]
+
+>look in pail
+In the pail you can see an egg.
+
+>undo
+[Previous turn undone.]
+
+>undo
+[Previous turn undone.]
+
+>look
+Barn
+Straw and shadows.
+You can see a pail here.
+
+>i
+You are carrying:
+  an egg
+
+>undo
+[Previous turn undone.]
+
+>undo
+[Previous turn undone.]
+
+>undo
+[Previous turn undone.]
+
+>score
+You have scored 0 out of a possible 3, in 4 turns.
+
+>q
+Do you really want to stop?
+> y

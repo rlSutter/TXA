@@ -979,15 +979,13 @@ OPQUIT B    @VMEND
 * PRPAGE on), the stacks emptied, Main called again.
 OPRST  BL   @PRISTN
        BL   @GLOAD             the globals again, from the restored area
+       BL   @UINIT             no undo across a restart
        B    @VMRUN
 OPSAVE CLR  *R6+               (saving and undo come in M4)
        B    @NEXT
 OPREST CLR  *R6+
        B    @NEXT
-OPUSAV CLR  *R6+
-       B    @NEXT
-OPUNDO CLR  *R6+
-       B    @NEXT
+* UNDOSAVE and UNDO are in undo.a99.
 * PICTURE and SOUND print a placeholder for now, as txvm.py does, so
 * the two VMs' transcripts agree until M4 makes them real.
 OPPIC  LI   R1,SPIC

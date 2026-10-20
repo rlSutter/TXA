@@ -20,7 +20,17 @@ ROUTINE Main
   ShowStatus()
   WHILE deadflag = 0
     IF ReadLine()
-      RunLine()
+      ! an undo snapshot before every command but UNDO itself; when UNDO
+      ! comes back here, UNDOSAVE gives 2 and the old command is not run
+      IF WordAt(0) = 'undo'
+        RunLine()
+      ELSEIF UNDOSAVE() = 2
+        PRINT "[Previous turn undone.]"
+        BuildScope()
+        ShowStatus()
+      ELSE
+        RunLine()
+      END
     END
   END
   IF deadflag = 1

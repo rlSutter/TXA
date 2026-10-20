@@ -71,6 +71,7 @@ STR4   BL   @LOADST            the story into SAMS
        BL   @CHKST             header and checksum
        BL   @KEEPDY            the pristine dynamic area
        BL   @GLOAD             the globals into RAM
+       BL   @UINIT             undo: LAST = the starting state, no records
        CLR  R0                 the status line: the title, in reverse
        LI   R1,1
        BL   @TXAT

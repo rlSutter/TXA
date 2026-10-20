@@ -80,10 +80,17 @@ check('SHOW both ways round goes to the character (LIFE)', after('show note to g
       == '"That\'s the note, that is," the gardener says.')
 check('REPLACE: the game\'s SingSub instead of the library\'s', after('sing') == 'You hum a tune the ferns seem to like.')
 check('EXTEND: a new grammar line on a library verb', after('smell the air') == 'Nothing smells out of the ordinary.')
-check('SAVE, RESTORE, UNDO fail honestly until M4', after('save') == 'Save failed.' and after('restore') == 'Restore failed.'
-      and after('undo') == "You can't undo that.")
+check('SAVE and RESTORE fail honestly until they arrive; UNDO works', after('save') == 'Save failed.' and after('restore') == 'Restore failed.'
+      and after('undo') == '[Previous turn undone.]')
 check('RESTART and QUIT ask first', after('restart', 3) == 'Do you really want to start again?\n> no\nCarrying on, then.'
       and after('quit', 3) == 'Do you really want to stop?\n> no\nCarrying on, then.')
+
+out, vm = play('world4')
+check('UNDO with nothing to undo', after('undo') == "You can't undo that.")
+check('UNDO takes back the last command only', after('undo', nth=2) == '[Previous turn undone.]' and '  an egg' in after('i', 2, nth=2))
+check('UNDO brings back an eaten egg (into the pail)', after('look in pail') == 'In the pail you can see an egg.')
+check('UNDO again goes further back', '  an egg' in after('i', 2, nth=3))
+check('turns are undone too', after('score') == 'You have scored 0 out of a possible 3, in 4 turns.')
 
 print('ALL PASS' if not fails else f'{fails} FAILED')
 sys.exit(1 if fails else 0)

@@ -33,6 +33,7 @@ class VM:
         self.self_ = 0
         self.steps = 0
         self.status = None
+        self.undo = []                # snapshots (no limit in the reference VM)
         h = self.hw
         self.objects, self.nobj = h('objects'), h('object_count')
         self.globals, self.arrays = h('globals'), h('arrays')
@@ -396,9 +397,23 @@ class VM:
         elif name == 'QUIT': raise Quit()
         elif name == 'RESTART':
             self.img[:self.hw('dynamic_len')] = self.orig[:self.hw('dynamic_len')]
-            self.stack.clear(); self.frames.clear(); self.self_ = 0
+            self.stack.clear(); self.frames.clear(); self.self_ = 0; self.undo.clear()
             pc = self.call(self.hw('entry'), [], None)
-        elif name in ('SAVE', 'RESTORE', 'UNDOSAVE', 'UNDO'): push(0)    # M4
+        elif name == 'UNDOSAVE':
+            import copy
+            dyn = self.hw('dynamic_len')
+            self.undo.append((bytes(self.img[:dyn]), list(st), copy.deepcopy(self.frames), pc, self.self_))
+            push(1)
+        elif name == 'UNDO':
+            if not self.undo:
+                push(0)
+            else:
+                d, stk, fr, upc, sf = self.undo.pop()
+                self.img[:len(d)] = d
+                st[:] = stk; self.frames[:] = fr; self.self_ = sf
+                pc = upc
+                st.append(2)
+        elif name in ('SAVE', 'RESTORE'): push(0)    # M4 part 2
         elif name in ('PICTURE', 'SOUND'): self.write(f'[{name.lower()} {pop()}]')
         elif name == 'STATUS':
             mv = pop(); sc = pop(); r = pop()

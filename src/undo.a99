@@ -1,0 +1,324 @@
+*======================================================================
+* undo.a99 - UNDOSAVE and UNDO.
+*
+* Pages UNDLST.. (four, 16K) hold LAST: the dynamic area as it was at
+* the newest snapshot.  Pages UNDRNG.. (seven, 28K) hold the records,
+* one per snapshot, back to back; URECS says where each starts.  A
+* record:
+*   word  R4 (the PC in window A)     word  R5 (its page)
+*   word  bytes of value stack        word  R7 (frame pointer)
+*   word  R8 (SELF)                   word  bytes of frames
+*   the value stack, the frames
+*   the difference: (this snapshot's dynamic area) XOR (the previous
+*   one's), run-length coded:
+*     >00->7E  n: n+1 bytes that did not change (skip them)
+*     >7F      the end
+*     >80->FF  n: n->7F changed bytes follow (1-128), XOR values
+*
+* UNDOSAVE: write the record (the difference against LAST, making LAST
+* the current state as it goes).  UNDO: the dynamic area = LAST; then
+* LAST = LAST XOR the newest record's difference, which is the snapshot
+* before; the stacks and registers come from the record; that record is
+* dropped.  So UNDO after UNDO goes back a step further.
+*
+* When the records would not fit (28K) or 128 are kept, they start again
+* with this one: UNDO then has one step until more are taken.
+*
+* Windows during the work: A shows a dynamic-area page, B the matching
+* LAST page, D a record page.  Afterwards A is put back on the PC's page
+* and B marked unknown (CURBH); D is left (PRSTR maps it itself).
+* Globals: GSYNC before (they live in RAM), GLOAD after an UNDO.
+*======================================================================
+
+* ---- the record pages ------------------------------------------------------
+* RGPUT - write R0's low byte at UDOFF; RGGET - R0 = the byte at UDOFF.
+* Both advance UDOFF.  Use R0-R3, R12.
+RGMAP  MOV  @UDOFF,R1
+       SRL  R1,12              the record page for UDOFF
+       C    R1,@URPG
+       JEQ  RGM9
+       MOV  R1,@URPG
+       MOV  R1,R2
+       AI   R2,UNDRNG-STPAGE
+       LI   R3,MAPRGD
+       B    @MAPWIN
+RGM9   RT
+RGPUT  .enter
+       MOV  R0,@UTMP
+       BL   @RGMAP
+       MOV  @UDOFF,R1
+       ANDI R1,>0FFF
+       MOV  @UTMP,R0
+       SWPB R0
+       MOVB R0,@WIND(R1)
+       INC  @UDOFF
+       .leave
+       RT
+RGGET  .enter
+       BL   @RGMAP
+       MOV  @UDOFF,R1
+       ANDI R1,>0FFF
+       MOVB @WIND(R1),R0
+       SRL  R0,8
+       INC  @UDOFF
+       .leave
+       RT
+* RGPUTW / RGGETW - a word (high byte first) from or to R0.
+RGPUTW .enter
+       MOV  R0,@UTMP2
+       SRL  R0,8
+       BL   @RGPUT
+       MOV  @UTMP2,R0
+       BL   @RGPUT
+       .leave
+       RT
+RGGETW .enter
+       BL   @RGGET
+       SWPB R0
+       MOV  R0,@UTMP2
+       BL   @RGGET
+       SOC  @UTMP2,R0
+       .leave
+       RT
+
+* UPMAP - windows A and B onto the dynamic-area page and LAST page that
+* hold byte UPOS; R1 = UPOS's offset in the page.  Uses R0-R3, R12.
+UPMAP  .enter
+       MOV  @UPOS,R1
+       SRL  R1,12
+       C    R1,@UPAGE
+       JEQ  UPM1
+       MOV  R1,@UPAGE
+       MOV  R1,R2              A: the story's page
+       LI   R3,MAPRGA
+       BL   @MAPWIN
+       MOV  @UPAGE,R2          B: LAST's page
+       AI   R2,UNDLST-STPAGE
+       LI   R3,MAPRGB
+       BL   @MAPWIN
+UPM1   MOV  @UPOS,R1
+       ANDI R1,>0FFF
+       .leave
+       RT
+
+* ---- UNDOSAVE ---------------------------------------------------------------
+OPUSAV BL   @GSYNC             the globals into the dynamic area
+       MOV  @UCNT,R0           start again if full: 128 records, or not
+       CI   R0,128             enough room for the worst case (header,
+       JHE  USV0               stacks, every byte changed: dyn + dyn/128)
+       MOV  R6,R0
+       AI   R0,-VSTK
+       A    @FREND,R0
+       AI   R0,-FRAMES+16
+       A    @H.DYN,R0
+       MOV  @H.DYN,R1
+       SRL  R1,7
+       A    R1,R0
+       INCT R0
+       A    @UTOP,R0
+       JOC  USV0               (past 64K: certainly too big)
+       CI   R0,UNDMAX
+       JLE  USV1
+USV0   CLR  @UCNT
+       CLR  @UTOP
+USV1   MOV  @UCNT,R1           this record starts at UTOP
+       SLA  R1,1
+       MOV  @UTOP,@URECS(R1)
+       MOV  @UTOP,@UDOFF
+       SETO @URPG
+       MOV  R4,R0              the header
+       BL   @RGPUTW
+       MOV  R5,R0
+       BL   @RGPUTW
+       MOV  R6,R0
+       AI   R0,-VSTK
+       BL   @RGPUTW
+       MOV  R7,R0
+       BL   @RGPUTW
+       MOV  R8,R0
+       BL   @RGPUTW
+       MOV  @FREND,R0
+       AI   R0,-FRAMES
+       BL   @RGPUTW
+       LI   R14,VSTK           the value stack, then the frames
+USV2   C    R14,R6
+       JHE  USV3
+       MOVB *R14+,R0
+       SRL  R0,8
+       BL   @RGPUT
+       JMP  USV2
+USV3   LI   R14,FRAMES
+USV4   C    R14,@FREND
+       JHE  USV5
+       MOVB *R14+,R0
+       SRL  R0,8
+       BL   @RGPUT
+       JMP  USV4
+USV5   CLR  @UPOS              the difference, byte by byte
+       SETO @UPAGE
+       CLR  @UZRUN
+       CLR  @ULITN
+USV6   C    @UPOS,@H.DYN
+       JHE  USV9
+       BL   @UPMAP
+       MOVB @WINA(R1),R0       now
+       MOVB @WINB(R1),R2       then (LAST)
+       MOVB R0,@WINB(R1)       LAST becomes now
+       XOR  R2,R0              (high bytes; the low halves don't matter)
+       SRL  R0,8
+       JNE  USV7
+       BL   @ULFLSH            unchanged: literals out, count the skip
+       INC  @UZRUN
+       MOV  @UZRUN,R0
+       CI   R0,127
+       JL   USV8
+       LI   R0,126             127 unchanged bytes: write the skip
+       BL   @RGPUT
+       CLR  @UZRUN
+       JMP  USV8
+USV7   MOV  R0,@UTMP2          changed: any skip out, keep the literal
+       BL   @UZFLSH
+       MOV  @ULITN,R1
+       MOV  @UTMP2,R0
+       SWPB R0
+       MOVB R0,@ULIT(R1)
+       INC  @ULITN
+       CI   R1,111
+       JL   USV8
+       BL   @ULFLSH            112 waiting (ULIT is full): write them
+USV8   INC  @UPOS
+       JMP  USV6
+USV9   BL   @UZFLSH            the rest, and the end
+       BL   @ULFLSH
+       LI   R0,>7F
+       BL   @RGPUT
+       MOV  @UDOFF,@UTOP
+       INC  @UCNT
+       BL   @UNDONE            windows back
+       LI   R0,1
+       MOV  R0,*R6+
+       B    @NEXT
+
+* UZFLSH - write a waiting skip.  ULFLSH - write waiting literals.
+UZFLSH .enter
+       MOV  @UZRUN,R0
+       JEQ  UZF9
+       DEC  R0
+       BL   @RGPUT
+       CLR  @UZRUN
+UZF9   .leave
+       RT
+ULFLSH .enter
+       MOV  @ULITN,R0
+       JEQ  ULF9
+       AI   R0,>7F
+       BL   @RGPUT
+       CLR  @UTMP2
+ULF1   MOV  @UTMP2,R1
+       MOVB @ULIT(R1),R0
+       SRL  R0,8
+       BL   @RGPUT
+       INC  @UTMP2
+       C    @UTMP2,@ULITN
+       JL   ULF1
+       CLR  @ULITN
+ULF9   .leave
+       RT
+
+* UNDONE - window A back on the PC's page; window B unknown.
+UNDONE MOV  R5,R2
+       LI   R3,MAPRGA
+       SETO @CURBH
+       B    @MAPWIN
+
+* ---- UNDO -------------------------------------------------------------------
+OPUNDO MOV  @UCNT,R0
+       JNE  UND1
+       CLR  *R6+               nothing to go back to: 0
+       B    @NEXT
+UND1   DEC  @UCNT
+       MOV  @UCNT,R1
+       SLA  R1,1
+       MOV  @URECS(R1),@UDOFF
+       MOV  @UDOFF,@UTOP       (its space is free again)
+       SETO @URPG
+       BL   @RGGETW            the header
+       MOV  R0,R4
+       BL   @RGGETW
+       MOV  R0,R5
+       BL   @RGGETW
+       MOV  R0,R6
+       AI   R6,VSTK
+       BL   @RGGETW
+       MOV  R0,R7
+       BL   @RGGETW
+       MOV  R0,R8
+       BL   @RGGETW
+       AI   R0,FRAMES
+       MOV  R0,@FREND
+       LI   R14,VSTK           the value stack, then the frames
+UND2   C    R14,R6
+       JHE  UND3
+       BL   @RGGET
+       SWPB R0
+       MOVB R0,*R14+
+       JMP  UND2
+UND3   LI   R14,FRAMES
+UND4   C    R14,@FREND
+       JHE  UND5
+       BL   @RGGET
+       SWPB R0
+       MOVB R0,*R14+
+       JMP  UND4
+UND5   CLR  @UPOS              the dynamic area = LAST, page by page
+       SETO @UPAGE
+UND6   C    @UPOS,@H.DYN
+       JHE  UND7
+       BL   @UPMAP
+       MOVB @WINB(R1),@WINA(R1)
+       INC  @UPOS
+       JMP  UND6
+UND7   CLR  @UPOS              LAST = LAST XOR the difference
+UND8   BL   @RGGET
+       CI   R0,>7F
+       JEQ  UND11
+       JH   UND9
+       INC  R0                 a skip of n+1
+       A    R0,@UPOS
+       JMP  UND8
+UND9   AI   R0,->7F            n->7F changed bytes
+       MOV  R0,R15
+UND10  BL   @RGGET
+       MOV  R0,@UTMP2
+       BL   @UPMAP
+       MOV  @UTMP2,R0
+       SWPB R0
+       MOVB @WINB(R1),R2
+       XOR  R0,R2
+       MOVB R2,@WINB(R1)
+       INC  @UPOS
+       DEC  R15
+       JNE  UND10
+       JMP  UND8
+UND11  BL   @UNDONE            windows back
+       BL   @GLOAD             the globals from the restored area
+       LI   R0,2               UNDOSAVE's result, the second time
+       MOV  R0,*R6+
+       B    @NEXT
+
+* UINIT - LAST = the dynamic area as the story starts (after loading),
+* and no records.  Also after RESTART and RESTORE.
+UINIT  .enter
+       CLR  @UCNT
+       CLR  @UTOP
+       CLR  @UPOS
+       SETO @UPAGE
+UIN1   C    @UPOS,@H.DYN
+       JHE  UIN2
+       BL   @UPMAP
+       MOVB @WINA(R1),@WINB(R1)
+       INC  @UPOS
+       JMP  UIN1
+UIN2   SETO @CURBH
+       .leave
+       RT

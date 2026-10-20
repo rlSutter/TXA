@@ -214,3 +214,19 @@ HISMAX EQU  16                 commands kept
 HISLEN EQU  162                bytes an entry: a length byte, 160 characters, a pad
 HISCNT EQU  RAMVAR+>360        commands in the history (not >340: inside STBUF)
 HISPOS EQU  RAMVAR+>362        the one being shown (HISCNT = the new line)
+* ---- UNDO (undo.a99) -----------------------------------------------------
+UNDLST EQU  16                 SAMS pages 16-19: the state at the newest snapshot
+UNDRNG EQU  20                 pages 20-26: the snapshots' records
+UNDMAX EQU  7*4096             bytes of records
+UCNT   EQU  RAMVAR+>370        snapshots kept
+UTOP   EQU  RAMVAR+>372        the first free byte of the records
+UDOFF  EQU  RAMVAR+>374        the record byte being read or written
+URPG   EQU  RAMVAR+>376        the record page window D shows (-1 none)
+UPOS   EQU  RAMVAR+>378        the dynamic-area byte being encoded or applied
+UZRUN  EQU  RAMVAR+>37A        zero bytes waiting to be written as a skip
+ULITN  EQU  RAMVAR+>37C        literal bytes waiting in ULIT
+UPAGE  EQU  RAMVAR+>37E        the dynamic-area page mapped (-1 none)
+UTMP   EQU  RAMVAR+>380        scratch
+UTMP2  EQU  RAMVAR+>382        scratch
+ULIT   EQU  RAMVAR+>390        112 bytes: literal bytes waiting (written in runs of up to 112)
+URECS  EQU  RAMVAR+>5E0        256 bytes: where each snapshot's record starts (128 words)

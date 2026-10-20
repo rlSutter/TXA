@@ -372,6 +372,34 @@ when a letter replaced it).  m2_engine_test now checks the screen
 mid-typing.  The happy-path test for lamplight8.bin is a Claude Doc:
 https://claude.ai/code/artifact/271a225f-12cf-4e70-9503-129083f04dec
 
+## M4: under way
+
+Parts: 1 UNDO; 2 SAVE and RESTORE; 3 stories on disk and the game
+writer; 4 pictures; 5 sound and music.
+
+Fixed first (20 October 2026): the command history's counters sat
+inside the status-line buffer, so a long status line ("Score: 10
+Moves: 23") corrupted them.  Moved, and build.py now refuses to build if
+any two RAM variables overlap (sizes from the "N bytes" in their
+comments); it caught a second overlap at once (UNDO's literal buffer).
+Regression test in sample_test.
+
+Part 1 done (20 October 2026): UNDO.
+- Opcodes: UNDOSAVE pushes 1, or 2 when an UNDO comes back to it; UNDO
+  goes back to the newest snapshot and removes it, or pushes 0.
+- Library: a snapshot after reading every command but UNDO itself; when
+  UNDO comes back, "[Previous turn undone.]" and the old command is not
+  run.  UNDO again goes further back.
+- TI (src/undo.a99): LAST (pages 16-19) holds the dynamic area at the
+  newest snapshot; records (pages 20-26, 28K) hold the stacks, registers
+  and the XOR difference from the snapshot before, run-length coded.
+  UNDO: dynamic area = LAST, then LAST ^= the record's difference.  128
+  records or a full 28K start the records again.  GSYNC before, GLOAD
+  after.  RESTART clears them.
+- The Python VM keeps full snapshots, unlimited.
+- tests: world4 (reference + 5 named checks); the engine plays it
+  identically.
+
 ## Next
 
 1. M4: saving, restoring and UNDO (platform-independent save format;
