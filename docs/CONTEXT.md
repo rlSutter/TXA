@@ -4,7 +4,16 @@ Read this first. `plan.md` has status, open decisions and history; the
 specification is the Claude Doc
 https://claude.ai/code/artifact/43a54522-f42d-42ed-b2c7-bf348e97a95d
 (container id `43a54522-f42d-42ed-b2c7-bf348e97a95d`, root node
-`5fb8447c-6c85`).
+`5fb8447c-6c85`).  The Authoring Language Reference is the Claude Doc
+https://claude.ai/artifact/FdxcHQseUMuCM6etTi4BzW (doc id
+`7688fc9f-8239-4683-9bc0-3fa3dc6e24f7`, body node `c67c40d5-298f`):
+keep it current when the language changes.
+
+**State (20 October 2026, checkpoint-m4b):** M0-M3 complete; M4 parts 1-3
+done (UNDO, SAVE/RESTORE with a portable save format, stories on disk and
+the game writer `tools/txa_game.py`), plus a title page.  Next: M4 part 4
+(pictures) and part 5 (sound and music).  The sample game is
+`samples/lamplight.txa`; Rebecca tests it from `LAMPLIGHT-TESTING.md`.
 
 ## What it is
 
@@ -23,9 +32,10 @@ owns it; Claude builds it. The engine comes first; the story later.
 | Assembler | xdt99 at `/home/claude/xdt99` (commit a77bd31); `git clone https://github.com/endlos99/xdt99` |
 | Kernel origin | The Lantern Coast 1.13 (`TheLanternCoast-1_13.bundle`, Rebecca's upload) |
 | Build | `python3 tools/build.py` |
-| Tests | `tests/m0_test.py`, `txc_parse_test.py`, `txc_sema_test.py`, `txc_run_test.py`, `m1_vm_test.py` (each prints PASS/FAIL lines and ALL PASS) |
-| Outputs | `/mnt/user-data/outputs/txa/` (checkpoint: `checkpoint-m2/`) |
-| Library | `lib/`: stdlib.txa (Main), libdefs.txa, parser.txa, verbs.txa |
+| Tests | see "Restoring in a new session" (each prints PASS/FAIL lines and ALL PASS) |
+| Outputs | `/mnt/user-data/outputs/txa/` (latest checkpoint: `checkpoint-m4b/`) |
+| Library | `lib/`: stdlib.txa (Main), libdefs.txa, parser.txa, verbs.txa, verbs2.txa, turn.txa |
+| A game for the TI | `python3 tools/txa_game.py story.txa --prefix NAME [--title T] [--cart]` |
 
 ## Source map
 
@@ -48,7 +58,13 @@ owns it; Claude builds it. The engine comes first; the story later.
 | `tests/txa/` | test programs and `lib/stdlib.txa`, a stand-in standard library |
 | `src/fast.a99` | the scratchpad block (copied to >8320 at START): NEXT, FB, FW, RDW, WRW, RDB, WRB |
 | `tests/bench_engine.py` | instruction counts and time estimates per command (appends to build/bench.txt) |
-| `src/input.a99` | line editor, KEYGT2, READ, TOKENIZE (+LOOKUP), ALOADV/ASTOREV/HASATTRV/FRESH, ISNAME, FILTERN |
+| `src/input.a99` | line editor (two rows, 160 chars, FCTN E/X history in SAMS page 27, KEYFRE), KEYGT2, READ, TOKENIZE (+LOOKUP), ALOADV/ASTOREV/HASATTRV/FRESH, ISNAME, FILTERN, ACOPY |
+| `src/undo.a99` | UNDOSAVE/UNDO: LAST in SAMS pages 16-19, XOR/RLE records in pages 20-26; PGCOPY; UPMAP (window B base in UBBASE) |
+| `src/disk.a99` | DSKCAL (PAB at >37A0, file buffer FBUF >2000) and Lantern's DSRLNK; SPRZER |
+| `src/save.a99` | SAVE/RESTORE: the portable save file built in and read from VRAM; FNAME (DSK1. prefix) |
+| `tools/txa_game.py` | the game writer: E/A 5 engine files, 4K story files, disk image, optional cartridge |
+| `samples/lamplight.txa` | the sample game, its walkthrough (.walk) and reviewed transcript (.expected) |
+| `tests/m4_save_test.py`, `tests/m4_disk_test.py` | SAVE/RESTORE cross-checks (identical save files from both VMs); the game writer and loading from disk |
 | `demos/m1demo.txa`, `demos/m2demo.txa` | the demonstration stories |
 | `lib/` | the standard library in TXA: stdlib (Main), libdefs, parser, verbs, turn (end of turn, daemons, timers, scoring, status) |
 | `samples/lamplight.txa` | "Lamplight", the sample game, with its walkthrough (.walk) and reviewed transcript (.expected) |
@@ -63,16 +79,19 @@ owns it; Claude builds it. The engine comes first; the story later.
 
 ## Restoring in a new session
 
-1. Ask Rebecca to upload `txa-checkpoint-m2.bundle` (or `txa-latest.bundle`).
+1. Ask Rebecca to upload `txa-checkpoint-m4b.bundle` (or `txa-latest.bundle`).
 2. `cd /home/claude && git clone <bundle> txa`
 3. `git clone https://github.com/endlos99/xdt99` next to it (tested at commit a77bd31).
 4. `cd txa && python3 tools/build.py` and run the tests (each ends ALL PASS):
    `tests/m0_test.py`, `txc_parse_test.py`, `txc_sema_test.py`,
    `txc_run_test.py`, `m2_parser_test.py`, `m3_world_test.py`,
    `sample_test.py --quick`; the slow engine ones, `m1_vm_test.py`,
-   `m2_engine_test.py`, `m3_engine_test.py`, `sample_test.py`, run 1-3 minutes each (start
-   them in the background with output to a file: the tool stops any
-   command after 300 s).
+   `m2_engine_test.py`, `m3_engine_test.py`, `sample_test.py`,
+   `m4_save_test.py`, `m4_disk_test.py`, run 1-4 minutes each.  Start each
+   in the background with output to a file and collect it in a later
+   call: the tool stops any command after 300 s.  Run them one after
+   another, never two at once, and never build anything while they run
+   (they share build/ and src/gen/).
 5. Read `plan.md` (status, decisions, next) and the spec Claude Doc.
 
 ## Conventions
@@ -85,6 +104,21 @@ owns it; Claude builds it. The engine comes first; the story later.
   and never claim a fix that was only reasoned.
 
 ## Things learned the hard way
+
+- RAM variables: build.py refuses to build if two in defs.a99 overlap;
+  a variable's size is the "N bytes" (or "N words") in its comment, so
+  every buffer must say its size.  It has caught four real overlaps.
+- Anything that maps SAMS windows A or B itself (UPMAP, PGCOPY, MAPWIN)
+  must SETO CURBH (UNDONE does) before RDW/WRW/GLOAD are used again:
+  RESTORE once reloaded the globals through a stale window B.
+- KEYGT2 reports a key only when it differs from the last one seen, and
+  nothing scans while the game is busy: KEYFRE at the start of each line
+  forgets the last key if none is down (a second ENTER was being lost).
+- In TXA, 'x' is a dictionary word, not a character: character codes are
+  numbers (the library's default save name is 115, 97, 118, 101, 49).
+- Cost per command matters: the UNDO snapshot once took about 2 s a
+  command (byte at a time); measure with sample_test's estimate after
+  any change to the per-command path.
 
 - xas99 reads commas and parentheses in a DATA line's comment as
   operands, and a comment starting with "..." as an expression: keep

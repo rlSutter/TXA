@@ -24,3 +24,12 @@ Outputs: `build/txaprobe8.bin` (FinalGROM cartridge), `build/txaprobe.dsk`
 
 MIT (proposed, matching The Lantern Coast; see the spec's open questions).
 The font is X11 misc-fixed 5x8, public domain.
+
+## Making a game for the TI
+
+    python3 tools/txa_game.py samples/lamplight.txa --prefix LAMP --title LAMPLIGHT --cart
+
+writes the engine as E/A option 5 files (LAMP1..), the story as 4K files
+(LAMPS01..), a disk image, and a FinalGROM cartridge, in build/game/lamp/.
+The language is described in the Authoring Language Reference (a Claude
+Doc: see docs/CONTEXT.md).
