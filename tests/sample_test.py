@@ -49,6 +49,14 @@ if '--quick' not in sys.argv:
         print(f'      engine time per command (estimate): median {secs[len(secs)//2]:.1f}s, worst {secs[-1]:.1f}s')
     if '--png' in sys.argv:
         g['R'].render(m, os.path.join(ROOT, 'build/shots/lamplight-end.png'))
+    # the command history with a long status line ("Score: 5  Moves: 7"):
+    # the status buffer once overlapped the history's counters
+    typed = ['n', 'u', 'take spectacles', 'd', 'give spectacles to brannock', 'i', '\x0b', 'q', 'y']
+    meant = ['n', 'u', 'take spectacles', 'd', 'give spectacles to brannock', 'i', 'i', 'q', 'y']
+    want2 = txvm.VM(img, meant).run()
+    got2, m2, why2, _ = g['play'](img, typed)
+    check('history after the score appears on the status line', got2 == want2 and why2 == 'halt',
+          f'{why2}: {got2[-200:]!r}')
 
 print('ALL PASS' if not fails else f'{fails} FAILED')
 sys.exit(1 if fails else 0)

@@ -212,5 +212,5 @@ STBUF  EQU  RAMVAR+>330        48 bytes: "Score: n  Moves: m", or a room name
 HISPG  EQU  27                 SAMS page of the command history (window D during READ)
 HISMAX EQU  16                 commands kept
 HISLEN EQU  162                bytes an entry: a length byte, 160 characters, a pad
-HISCNT EQU  RAMVAR+>340        commands in the history
-HISPOS EQU  RAMVAR+>342        the one being shown (HISCNT = the new line)
+HISCNT EQU  RAMVAR+>360        commands in the history (not >340: inside STBUF)
+HISPOS EQU  RAMVAR+>362        the one being shown (HISCNT = the new line)
