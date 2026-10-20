@@ -466,6 +466,13 @@ revealing a box of matches."), Infocom-style; the matches had the same
 problem.  Rule for game text, worth putting in the authoring manual:
 every object a player needs must be named in text they can see.
 
+Authoring Language Reference written (20 October 2026), a Claude Doc:
+https://claude.ai/artifact/FdxcHQseUMuCM6etTi4BzW  (built from the
+compiler and library source; its examples and compiler messages were run;
+keep it current as the language changes).  Not yet covered there:
+scope=Routine supplying out-of-scope objects (not implemented: it only
+filters, like noun=Routine).
+
 ## Next
 
 1. M4 part 4 (pictures) and part 5 (sound and music).
