@@ -361,6 +361,12 @@ possible 25, in 47 turns."
 
 **M3 is complete.**
 
+Fixed after Rebecca's report (19 October 2026): typed letters stayed in
+reverse video until ENTER (the cursor cell's colours were never reset
+when a letter replaced it).  m2_engine_test now checks the screen
+mid-typing.  The happy-path test for lamplight8.bin is a Claude Doc:
+https://claude.ai/code/artifact/271a225f-12cf-4e70-9503-129083f04dec
+
 ## Next
 
 1. M4: saving, restoring and UNDO (platform-independent save format;
