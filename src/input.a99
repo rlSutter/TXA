@@ -181,8 +181,13 @@ RDL3   CI   R0,' '
        SWPB R0
        MOVB R0,@IBUF(R1)
        MOV  R0,R1              the character on the screen, in place of
-       MOV  @ICOL,R0           the cursor
+       MOV  @ICOL,R0           the cursor ...
        A    @ILEN,R0
+       BL   @VSBW
+       MOV  @ICOL,R0           ... and that cell back to normal colours:
+       A    @ILEN,R0           it was the cursor's reverse video (VSBW
+       AI   R0,ATRTAB          changed R0, so work the address out again)
+       LI   R1,ATNORM*256
        BL   @VSBW
        INC  @ILEN
        BL   @CURSON

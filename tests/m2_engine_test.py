@@ -95,5 +95,33 @@ got, m, why, _ = play(img, ['take xx\b\btin LAMP', 'q'])
 check('rub out (FCTN S) and SHIFT: "take xx<-<-tin LAMP" reads as "take tin lamp"',
       '>take tin lamp\nTaken.' in got, got[-200:])
 
+# typing, seen on the screen before ENTER: the letters in normal colours,
+# only the cursor cell in reverse (a bug once left every typed letter in
+# reverse video, the cursor's colours, until ENTER rewrote the line)
+def typed_screen(image, partial):
+    cart, _ = build.engine_cart(image, 'TXA M2 TEST')
+    sy = build.symbols(os.path.join(ROOT, 'build/engine.equ'))
+    m = S.Machine(cart, f18a=True, pages=128); cpu = S.CPU(m)
+    cpu.pc = m.rw(m.rw(0x6006) + 2)
+    queue = keys_for(partial)[:-1]                 # no ENTER
+    steps, hold_until, free_until = 0, 0, 0
+    while steps < 20_000_000:
+        pc = cpu.pc
+        if pc == sy['WK21'] and not hold_until and steps >= free_until:
+            if not queue:
+                break
+            m.held = queue.pop(0); hold_until = steps + 12_000
+        if hold_until and steps >= hold_until:
+            m.held = None; hold_until = 0; free_until = steps + 12_000
+        cpu.step(); steps += 1
+    return m, sy
+m2, sy = typed_screen(img, 'take lamp')
+rows = R.screen(m2).splitlines()
+r = next(i for i in range(len(rows) - 1, 0, -1) if rows[i].startswith('>take lamp'))
+att = R.attrs(m2, r)
+check('typing: letters in normal colours, the cursor alone in reverse',
+      all(a == 0xE1 for a in att[:10]) and att[10] == 0x1E and all(a == 0xE1 for a in att[11:]),
+      ' '.join(f'{a:02X}' for a in att[:14]))
+
 print('ALL PASS' if not fails else f'{fails} FAILED')
 sys.exit(1 if fails else 0)
