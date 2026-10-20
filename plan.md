@@ -454,6 +454,15 @@ UINIT and RESTORE: Lamplight's estimate 3.3 s -> 1.6 s a command (1.2 s
 before UNDO; the rest is the stacks and globals copied a byte at a time
 into each snapshot: room to tighten later).
 
+From Rebecca's play-testing (20 October 2026): the cave's float was
+never named ("Something round and green gleams ..."), so a player had
+no word for it.  Now named in its INITIAL text, with "green", "round",
+"thing", "something" as names, and examinable stones that point to it.
+Library: OPEN now reveals what a container held ("You open the drawer,
+revealing a box of matches."), Infocom-style; the matches had the same
+problem.  Rule for game text, worth putting in the authoring manual:
+every object a player needs must be named in text they can see.
+
 ## Next
 
 1. M4 part 4 (pictures) and part 5 (sound and music).

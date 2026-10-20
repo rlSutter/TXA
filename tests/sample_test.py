@@ -30,7 +30,8 @@ check(f'walkthrough = the reviewed transcript ({len(walk)} commands)', out == wa
 check('the game is won with full marks', '*** You have won ***' in out and 'you scored 25 out of a possible 25' in out)
 check('the tide floods and uncovers the causeway', "The causeway is under water. You'll have to wait for the tide." in out
       and 'The tide draws back' in out)
-check('light arriving in the dark cave describes it', 'You switch the storm lantern on.\n\nSea Cave' in out)
+check('light arriving in the dark cave describes it, naming the float', 'You switch the storm lantern on.\n\nSea Cave' in out
+      and 'A glass float, round and green, gleams among the stones.' in out)
 check('no compiler warnings', info['program'].warnings == [], info['program'].warnings)
 print(f'      story image {len(img)} bytes')
 

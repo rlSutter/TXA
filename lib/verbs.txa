@@ -251,6 +251,16 @@ ROUTINE DescribeContents o
   PRINT "."
 END
 
+ROUTINE HasListable o
+  LOCAL c
+  FOR EACH c IN o
+    IF Listable(c)
+      RETURN TRUE
+    END
+  END
+  RETURN FALSE
+END
+
 ROUTINE OnlyChildSingular o
   LOCAL c
   FOR EACH c IN o
@@ -525,7 +535,13 @@ ROUTINE OpenSub
     IF AfterRules()
       RETURN
     END
-    PRINT "You open ", (the) noun, "."
+    IF noun HAS container AND noun HASNT transparent AND HasListable(noun)
+      WRITE "You open ", (the) noun, ", revealing "     ! what was hidden shows
+      ListWhere(noun, TRUE)
+      PRINT "."
+    ELSE
+      PRINT "You open ", (the) noun, "."
+    END
   END
 END
 

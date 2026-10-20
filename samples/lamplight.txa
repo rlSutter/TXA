@@ -231,14 +231,26 @@ OBJECT Nets "nets" IN BoatShed
   HAS scenery plural
 END
 OBJECT Float "glass float" IN Cave
-  NAME "glass" "float" "ball"
-  INITIAL "Something round and green gleams among the stones."
+  NAME "glass" "float" "ball" "green" "round" "thing" "something"
+  INITIAL "A glass float, round and green, gleams among the stones."
   DESC "A fisherman's float of green glass, old and lovely."
   AFTER
     Take: IF self HASNT general
             GIVE self general
             score = score + 5
           END
+  END
+END
+OBJECT CaveStones "stones" IN Cave
+  NAME "stones" "stone" "rocks" "pebbles" "shingle"
+  HAS scenery plural
+  DESC
+    IF Float IN Cave
+      PRINT "Wet black stones, worn smooth. A glass float lies among them."
+    ELSE
+      PRINT "Wet black stones, worn smooth."
+    END
+    RETURN TRUE
   END
 END
 OBJECT Tins "tins" IN StoreRoom

@@ -41,7 +41,7 @@ check('unknown word', after('xyzzy') == 'I don\'t know the word "xyzzy".')
 check('OOPS', after('oops tin') == 'Taken.')
 check('AGAIN', after('g') == 'You already have the tin lamp.')
 check('several commands on a line, open, look in', after('open box. look in box. take coins from box', 3) ==
-      'You open the wooden box.\nIn the wooden box you can see some gold coins.\nTaken.')
+      'You open the wooden box, revealing some gold coins.\nIn the wooden box you can see some gold coins.\nTaken.')
 check('THEM and HER', after('x them') == 'You see nothing special about the gold coins.' and after('x her') == 'Ada is stirring a pot.')
 check('REVERSE grammar (GIVE ADA LAMP) and a phrase that stops when nothing fits', after('give ada tin lamp') == 'Ada takes the tin lamp and thanks you.')
 check('orders', after('ada, take coins') == '"Get it yourself," says Ada.' and after('cook,') == 'Ada looks at you expectantly.')
