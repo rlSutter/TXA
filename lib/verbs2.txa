@@ -175,7 +175,7 @@ ROUTINE YesOrNo
         RETURN FALSE
       END
     END
-    WRITE "Please answer yes or no."
+    PRINT "Please answer yes or no."
   END
 END
 

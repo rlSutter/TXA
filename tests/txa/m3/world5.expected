@@ -1,0 +1,65 @@
+
+Narrow Ledge
+A ledge high on a cliff. A path leads down.
+
+>jump
+You step off into the air.
+
+*** You have died ***
+
+In that game you scored 0 out of a possible 10, in 1 turn.
+
+Would you like to RESTART, RESTORE a saved game, UNDO your last move, or QUIT?
+> dance
+
+Would you like to RESTART, RESTORE a saved game, UNDO your last move, or QUIT?
+> undo
+[Previous turn undone.]
+
+>look
+Narrow Ledge
+A ledge high on a cliff. A path leads down.
+
+>save
+Save to which file? (Enter for SAVE1) 
+Saved.
+
+>jump
+You step off into the air.
+
+*** You have died ***
+
+In that game you scored 0 out of a possible 10, in 2 turns.
+
+Would you like to RESTART, RESTORE a saved game, UNDO your last move, or QUIT?
+> restore
+Restore which file? (Enter for SAVE1) 
+Restored.
+
+>jump
+You step off into the air.
+
+*** You have died ***
+
+In that game you scored 0 out of a possible 10, in 2 turns.
+
+Would you like to RESTART, RESTORE a saved game, UNDO your last move, or QUIT?
+> restart
+
+Narrow Ledge
+A ledge high on a cliff. A path leads down.
+
+>d
+Cliff Base
+The foot of the cliff. A boat waits at the water's edge.
+You can see a boat here.
+
+>enter boat
+You push off and row for home.
+
+*** You have escaped ***
+
+In that game you scored 10 out of a possible 10, in 2 turns.
+
+Would you like to RESTART, RESTORE a saved game, UNDO your last move, or QUIT?
+> quit

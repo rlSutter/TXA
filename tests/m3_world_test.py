@@ -92,5 +92,15 @@ check('UNDO brings back an eaten egg (into the pail)', after('look in pail') == 
 check('UNDO again goes further back', '  an egg' in after('i', 2, nth=3))
 check('turns are undone too', after('score') == 'You have scored 0 out of a possible 3, in 4 turns.')
 
+out, vm = play('world5')
+check('the end screen after a death: banner, score, the choice', after('jump', 7) ==
+      'You step off into the air.\n\n*** You have died ***\n\nIn that game you scored 0 out of a possible 10, in 1 turn.\n\n'
+      'Would you like to RESTART, RESTORE a saved game, UNDO your last move, or QUIT?')
+check('an answer it doesn\'t know asks again', '> dance\n\nWould you like to RESTART' in out)
+check('UNDO at the end screen takes back the fatal move', '> undo\n[Previous turn undone.]' in out)
+check('RESTORE at the end screen brings back the saved game', '> restore\nRestore which file? (Enter for SAVE1) \nRestored.' in out)
+check('RESTART at the end screen starts again', '> restart\n\nNarrow Ledge' in out)
+check('a win with the game\'s own endmessage, and QUIT ends it', '*** You have escaped ***' in out and out.rstrip().endswith('> quit'))
+
 print('ALL PASS' if not fails else f'{fails} FAILED')
 sys.exit(1 if fails else 0)

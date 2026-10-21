@@ -37,20 +37,6 @@ ROUTINE Main
   IF deadflag < 3               ! the move that ended the game was a turn too,
     turns = turns + 1           ! and the status line shows the final score
     ShowStatus()
-  END
-  IF deadflag = 1
-    PRINT
-    PRINT "*** You have died ***"
-  ELSEIF deadflag = 2
-    PRINT
-    PRINT "*** You have won ***"
-  END
-  IF max_score > 0 AND deadflag < 3
-    PRINT
-    WRITE "In that game you scored ", score, " out of a possible ", max_score, ", in ", turns, " turn"
-    IF turns <> 1
-      WRITE "s"
-    END
-    PRINT "."
+    EndScreen()
   END
 END

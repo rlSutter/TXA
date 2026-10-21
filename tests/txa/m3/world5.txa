@@ -1,0 +1,34 @@
+! world5.txa - the end screen: dying, UNDO, RESTART, RESTORE, a custom ending.
+INCLUDE "DSK1.STDLIB"
+
+ROOM Ledge "Narrow Ledge"
+  DESC "A ledge high on a cliff. A path leads down."
+  HAS light
+  DOWN Base
+  BEFORE
+    Jump: PRINT "You step off into the air."
+          deadflag = 1
+          RETURN TRUE
+  END
+END
+ROOM Base "Cliff Base"
+  DESC "The foot of the cliff. A boat waits at the water's edge."
+  HAS light
+  UP Ledge
+END
+OBJECT Boat "boat" IN Base
+  NAME "boat"
+  HAS enterable static
+  BEFORE
+    Enter: PRINT "You push off and row for home."
+           score = score + 10
+           endmessage = "You have escaped"
+           deadflag = 2
+           RETURN TRUE
+  END
+END
+
+ROUTINE Initialise
+  location = Ledge
+  max_score = 10
+END

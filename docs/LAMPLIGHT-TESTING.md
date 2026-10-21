@@ -95,8 +95,8 @@ Type each command and check the response. Where a response has several lines, th
 - [ ] 44. `x lens` — A tower of glass prisms around a wick. The oil reservoir is dry.
 - [ ] 45. `light lens with matches` — The wick is dry; it won't take a flame.
 - [ ] 46. `pour oil into lens` — You fill the reservoir from the can, and the wick darkens as it drinks. Then: [Your score has just gone up by 5 points.]
-- [ ] 47. `light lens with matches` — The lamp is lit and a ship's horn answers; then "\*\*\* You have won \*\*\*" and "In that game you scored 25 out of a possible 25, in 47 turns."
-- [ ] After the last step, "[End of story: press a key]" appears in reverse video at the bottom; any key returns to the TI title screen.
+- [ ] 47. `light lens with matches` — The lamp is lit and a ship's horn answers. The picture changes to the lighthouse lit, its beams across the water; then, centred, "\*\*\* You have won \*\*\*" and "In that game you scored 25 out of a possible 25, in 47 turns."; then "Would you like to RESTART, RESTORE a saved game, UNDO your last move, or QUIT?"
+- [ ] 48. `quit` — "[End of story: press a key]" appears in reverse video at the bottom; any key returns to the TI title screen. The status line reads Score: 25  Moves: 47.
 
 The five waits at the quay (26–30) let the tide come in, so step 31 shows the causeway flooded; the four after it (33–36) let it go out again.
 
@@ -273,13 +273,20 @@ A disk must be mounted as DSK1. With the cartridge, any blank disk image; with t
 - [ ] Rename or delete one story file (for example `LAMPS03`) on a copy of the disk and load again: the engine stops with "Cannot read the story file DSK1.LAMPS03". A key returns to the title screen.
 - [ ] (Optional) On real hardware with TIPI or a CF7 as DSK1: the same.
 
-### 5.8 Quitting and restarting
+### 5.8 The end screen
+
+- [ ] At the end screen, answer `dance`: the question is simply asked again.
+- [ ] Answer `undo`: [Previous turn undone.] You are back in the Lamp Room before lighting the lamp, with the Lamp Room picture.
+- [ ] Light it again, then answer `restart`: the title page, then a new game.
+- [ ] Save during a game, win, then answer `restore` (ENTER for SAVE1): Restored, back at the saved point.
+
+### 5.9 Quitting and restarting
 
 - [ ] `quit`, then `no`: Carrying on, then.
 - [ ] `quit`, then `yes`: the game ends; "[End of story: press a key]"; a key returns to the TI title screen with normal colours.
 - [ ] `restart`, then `yes`: the title page again; a key, then the introduction and Harbour Road, Score 0, Moves 0.
 
-### 5.9 Pictures
+### 5.10 Pictures
 
 - [ ] Light the lantern in the Sea Cave: a picture of the cave (daylight at the mouth, the green float glowing) appears at the top, and the text continues below it.
 - [ ] Walk out (`e`): the picture disappears and the text uses the whole screen again.
@@ -291,7 +298,7 @@ A disk must be mounted as DSK1. With the cartridge, any blank disk image; with t
 - [ ] `restart`: no picture until the title page shows its own.
 - [ ] Note how long a picture takes to appear (expected: about a second).
 
-### 5.10 Speed and the screen
+### 5.11 Speed and the screen
 
 - [ ] Note the time for `take all` in the kitchen, for `look` in a room with many things, and for crossing the causeway.
 - [ ] Walk around until the screen fills and scrolls: the text scrolls smoothly, with bold room names and the reverse status line intact.

@@ -61,6 +61,27 @@ def title():
     px[110, horizon - 2] = pal[6]
     return im
 
+def ending():
+    """The title scene with the lamp lit: a glow in the lamp room and two
+    beams sweeping out over the water."""
+    im = title(); px = im.load(); d = ImageDraw.Draw(im)
+    pal = [hexc(c) for c in ['#0b0c22', '#1d1a44', '#3a2a66', '#6a3a78', '#b0506a', '#e8804a',
+                             '#f8c060', '#fff0c0', '#0a1830', '#123050', '#2a5070', '#06080e',
+                             '#202430', '#e8e8e0', '#b03030', '#8890a0']]
+    tx, ly = 30, 27
+    for (x1, y1, x2, y2) in [(tx + 3, ly - 1, 127, ly - 12), (tx + 3, ly + 1, 127, ly + 10)]:
+        steps = x2 - x1
+        for k in range(steps):                  # a beam: a widening wedge of light, dithered
+            x = x1 + k
+            top = y1 + (y2 - y1) * k // steps
+            half = 1 + k // 18
+            for y in range(top - half, top + half + 1):
+                if 0 <= y < 58 and (x + y) % (2 if k < 70 else 3) == 0:
+                    px[x, y] = pal[7] if k < 60 else pal[6]
+    d.rectangle([tx - 3, 25, tx + 3, 30], fill=pal[7])           # the lamp room ablaze
+    d.rectangle([tx - 1, 26, tx + 1, 29], fill=pal[6])
+    return im
+
 def cave():
     pal = [hexc(c) for c in ['#04060a', '#0c1218', '#18222c', '#28343e', '#3e4e58', '#64808c',
                              '#9cb4bc', '#d8e6e6', '#0a2a1a', '#1c7040', '#48c070', '#b8f8c0',
@@ -146,6 +167,7 @@ def lamproom():
 
 if __name__ == '__main__':
     title().save(os.path.join(HERE, 'title.png'))
+    ending().save(os.path.join(HERE, 'ending.png'))
     cave().save(os.path.join(HERE, 'cave.png'))
     lamproom().save(os.path.join(HERE, 'lamproom.png'))
-    print('title.png cave.png lamproom.png')
+    print('title.png ending.png cave.png lamproom.png')

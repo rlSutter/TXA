@@ -31,8 +31,8 @@ srcf = os.path.join(ROOT, 'samples/lamplight.txa')
 img, info = compile_file(srcf, [os.path.join(ROOT, 'lib')], title='LAMPLIGHT')
 area = txpics.picture_area(info, [os.path.join(ROOT, 'samples'), os.path.join(ROOT, 'samples/pics')])
 pics = txpics.read_area(area)
-check('the converter: 3 pictures, formats 4, 4, 2, each 6144 bytes of pixels',
-      [p[0] for p in pics] == [4, 4, 2] and all(len(p[2]) == 6144 for p in pics), [(p[0], len(p[2])) for p in pics])
+check('the converter: 4 pictures, formats 4, 4, 2, 4, each 6144 bytes of pixels',
+      [p[0] for p in pics] == [4, 4, 2, 4] and all(len(p[2]) == 6144 for p in pics), [(p[0], len(p[2])) for p in pics])
 blob, picpg = build.story_blob(img, area)
 check('the picture area starts on the page after the story', picpg == (len(img) + 4095) // 4096 and blob[picpg * 4096:] == area)
 cart, _ = build.engine_cart(img, 'LAMPLIGHT', pictures=area)
@@ -95,6 +95,11 @@ ok, d = shows(snaps[i_lit], 2)
 check('lighting the lantern in the cave shows the cave picture', ok, d)
 ok, d = shows(snaps[i_lamp], 3)
 check('the lamp room shows its picture in the 4-colour format', ok, d)
+end = {'vr': list(m.vregs), 'pal': dict(m.palette), 'bml': bytes(m.vram[0x2800:0x4000]),
+       'curpic': m.rw(sy['CURPIC']), 'txttop': m.rw(sy['TXTTOP'])}
+ok, d = shows(end, 4)
+check('the end screen shows the ending picture (end_picture)', ok, d)
+R.render(m, os.path.join(ROOT, 'build/shots/pic-end.png'))
 
 # SAVE and RESTORE (the disk calls overwrite the layer's VRAM) and UNDO
 cave = ['n', 'take lantern', 's', 's', 'w', 'turn on lantern', 'save', '', 'restore', '', 'e', 'undo', 'q', 'y']

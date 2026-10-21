@@ -189,3 +189,58 @@ ROUTINE RoomPicture
     ShowPicture(0)
   END
 END
+
+! EndScreen: the end of the game (deadflag 1 died, 2 won), after the last
+! move's own text.  The banner (endmessage, or "You have won" / "You have
+! died") and the score, centred; end_picture if the game names one; then
+! the player chooses: RESTART, RESTORE a saved game, UNDO the last move
+! (after a death, the move that killed them), or QUIT, which ends the
+! game.  A game may REPLACE it.  (QUIT typed during play skips it.)
+ROUTINE EndScreen
+  LOCAL w
+  IF end_picture
+    ShowPicture(end_picture)
+  END
+  PRINT
+  STYLE(9)
+  IF endmessage
+    PRINT "*** ", (string) endmessage, " ***"
+  ELSEIF deadflag = 1
+    PRINT "*** You have died ***"
+  ELSE
+    PRINT "*** You have won ***"
+  END
+  STYLE(8)
+  IF max_score > 0
+    PRINT
+    WRITE "In that game you scored ", score, " out of a possible ", max_score, ", in ", turns, " turn"
+    IF turns <> 1
+      WRITE "s"
+    END
+    PRINT "."
+  END
+  STYLE(0)
+  WHILE TRUE
+    PRINT
+    PRINT "Would you like to RESTART, RESTORE a saved game, UNDO your last move, or QUIT?"
+    WRITE "> "
+    IF READ(text2, parse2) > 0
+      w = parse2(1)
+      IF w = 'restart'
+        RESTART()
+      ELSEIF w = 'restore'
+        WRITE "Restore which file? (Enter for SAVE1) "
+        AskFile()
+        IF RESTORE(text2) = 0
+          PRINT "Restore failed."
+        END
+      ELSEIF w = 'undo'
+        IF UNDO() = 0
+          PRINT "You can't undo that."
+        END
+      ELSEIF w = 'quit' OR w = 'q'
+        RETURN
+      END
+    END
+  END
+END

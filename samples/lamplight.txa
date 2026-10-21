@@ -13,6 +13,7 @@ INCLUDE "DSK1.STDLIB"
 PICTURE TitlePic "TITLE"     ! samples/pics/title.png: the lighthouse at dusk
 PICTURE CavePic "CAVE"       ! the sea cave, the float glowing
 PICTURE LampPic "LAMPROOM"   ! the great lens
+PICTURE EndPic "ENDING"      ! the lighthouse lit: the end screen
 
 GLOBAL tide_in              ! 1 while the causeway is under water
 GLOBAL tide_turns = 6       ! turns until the tide turns
@@ -294,6 +295,7 @@ OBJECT Lens "great lens" IN LampRoom
         RETURN TRUE
       END
       score = score + 10
+      end_picture = EndPic
       PRINT "You strike a match and touch it to the wick. The flame catches, steadies, and the great lens takes it, throwing a slow beam out across the water. Far out, a ship's horn answers."
       deadflag = 2
       RETURN TRUE

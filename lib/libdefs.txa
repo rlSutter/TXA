@@ -47,6 +47,8 @@ GLOBAL endturnhook            ! one run at the end of every turn
 GLOBAL picnum                 ! the picture showing (kept in saves, so RESTORE and UNDO can show it again)
 GLOBAL pictures_on = 1        ! PICTURES OFF sets 0
 GLOBAL title_picture          ! a picture for the title page (0: none)
+GLOBAL end_picture            ! a picture for the end screen (0: none)
+GLOBAL endmessage             ! a string to use instead of "You have won" / "You have died" (0: those)
 
 OBJECT Yourself "yourself"
   NAME "me" "myself" "self" "yourself"
