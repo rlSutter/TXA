@@ -70,6 +70,8 @@ owns it; Claude builds it. The engine comes first; the story later.
 | `src/wbench.a99` | the TXA Workbench cartridge (M5): the native compiler's home; part 1 reads DV80 source into SAMS |
 | `src/wlex.a99` | the workbench's lexer: SAMS source to SAMS tokens, identical to lexer.py |
 | `tests/m5_lex_test.py` | the TI lexer against the Python lexer on the corpus (args: lib, samples, tests, errors) |
+| `src/wparse.a99` | the workbench's parser: SAMS tokens to the SAMS tree, identical to parser.py (dump.tree_bytes) |
+| `tests/m5_parse_test.py` | the TI parser against the Python parser on the corpus (args: small, lib, samples, tests, errors) |
 | `src/diskrec.a99` | DIS/VAR record files (DVOPEN, DVREAD, DVCLOS) for the workbench |
 | `tools/txa_srcdisk.py` | a game's source and the library as DIS/VAR 80 files on a TI disk image, for the workbench |
 | `tools/txa_wrap.py` | TXA source to 80 columns (D1 continuation), for DV80 files |
@@ -131,6 +133,9 @@ owns it; Claude builds it. The engine comes first; the story later.
 - The kernel's KEYGET returns the character in the HIGH byte (ENTER is
   >0D00) and ignores FCTN; the engine's KEYGT2 (input.a99) is the one
   with FCTN keys and a low-byte code.
+- A routine that reports through the status flags must not end with
+  .leave (its MOV spoils them): keep R11 in memory and make the compare
+  the last instruction before B *R11 (CMP1/CMP2 in wparse.a99).
 - MAPPG uses R0-R3 and R12: any routine that may cross a SAMS page in
   the middle of a caller's loop must keep R2/R3 itself (TPUT once didn't).
 - The simulator harness presses SHIFT for capitals; the kernel's KEYGET

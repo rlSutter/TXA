@@ -4,11 +4,11 @@
 * (SAMS from page TOKPG), exactly as tools/txc/lexer.py tokenizes it.
 *
 * A token: byte kind, word line, word text length, the text, and for a
-* number its value word.  Kinds:
+* number its value word (a keyword: its number in KWLIST).  Kinds:
 TK.NUM EQU  1                  text: the digits as written (>1F for hex)
 TK.STR EQU  2                  text: the string's value (^ and ~ done)
 TK.ID  EQU  3                  text: as written
-TK.KW  EQU  4                  text: the keyword in upper case
+TK.KW  EQU  4                  text: as written; then its number in KWLIST (from 1)
 TK.ACT EQU  5                  text: the action's name (after ##)
 TK.DIC EQU  6                  text: the word in lower case
 TK.SYM EQU  7                  text: the symbol
@@ -145,9 +145,11 @@ TEM1   MOV  R3,R3
        BL   @TPUT
        DEC  R3
        JMP  TEM1
-TEM2   CI   R6,TK.NUM
+TEM2   CI   R6,TK.NUM          a number's value, a keyword's number
+       JEQ  TEM2A
+       CI   R6,TK.KW
        JNE  TEM3
-       MOV  @LXNUM,R0
+TEM2A  MOV  @LXNUM,R0
        BL   @TPUTW
 TEM3   INC  @LXTCNT
        CI   R6,TK.NL
@@ -162,11 +164,12 @@ TEM3   INC  @LXTCNT
        JMP  TEM9
 TEM4   CI   R6,TK.KW
        JNE  TEM9
-       LI   R2,NOHEX           the four keywords after which > is greater-than
-       BL   @KWIN
-       MOV  R0,R0
-       JNE  TEM9
-       SETO @LXHOK
+       MOV  @LXNUM,R0          TRUE FALSE NOTHING SELF (32-35): > after them
+       CI   R0,KW.TRU          is greater-than
+       JL   TEM4A
+       CI   R0,KW.SLF
+       JLE  TEM9
+TEM4A  SETO @LXHOK
 TEM9   .leave
        RT
 BRPAR  BYTE ')'
@@ -174,10 +177,12 @@ BRPAR  BYTE ')'
 
 * ---- names and keywords --------------------------------------------------------
 * KWIN - is the text at R8 (R9 bytes, upper case) in the keyword list at
-* R2 (length-prefixed entries, a 0 byte at the end)?  R0 = 1 if so.
-* Keeps R4-R9.  Uses R0-R3.
-KWIN   CLR  R0
-KWI1   MOVB *R2+,R0            the entry's length
+* R2 (length-prefixed entries, a 0 byte at the end)?  R0 = its number
+* (from 1), or 0.  Keeps R4-R9.  Uses R0-R3.
+KWIN   CLR  @KWNUM
+       CLR  R0
+KWI1   INC  @KWNUM
+       MOVB *R2+,R0            the entry's length
        JEQ  KWI9               the list's end: no
        SRL  R0,8
        C    R0,R9
@@ -188,7 +193,7 @@ KWI2   CB   *R1+,*R2+
        JNE  KWI3
        DEC  R3
        JNE  KWI2
-       LI   R0,1
+       MOV  @KWNUM,R0
        RT
 KWI3   DEC  R3                 skip the rest of this entry
        A    R3,R2
@@ -553,13 +558,13 @@ LXN4   MOVB R0,@STRBUF(R2)
        LI   R2,KWLIST
        BL   @KWIN
        MOV  @LINENO,R7
+       MOV  R4,R8              the text as written (a keyword's spelling
+       AI   R8,LINBUF          matters: action names such as Give)
+       LI   R6,TK.ID
        MOV  R0,R0
-       JEQ  LXN5
-       LI   R6,TK.KW           a keyword: its upper case
-       JMP  LXN6
-LXN5   LI   R6,TK.ID           a name: as written
-       MOV  R4,R8
-       AI   R8,LINBUF
+       JEQ  LXN6
+       LI   R6,TK.KW           a keyword: its number too
+       MOV  R0,@LXNUM
 LXN6   BL   @TEMIT
        MOV  @LXTMP,R4
        .leave
@@ -704,8 +709,8 @@ SYMS1  TEXT ':,().+-*/=<>'
        BYTE 0
        EVEN
 
-* The keywords (lexer.py's KEYWORDS), and the four after which > is
-* greater-than rather than hex.
+* The keywords (lexer.py's KEYWORDS), numbered from 1 in this order (the
+* parser tests token numbers against the KW. names).
 KWLIST BYTE 7
        TEXT 'INCLUDE'
        BYTE 8
@@ -795,13 +800,50 @@ KWLIST BYTE 7
        BYTE 7
        TEXT 'REPLACE'
        BYTE 0
-NOHEX  BYTE 4
-       TEXT 'TRUE'
-       BYTE 5
-       TEXT 'FALSE'
-       BYTE 7
-       TEXT 'NOTHING'
-       BYTE 4
-       TEXT 'SELF'
-       BYTE 0
        EVEN
+
+* keyword numbers (their places in KWLIST)
+KW.INC EQU  1
+KW.CON EQU  2
+KW.GLO EQU  3
+KW.ARR EQU  4
+KW.ATT EQU  5
+KW.PRO EQU  6
+KW.CLA EQU  7
+KW.OBJ EQU  8
+KW.ROO EQU  9
+KW.VRB EQU  10
+KW.ROU EQU  11
+KW.PIC EQU  12
+KW.END EQU  13
+KW.IN  EQU  14
+KW.HAS EQU  15
+KW.NOT EQU  16
+KW.NAM EQU  17
+KW.IF  EQU  18
+KW.EIF EQU  19
+KW.ELS EQU  20
+KW.WHL EQU  21
+KW.FOR EQU  22
+KW.EAC EQU  23
+KW.LOC EQU  24
+KW.PRI EQU  25
+KW.WRI EQU  26
+KW.MOV EQU  27
+KW.TO  EQU  28
+KW.REM EQU  29
+KW.GIV EQU  30
+KW.RET EQU  31
+KW.TRU EQU  32
+KW.FAL EQU  33
+KW.NTH EQU  34
+KW.SLF EQU  35
+KW.AND EQU  36
+KW.OR  EQU  37
+KW.MOD EQU  38
+KW.HSN EQU  39
+KW.NTN EQU  40
+KW.REV EQU  41
+KW.EXT EQU  42
+KW.FST EQU  43
+KW.REP EQU  44

@@ -1,0 +1,2192 @@
+*======================================================================
+* wparse.a99 - the workbench's parser (M5 part 3): the token stream
+* (SAMS from TOKPG) to the tree (SAMS from TREEPG), exactly as
+* tools/txc/parser.py parses, in tools/txc/dump.py's tree encoding:
+*   >00 None  >01 True  >02 False  >03 word: an integer
+*   >04 word bytes: a string   >05 word items: a list   >06 byte items: a tuple
+*   >07 type line-word fields: a node (types: NT. below, ast.py's order)
+* Statements and declarations go straight into the tree; expressions are
+* built in EXB (RAM), where a node's header can be put in front of an
+* operand already built (a + b, x.p, f(x)), then copied in.  A list's
+* count is a placeholder until the list ends.  Errors stop the parser
+* with WBERR (a code: PE. below) and WBERRL (the line).
+*======================================================================
+TREEPG EQU  96                 SAMS page where the tree starts
+* the parser's variables, in RAM only the engine otherwise uses (VOICES,
+* ULIT, IBUF): the two never run together
+PV0    EQU  VOICES
+TCPG   EQU  PV0+0              the token cache: the token's place ...
+TCOF   EQU  PV0+2
+TKND   EQU  PV0+4              ... its kind, line, text length, value
+TLN    EQU  PV0+6
+TLEN   EQU  PV0+8
+TVAL   EQU  PV0+10
+TXPG   EQU  PV0+12             ... its text's place
+TXOF   EQU  PV0+14
+NXPG   EQU  PV0+16             ... the next token's place
+NXOF   EQU  PV0+18
+PKSAV  EQU  PV0+20             20 bytes: the cache, saved for a look ahead
+TTSAV  EQU  PV0+40             20 bytes: saved for a statement read again
+MAPEP  EQU  PV0+60             the token page window E shows
+RDPG   EQU  PV0+62             the reader's place
+RDOF   EQU  PV0+64
+PSTKS  EQU  PV0+66             the return stack at PARSE (errors go back to it)
+EXP    EQU  PV0+68             EXB's length
+LSP    EQU  PV0+70             the list stack's top
+PRET1  EQU  PV0+72
+PRET2  EQU  PV0+74
+PRET3  EQU  PV0+76
+PRET4  EQU  PV0+78
+PRET5  EQU  PV0+80
+PRET6  EQU  PV0+82
+PRET7  EQU  PV0+84
+PRETC  EQU  PV0+86
+PRETC2 EQU  PV0+88
+PTMPW  EQU  PV0+90
+PTMPW2 EQU  PV0+92
+PTMPL  EQU  PV0+94
+PTMPT  EQU  PV0+96
+PTMPO  EQU  PV0+98
+PTMPN  EQU  PV0+100
+PTMPP  EQU  PV0+102
+PTMPE  EQU  PV0+104
+PTMPC  EQU  PV0+106
+PTMPK  EQU  PV0+108
+PFPG   EQU  PV0+110            a print form's text
+PFOF   EQU  PV0+112
+PFLN   EQU  PV0+114
+PPPG   EQU  PV0+116            a property's name
+PPOF   EQU  PV0+118
+PPLN   EQU  ULIT+0
+PTMPI  EQU  ULIT+2
+HDRBUF EQU  ULIT+4             16 bytes: a header being put into EXB
+LSTK   EQU  IBUF               160 bytes: the list stack (26 frames of 6)
+EXB    EQU  >3000              2K: the expression being built (the font's
+EXBMAX EQU  2000               space after startup)
+* node types (dump.NODES)
+NT.INC EQU  1
+NT.CON EQU  2
+NT.GLO EQU  3
+NT.ARR EQU  4
+NT.ATT EQU  5
+NT.PRO EQU  6
+NT.PIC EQU  7
+NT.SND EQU  8
+NT.OBJ EQU  9
+NT.VRB EQU  10
+NT.EXT EQU  11
+NT.REP EQU  12
+NT.GLN EQU  13
+NT.GTK EQU  14
+NT.ROU EQU  15
+NT.HAS EQU  16
+NT.CLS EQU  17
+NT.INP EQU  18
+NT.NMS EQU  19
+NT.PVL EQU  20
+NT.PBL EQU  21
+NT.CAS EQU  22
+NT.IF  EQU  23
+NT.WHL EQU  24
+NT.FOR EQU  25
+NT.LOC EQU  26
+NT.PRN EQU  27
+NT.PIT EQU  28
+NT.MOV EQU  29
+NT.REM EQU  30
+NT.GIV EQU  31
+NT.RET EQU  32
+NT.PST EQU  33
+NT.ASG EQU  34
+NT.EST EQU  35
+NT.NUM EQU  36
+NT.STR EQU  37
+NT.NAM EQU  38
+NT.CST EQU  39
+NT.UNA EQU  40
+NT.BIN EQU  41
+NT.PRF EQU  42
+NT.ACT EQU  43
+NT.DIC EQU  44
+NT.CAL EQU  45
+* parse errors (the test maps parser.py's messages onto these)
+PE.EXP EQU  10                 expected X, found Y
+PE.NL  EQU  11                 expected the end of the line
+PE.DCL EQU  12                 expected a declaration
+PE.NOD EQU  13                 X cannot start a declaration
+PE.NEN EQU  14                 KIND NAME has no END
+PE.BDY EQU  15                 expected a property, HAS, NAME, CLASS, IN or END
+PE.ATT EQU  16                 expected an attribute
+PE.VEN EQU  17                 VERB has no END
+PE.GTK EQU  18                 expected a grammar token or ->
+PE.END EQU  19                 missing END
+PE.WRI EQU  20                 WRITE needs something to write
+PE.ASG EQU  21                 only a variable, a property or an array element ...
+PE.VAL EQU  22                 this line computes a value and does nothing with it
+PE.CHN EQU  23                 comparisons cannot be chained
+PE.ARG EQU  24                 a call takes at most 7 arguments
+PE.BIG EQU  25                 number 32768 is larger than 32767
+PE.EXV EQU  26                 expected a value
+PE.ACN EQU  27                 expected an action name
+PE.LNG EQU  30                 an expression too long for the workbench (EXB)
+* enders for STMTS
+EN.END EQU  1
+EN.EIF EQU  2
+EN.ELS EQU  4
+
+* ---- reading the token stream (window E) ----------------------------------
+* TRB - R0 = the byte at RDPG:RDOF (low byte); the reader moves on.
+* Uses R0, R1; keeps R2-R9.
+TRB    MOV  @RDPG,R0
+       C    R0,@MAPEP
+       JEQ  TRB1
+       MOV  R11,@PRET1
+       MOV  R2,@LXSV2
+       MOV  R3,@LXSV3
+       MOV  R0,@MAPEP
+       LI   R1,>E
+       BL   @MAPPG
+       MOV  @LXSV2,R2
+       MOV  @LXSV3,R3
+       MOV  @PRET1,R11
+TRB1   MOV  @RDOF,R1
+       CLR  R0
+       MOVB @>E000(R1),R0
+       SRL  R0,8
+       INC  R1
+       CI   R1,4096
+       JL   TRB2
+       CLR  R1
+       INC  @RDPG
+TRB2   MOV  R1,@RDOF
+       RT
+* TRW - R0 = the next word.
+TRW    MOV  R11,@PRET2
+       BL   @TRB
+       SWPB R0
+       MOV  R0,@PTMPW
+       BL   @TRB
+       SOC  @PTMPW,R0
+       MOV  @PRET2,R11
+       RT
+
+* TLOAD - the token at TCPG:TCOF into the cache: TKND, TLN, TLEN, TXPG:TXOF
+* (its text), TVAL (a number's value, a keyword's number), NXPG:NXOF
+* (the next token).  Keeps R2-R9.
+TLOAD  MOV  R11,@PRET3
+       MOV  @TCPG,@RDPG
+       MOV  @TCOF,@RDOF
+       BL   @TRB
+       MOV  R0,@TKND
+       BL   @TRW
+       MOV  R0,@TLN
+       BL   @TRW
+       MOV  R0,@TLEN
+       MOV  @RDPG,@TXPG        the text starts here ...
+       MOV  @RDOF,@TXOF
+       MOV  @RDOF,R1           ... and is stepped over
+       A    @TLEN,R1
+TLD1   CI   R1,4096
+       JL   TLD2
+       AI   R1,-4096
+       INC  @RDPG
+       JMP  TLD1
+TLD2   MOV  R1,@RDOF
+       CLR  @TVAL
+       MOV  @TKND,R0
+       CI   R0,TK.NUM
+       JEQ  TLD3
+       CI   R0,TK.KW
+       JNE  TLD4
+TLD3   BL   @TRW
+       MOV  R0,@TVAL
+TLD4   MOV  @RDPG,@NXPG
+       MOV  @RDOF,@NXOF
+       MOV  @PRET3,R11
+       RT
+
+* TTAKE - on to the next token.
+TTAKE  MOV  R11,@PRET4
+       MOV  @NXPG,@TCPG
+       MOV  @NXOF,@TCOF
+       BL   @TLOAD
+       MOV  @PRET4,R11
+       RT
+
+* CSAVE / CREST - the token cache to and from save area R1 (10 words).
+CSAVE  LI   R0,TCPG
+       LI   R2,10
+CSV1   MOV  *R0+,*R1+
+       DEC  R2
+       JNE  CSV1
+       RT
+CREST  LI   R0,TCPG
+       LI   R2,10
+CRS1   MOV  *R1+,*R0+
+       DEC  R2
+       JNE  CRS1
+       RT
+
+* TTXEQ - is the current token's text the length-prefixed string at R1?
+* R0 = 1 if so.  Keeps R4-R9.
+TTXEQ  .enter
+       MOVB *R1+,R0
+       SRL  R0,8
+       C    R0,@TLEN
+       JNE  TTQ8
+       MOV  R0,R3
+       MOV  R1,R2
+       MOV  @TXPG,@RDPG
+       MOV  @TXOF,@RDOF
+TTQ1   MOV  R3,R3
+       JEQ  TTQ7
+       BL   @TRB
+       SWPB R0
+       CB   R0,*R2+
+       JNE  TTQ8
+       DEC  R3
+       JMP  TTQ1
+TTQ7   LI   R0,1
+       JMP  TTQ9
+TTQ8   CLR  R0
+TTQ9   .leave
+       RT
+
+* ATSYM - R0 = 1 if the current token is the symbol at R1 (length-prefixed).
+ATSYM  .enter
+       CLR  R0
+       C    @TKND,@DTKSYM
+       JNE  ATS9
+       BL   @TTXEQ
+ATS9   .leave
+       RT
+DTKSYM DATA TK.SYM
+* ATKW - R0 = 1 if the current token is keyword number R1.
+ATKW   CLR  R0
+       C    @TKND,@DTKKW
+       JNE  ATK9
+       C    @TVAL,R1
+       JNE  ATK9
+       LI   R0,1
+ATK9   RT
+DTKKW  DATA TK.KW
+* ATK - R0 = 1 if the current token's kind is R1.
+ATK    CLR  R0
+       C    @TKND,R1
+       JNE  ATK1
+       LI   R0,1
+ATK1   RT
+
+* ---- errors ----------------------------------------------------------------------
+* PERR - stop the parser: error R0 at the current token's line.  PERRL -
+* error R0 at line R7.  Neither returns: the return stack goes back to
+* PARSE's, and PARSE returns.
+PERR   MOV  @TLN,R7
+PERRL  MOV  R0,@WBERR
+       MOV  R7,@WBERRL
+       MOV  @PSTKS,R10
+       B    @PARSX
+
+* ---- writing the tree (window F, through TPUT) -----------------------------------
+TB     SWPB R0                 R0's low byte
+       B    @TPUT
+TW     B    @TPUTW             R0
+* TNODE - a node of type R0 at line R1.
+TNODE  .enter
+       MOV  R1,@PTMPL
+       MOV  R0,@PTMPT
+       LI   R0,>0700
+       BL   @TPUT
+       MOV  @PTMPT,R0
+       BL   @TB
+       MOV  @PTMPL,R0
+       BL   @TPUTW
+       .leave
+       RT
+* TSTRAT - a string: R2 bytes of token text at page R3, offset R4 (keeps
+* R4-R9).  TSTRT - the current token's text.  TSTRC - the
+* length-prefixed constant at R1.
+TSTRT  MOV  @TLEN,R2
+       MOV  @TXPG,R3
+       MOV  @TXOF,@PTMPO
+       JMP  TSA0
+TSTRAT MOV  R4,@PTMPO
+TSA0   .enter
+       MOV  R2,@PTMPN
+       MOV  R3,@RDPG
+       MOV  @PTMPO,@RDOF
+       LI   R0,>0400
+       BL   @TPUT
+       MOV  @PTMPN,R0
+       BL   @TPUTW
+TSA1   MOV  @PTMPN,R0
+       JEQ  TSA9
+       BL   @TRB
+       SWPB R0
+       BL   @TPUT
+       DEC  @PTMPN
+       JMP  TSA1
+TSA9   .leave
+       RT
+TSTRC  .enter
+       MOV  R1,@PTMPP
+       LI   R0,>0400
+       BL   @TPUT
+       MOV  @PTMPP,R1
+       MOVB *R1+,R0
+       SRL  R0,8
+       MOV  R0,@PTMPN
+       MOV  R1,@PTMPP
+       BL   @TPUTW
+TSC1P   MOV  @PTMPN,R0
+       JEQ  TSC9P
+       MOV  @PTMPP,R1
+       MOVB *R1+,R0
+       MOV  R1,@PTMPP
+       BL   @TPUT
+       DEC  @PTMPN
+       JMP  TSC1P
+TSC9P   .leave
+       RT
+TNONE  CLR  R0
+       B    @TPUT
+TTRUE  LI   R0,>0100
+       B    @TPUT
+TFALSE LI   R0,>0200
+       B    @TPUT
+* TBOOL - True if R0, else False.
+TBOOL  MOV  R0,R0
+       JNE  TTRUE
+       JMP  TFALSE
+* TINT - an integer: R0.
+TINT   .enter
+       MOV  R0,@PTMPW2
+       LI   R0,>0300
+       BL   @TPUT
+       MOV  @PTMPW2,R0
+       BL   @TPUTW
+       .leave
+       RT
+
+* Lists: LBEG writes >05 and a placeholder count, and pushes a frame
+* (page, offset of the count, the count) on LSTK; LINC counts an item;
+* LEND pops the frame and writes the count in.
+LBEG   .enter
+       LI   R0,>0500
+       BL   @TPUT
+       MOV  @LSP,R1
+       MOV  @TKPAGE,*R1+
+       MOV  @TKOFF,*R1+
+       CLR  *R1+
+       MOV  R1,@LSP
+       CLR  R0
+       BL   @TPUTW
+       .leave
+       RT
+LINC   MOV  @LSP,R1
+       DECT R1
+       INC  *R1
+       RT
+LEND   .enter
+       MOV  @LSP,R1
+       AI   R1,-6
+       MOV  R1,@LSP
+       MOV  *R1+,R2            the count's page, offset; the count
+       MOV  *R1+,R3
+       MOV  *R1,R4
+       BL   @PATCH
+       .leave
+       RT
+* PATCH - word R4 into the tree at page R2, offset R3 (it may straddle a
+* page), then window F back on TKPAGE.  Uses R0-R4, R12.
+PATCH  .enter
+       MOV  R3,@PTMPO
+       MOV  R2,@PTMPP
+       MOV  R2,R0
+       LI   R1,>F
+       BL   @MAPPG
+       MOV  @PTMPO,R1
+       MOVB R4,@>F000(R1)      the high byte
+       INC  R1
+       CI   R1,4096
+       JL   PAT1
+       MOV  @PTMPP,R0          the low byte on the next page
+       INC  R0
+       MOV  R4,@PTMPN
+       LI   R1,>F
+       BL   @MAPPG
+       MOV  @PTMPN,R4
+       CLR  R1
+PAT1   SWPB R4
+       MOVB R4,@>F000(R1)
+       MOV  @TKPAGE,R0
+       LI   R1,>F
+       BL   @MAPPG
+       .leave
+       RT
+
+* ---- the expression buffer (EXB, RAM) ----------------------------------------------
+* EB - R0's low byte onto EXB.  EW - R0 as a word.  Keep R2-R9.
+EB     MOV  @EXP,R1
+       CI   R1,EXBMAX
+       JL   EB1
+       LI   R0,PE.LNG
+       B    @PERR
+EB1    SWPB R0
+       MOVB R0,@EXB(R1)
+       INC  @EXP
+       RT
+EW     MOV  R11,@PRET5
+       MOV  R0,@PTMPE
+       SWPB R0
+       BL   @EB
+       MOV  @PTMPE,R0
+       BL   @EB
+       MOV  @PRET5,R11
+       RT
+* ENODE - a node of type R0, line R1, onto EXB.
+ENODE  MOV  R11,@PRET6
+       MOV  R1,@PTMPL
+       MOV  R0,@PTMPT
+       LI   R0,7
+       BL   @EB
+       MOV  @PTMPT,R0
+       BL   @EB
+       MOV  @PTMPL,R0
+       BL   @EW
+       MOV  @PRET6,R11
+       RT
+* ESTRT - the current token's text as a string onto EXB.  ESTRC - the
+* length-prefixed constant at R1.
+ESTRT  .enter
+       LI   R0,4
+       BL   @EB
+       MOV  @TLEN,R0
+       BL   @EW
+       MOV  @TXPG,@RDPG
+       MOV  @TXOF,@RDOF
+       MOV  @TLEN,@PTMPN
+EST1   MOV  @PTMPN,R0
+       JEQ  EST9
+       BL   @TRB
+       BL   @EB
+       DEC  @PTMPN
+       JMP  EST1
+EST9   .leave
+       RT
+ESTRC  .enter
+       MOV  R1,@PTMPP
+       LI   R0,4
+       BL   @EB
+       MOV  @PTMPP,R1
+       MOVB *R1+,R0
+       SRL  R0,8
+       MOV  R0,@PTMPN
+       MOV  R1,@PTMPP
+       BL   @EW
+ESC1   MOV  @PTMPN,R0
+       JEQ  ESC9
+       MOV  @PTMPP,R1
+       MOVB *R1+,R0
+       SRL  R0,8
+       MOV  R1,@PTMPP
+       BL   @EB
+       DEC  @PTMPN
+       JMP  ESC1
+ESC9   .leave
+       RT
+* EINS - R2 bytes of room at EXB position R1 (what follows moves up), and
+* the bytes at R3 (RAM) copied in.  Keeps R5-R9.  (R0 cannot index on the
+* TMS9900: R4 and R12 do.)
+EINS   MOV  R4,@PTMPI
+       MOV  @EXP,R4            the last byte to move
+       A    R2,@EXP
+       MOV  @EXP,R12
+       CI   R12,EXBMAX
+       JL   EIN1
+       LI   R0,PE.LNG
+       B    @PERR
+EIN1   C    R4,R1              move EXB[R1..R4-1] up by R2, from the top
+       JLE  EIN2
+       DEC  R4
+       MOV  R4,R12
+       A    R2,R12
+       MOVB @EXB(R4),@EXB(R12)
+       JMP  EIN1
+EIN2   MOV  R2,R2              the new bytes
+       JEQ  EIN9
+       MOVB *R3+,@EXB(R1)
+       INC  R1
+       DEC  R2
+       JMP  EIN2
+EIN9   MOV  @PTMPI,R4
+       RT
+* EFLUSH - EXB into the tree, and EXB empty.
+EFLUSH .enter
+       CLR  @PTMPN
+EFL1   C    @PTMPN,@EXP
+       JHE  EFL9
+       MOV  @PTMPN,R1
+       MOVB @EXB(R1),R0
+       BL   @TPUT
+       INC  @PTMPN
+       JMP  EFL1
+EFL9   CLR  @EXP
+       .leave
+       RT
+* EHDR - insert at EXB position R1 a node header (type R0, line R2) and,
+* when R3 is not 0, a string field: the length-prefixed text at R3.
+EHDR   .enter
+       LI   R12,HDRBUF
+       LI   R4,>0700
+       MOVB R4,*R12+
+       SWPB R0
+       MOVB R0,*R12+
+       MOVB R2,*R12+
+       SWPB R2
+       MOVB R2,*R12+
+       MOV  R3,R3
+       JEQ  EHD2
+       LI   R4,>0400           the string: >04, its length (a word), its bytes
+       MOVB R4,*R12+
+       CLR  R4
+       MOVB R4,*R12+
+       MOVB *R3+,R4
+       MOVB R4,*R12+
+       SRL  R4,8
+EHD1   MOV  R4,R4
+       JEQ  EHD2
+       MOVB *R3+,*R12+
+       DEC  R4
+       JMP  EHD1
+EHD2   MOV  R12,R2             its length
+       AI   R2,-HDRBUF
+       LI   R3,HDRBUF
+       BL   @EINS
+       .leave
+       RT
+
+* ---- expressions (into EXB) ---------------------------------------------------------
+* Each level keeps where its expression starts (the return stack's top
+* word, *R10, while it runs).
+* EXPRT - an expression, statement-level: built in EXB, then into the tree.
+EXPRT  .enter
+       CLR  @EXP
+       BL   @EXPRI
+       BL   @EFLUSH
+       .leave
+       RT
+* EXPRI - expr := and_expr {OR and_expr}
+EXPRI  .enter
+       .push @EXP
+       BL   @EAND
+EXO1   LI   R1,KW.OR
+       BL   @ATKW
+       MOV  R0,R0
+       JEQ  EXO9
+       MOV  @TLN,R2
+       BL   @TTAKE
+       MOV  *R10,R1
+       LI   R0,NT.BIN
+       LI   R3,SOR
+       BL   @EHDR
+       BL   @EAND
+       JMP  EXO1
+EXO9   INCT R10
+       .leave
+       RT
+EAND   .enter
+       .push @EXP
+       BL   @ENOT
+EAN1   LI   R1,KW.AND
+       BL   @ATKW
+       MOV  R0,R0
+       JEQ  EAN9
+       MOV  @TLN,R2
+       BL   @TTAKE
+       MOV  *R10,R1
+       LI   R0,NT.BIN
+       LI   R3,SAND
+       BL   @EHDR
+       BL   @ENOT
+       JMP  EAN1
+EAN9   INCT R10
+       .leave
+       RT
+ENOT   .enter
+       LI   R1,KW.NOT
+       BL   @ATKW
+       MOV  R0,R0
+       JEQ  ENT2
+       LI   R0,NT.UNA          NOT: the header first, then its operand
+       MOV  @TLN,R1
+       BL   @ENODE
+       LI   R1,SNOT
+       BL   @ESTRC
+       BL   @TTAKE
+       BL   @ENOT
+       JMP  ENT9
+ENT2   BL   @ECMP
+ENT9   .leave
+       RT
+* ECMP - add [cmp add]; a second comparison is an error.
+ECMP   .enter
+       .push @EXP
+       BL   @EADD
+       BL   @CMPOP             R3 = the operator's text, or 0
+       MOV  R3,R3
+       JEQ  ECM9
+       MOV  @TLN,R2
+       BL   @TTAKE
+       MOV  *R10,R1
+       LI   R0,NT.BIN
+       BL   @EHDR
+       BL   @EADD
+       BL   @CMPOP
+       MOV  R3,R3
+       JEQ  ECM9
+       LI   R0,PE.CHN
+       B    @PERR
+ECM9   INCT R10
+       .leave
+       RT
+* CMPOP - R3 = the length-prefixed text of the comparison at the current
+* token (= <> < > <= >= HAS HASNT IN NOTIN), or 0.  Uses R0-R3.
+CMPOP  .enter
+       LI   R3,SEQ
+       BL   @CMP1
+       JEQ  CMP9
+       LI   R3,SNE
+       BL   @CMP1
+       JEQ  CMP9
+       LI   R3,SLT
+       BL   @CMP1
+       JEQ  CMP9
+       LI   R3,SGT
+       BL   @CMP1
+       JEQ  CMP9
+       LI   R3,SLE
+       BL   @CMP1
+       JEQ  CMP9
+       LI   R3,SGE
+       BL   @CMP1
+       JEQ  CMP9
+       LI   R1,KW.HAS
+       LI   R3,SHAS
+       BL   @CMP2
+       JEQ  CMP9
+       LI   R1,KW.HSN
+       LI   R3,SHASNT
+       BL   @CMP2
+       JEQ  CMP9
+       LI   R1,KW.IN
+       LI   R3,SIN
+       BL   @CMP2
+       JEQ  CMP9
+       LI   R1,KW.NTN
+       LI   R3,SNOTIN
+       BL   @CMP2
+       JEQ  CMP9
+       CLR  R3
+CMP9   .leave
+       RT
+* CMP1 - status EQ when the token is symbol R3.  CMP2 - when it is keyword
+* R1.  Both keep R3.  (No .leave: its MOV would spoil the status; the CI
+* comes last before the return.)
+CMP1   MOV  R11,@PRETC
+       MOV  R3,@PTMPC
+       MOV  R3,R1
+       BL   @ATSYM
+       MOV  @PTMPC,R3
+       MOV  @PRETC,R11
+       CI   R0,1
+       B    *R11
+CMP2   MOV  R11,@PRETC2
+       MOV  R3,@PTMPC
+       BL   @ATKW
+       MOV  @PTMPC,R3
+       MOV  @PRETC2,R11
+       CI   R0,1
+       B    *R11
+EADD   .enter
+       .push @EXP
+       BL   @EMUL
+EAD1   LI   R3,SPLUS
+       BL   @CMP1
+       JEQ  EAD2
+       LI   R3,SMINUS
+       BL   @CMP1
+       JNE  EAD9
+EAD2   MOV  @TLN,R2
+       BL   @TTAKE
+       MOV  *R10,R1
+       LI   R0,NT.BIN
+       BL   @EHDR
+       BL   @EMUL
+       JMP  EAD1
+EAD9   INCT R10
+       .leave
+       RT
+EMUL   .enter
+       .push @EXP
+       BL   @EUNA
+EMU1   LI   R3,STIMES
+       BL   @CMP1
+       JEQ  EMU2
+       LI   R3,SDIV
+       BL   @CMP1
+       JEQ  EMU2
+       LI   R1,KW.MOD
+       LI   R3,SMOD
+       BL   @CMP2
+       JNE  EMU9
+EMU2   MOV  @TLN,R2
+       BL   @TTAKE
+       MOV  *R10,R1
+       LI   R0,NT.BIN
+       BL   @EHDR
+       BL   @EUNA
+       JMP  EMU1
+EMU9   INCT R10
+       .leave
+       RT
+* EUNA - unary: -32768; - folded into a number; - operand; or postfix.
+EUNA   .enter
+       LI   R3,SMINUS
+       BL   @CMP1
+       JEQ  EUN1
+       BL   @EPOST
+       B    @EUN9
+EUN1   .push @TLN              (the - token's line)
+       BL   @TTAKE
+       LI   R1,TK.NUM          - 32768 (written in decimal)?
+       BL   @ATK
+       MOV  R0,R0
+       JEQ  EUN3
+       C    @TVAL,@D8000
+       JNE  EUN3
+       BL   @TXT1ST
+       CI   R0,'>'
+       JEQ  EUN3
+       BL   @TTAKE             yes: Num(-32768)
+       LI   R0,NT.NUM
+       MOV  *R10,R1
+       BL   @ENODE
+       LI   R0,3
+       BL   @EB
+       LI   R0,>8000
+       BL   @EW
+       JMP  EUN8
+EUN3   .push @EXP              the operand
+       BL   @EUNA
+       MOV  *R10+,R1           (its start)
+       MOV  *R10,R2            (the - line)
+       MOVB @EXB+1(R1),R0      a number: fold the minus in
+       SRL  R0,8
+       CI   R0,NT.NUM
+       JNE  EUN4
+       MOVB R2,@EXB+2(R1)      (the line: the -'s, high byte first)
+       SWPB R2
+       MOVB R2,@EXB+3(R1)
+       MOVB @EXB+5(R1),R0      (the value, negated)
+       SWPB R0
+       MOVB @EXB+6(R1),R0
+       SWPB R0
+       NEG  R0
+       MOVB R0,@EXB+5(R1)
+       SWPB R0
+       MOVB R0,@EXB+6(R1)
+       JMP  EUN8
+EUN4   LI   R0,NT.UNA          otherwise Unary('-', operand)
+       LI   R3,SMINUS
+       BL   @EHDR
+EUN8   INCT R10
+EUN9   .leave
+       RT
+D8000  DATA >8000
+* TXT1ST - R0 = the current token's first character.
+TXT1ST MOV  R11,@PRET7
+       MOV  @TXPG,@RDPG
+       MOV  @TXOF,@RDOF
+       BL   @TRB
+       MOV  @PRET7,R11
+       RT
+* EPOST - primary { .prop | (args) }
+EPOST  .enter
+       .push @EXP
+       BL   @EPRIM
+EPO1   LI   R3,SDOT
+       BL   @CMP1
+       JNE  EPO4
+       MOV  @TLN,R2            .prop: PropRef(the expression so far, prop)
+       BL   @TTAKE
+       MOV  *R10,R1
+       LI   R0,NT.PRF
+       CLR  R3
+       BL   @EHDR
+       LI   R1,KW.NAM
+       BL   @ATKW
+       MOV  R0,R0
+       JEQ  EPO2
+       BL   @TTAKE
+       LI   R1,SNAME
+       BL   @ESTRC
+       JMP  EPO1
+EPO2   LI   R1,TK.ID
+       BL   @ATK
+       MOV  R0,R0
+       JNE  EPO3
+       LI   R0,PE.EXP          expected a property name
+       B    @PERR
+EPO3   BL   @ESTRT
+       BL   @TTAKE
+       JMP  EPO1
+EPO4   LI   R3,SLPAR           (args), after a name or a property
+       BL   @CMP1
+       JNE  EPO9
+       MOV  *R10,R1
+       MOVB @EXB+1(R1),R0
+       SRL  R0,8
+       CI   R0,NT.NAM
+       JEQ  EPO5
+       CI   R0,NT.PRF
+       JNE  EPO9
+EPO5   .push @TLN              ( line
+       MOV  @TLN,R2
+       BL   @TTAKE
+       MOV  @2(R10),R1         Call(the expression so far, args)
+       LI   R0,NT.CAL
+       CLR  R3
+       BL   @EHDR
+       LI   R0,5               the args: a list, its count patched
+       BL   @EB
+       .push @EXP              (the count's place)
+       CLR  R0
+       BL   @EW
+       .push @DZERO            (the count)
+       LI   R3,SRPAR
+       BL   @CMP1
+       JEQ  EPO7
+       BL   @EXPRI
+       INC  *R10
+EPO6   LI   R3,SCOMMA
+       BL   @CMP1
+       JNE  EPO7
+       BL   @TTAKE
+       BL   @EXPRI
+       INC  *R10
+       JMP  EPO6
+EPO7   LI   R3,SRPAR
+       BL   @CMP1
+       JEQ  EPO8
+       LI   R0,PE.EXP          expected )
+       B    @PERR
+EPO8   BL   @TTAKE
+       MOV  *R10+,R2           the count
+       MOV  *R10+,R1           its place
+       MOV  *R10+,R7           the ( line
+       CI   R2,7
+       JLE  EPO8A
+       LI   R0,PE.ARG
+       B    @PERRL
+EPO8A  MOVB R2,@EXB(R1)        (the count: high byte first)
+       SWPB R2
+       MOVB R2,@EXB+1(R1)
+       B    @EPO1
+EPO9   INCT R10
+       .leave
+       RT
+DZERO  DATA 0
+* EPRIM - a number, string, ##action, 'word', NAME, a name, TRUE FALSE
+* NOTHING SELF, or ( expr ).
+EPRIM  .enter
+       MOV  @TKND,R0
+       CI   R0,TK.NUM
+       JNE  EPR2
+       C    @TVAL,@D8000       32768 written in decimal: an error here
+       JNE  EPR1
+       BL   @TXT1ST
+       CI   R0,'>'
+       JEQ  EPR1
+       LI   R0,PE.BIG
+       B    @PERR
+EPR1   LI   R0,NT.NUM
+       MOV  @TLN,R1
+       BL   @ENODE
+       LI   R0,3
+       BL   @EB
+       MOV  @TVAL,R0
+       BL   @EW
+       JMP  EPR8
+EPR2   LI   R1,NT.STR
+       CI   R0,TK.STR
+       JEQ  EPR3
+       LI   R1,NT.ACT
+       CI   R0,TK.ACT
+       JEQ  EPR3
+       LI   R1,NT.DIC
+       CI   R0,TK.DIC
+       JEQ  EPR3
+       LI   R1,NT.NAM
+       CI   R0,TK.ID
+       JNE  EPR4
+EPR3   MOV  R1,R0              (a node holding the token's text)
+       MOV  @TLN,R1
+       BL   @ENODE
+       BL   @ESTRT
+       JMP  EPR8
+EPR4   CI   R0,TK.KW
+       JNE  EPR6
+       MOV  @TVAL,R0
+       CI   R0,KW.NAM          NAME: Name('NAME')
+       JNE  EPR5
+       LI   R0,NT.NAM
+       MOV  @TLN,R1
+       BL   @ENODE
+       LI   R1,SNAME
+       BL   @ESTRC
+       JMP  EPR8
+EPR5   CI   R0,KW.TRU          TRUE FALSE NOTHING SELF: Const
+       JL   EPR6
+       CI   R0,KW.SLF
+       JH   EPR6
+       MOV  R0,@PTMPK
+       LI   R0,NT.CST
+       MOV  @TLN,R1
+       BL   @ENODE
+       MOV  @PTMPK,R1
+       AI   R1,-KW.TRU
+       SLA  R1,1
+       MOV  @CSTTAB(R1),R1
+       BL   @ESTRC
+       JMP  EPR8
+EPR6   LI   R3,SLPAR           ( expr )
+       BL   @CMP1
+       JNE  EPR7
+       BL   @TTAKE
+       BL   @EXPRI
+       LI   R3,SRPAR
+       BL   @CMP1
+       JEQ  EPR8
+       LI   R0,PE.EXP
+       B    @PERR
+EPR7   LI   R0,PE.EXV
+       B    @PERR
+EPR8   BL   @TTAKE
+       .leave
+       RT
+CSTTAB DATA STRUE,SFALSE,SNOTHG,SSELF
+
+* ---- statements (into the tree) -------------------------------------------------------
+* EXPNL - the end of the line.
+EXPNL  .enter
+       LI   R1,TK.NL
+       BL   @ATK
+       MOV  R0,R0
+       JNE  ENL1
+       LI   R0,PE.NL
+       B    @PERR
+ENL1   BL   @TTAKE
+       .leave
+       RT
+* EXPKW - keyword R1 must come next (taken).  EXPSYM - symbol R3.
+EXPKW  .enter
+       BL   @ATKW
+       MOV  R0,R0
+       JNE  EXK1
+       LI   R0,PE.EXP
+       B    @PERR
+EXK1   BL   @TTAKE
+       .leave
+       RT
+EXPSYM .enter
+       BL   @CMP1
+       JEQ  EXS1
+       LI   R0,PE.EXP
+       B    @PERR
+EXS1   BL   @TTAKE
+       .leave
+       RT
+* IDENT - a name next: its text into the tree, taken.  ISTR - a string.
+IDENT  .enter
+       LI   R1,TK.ID
+       BL   @ATK
+       MOV  R0,R0
+       JNE  IDN1
+       LI   R0,PE.EXP
+       B    @PERR
+IDN1   BL   @TSTRT
+       BL   @TTAKE
+       .leave
+       RT
+ISTR   .enter
+       LI   R1,TK.STR
+       BL   @ATK
+       MOV  R0,R0
+       JNE  ISR1
+       LI   R0,PE.EXP
+       B    @PERR
+ISR1   BL   @TSTRT
+       BL   @TTAKE
+       .leave
+       RT
+* ATENDS - R0 = 1 if the current token is one of the enders in R4
+* (EN.END, EN.EIF, EN.ELS).
+ATENDS .enter
+       LI   R1,KW.END
+       BL   @ATKW
+       MOV  R0,R0
+       JEQ  ATE1
+       COC  @DENEND,R4
+       JEQ  ATE9
+ATE1   LI   R1,KW.EIF
+       BL   @ATKW
+       MOV  R0,R0
+       JEQ  ATE2
+       COC  @DENEIF,R4
+       JEQ  ATE9
+ATE2   LI   R1,KW.ELS
+       BL   @ATKW
+       MOV  R0,R0
+       JEQ  ATE8
+       COC  @DENELS,R4
+       JEQ  ATE9
+ATE8   CLR  R0
+       .leave
+       RT
+ATE9   LI   R0,1
+       .leave
+       RT
+DENEND DATA EN.END
+DENEIF DATA EN.EIF
+DENELS DATA EN.ELS
+
+* STMTS - statements up to the enders in R4; R5 = 1 allows rule cases.
+STMTS  .enter
+       .push R4
+       .push R5
+       BL   @LBEG
+STS1   MOV  @2(R10),R4
+       BL   @ATENDS
+       MOV  R0,R0
+       JNE  STS9
+       LI   R1,TK.EOF
+       BL   @ATK
+       MOV  R0,R0
+       JEQ  STS2
+       LI   R0,PE.END
+       B    @PERR
+STS2   MOV  *R10,R5
+       JEQ  STS3
+       BL   @ISCASE
+       MOV  R0,R0
+       JEQ  STS3
+       MOV  @2(R10),R4
+       BL   @CASE
+       JMP  STS4
+STS3   BL   @STMT
+STS4   BL   @LINC
+       JMP  STS1
+STS9   BL   @LEND
+       .pop R5
+       .pop R4
+       .leave
+       RT
+
+* ISCASE - R0 = 1 if an  Action, Action:  label starts here.
+ISCASE .enter
+       LI   R1,PKSAV
+       BL   @CSAVE
+ISC1   MOV  @TKND,R0
+       CI   R0,TK.ID
+       JEQ  ISC2
+       CI   R0,TK.KW
+       JNE  ISC8
+ISC2   BL   @TTAKE
+       LI   R3,SCOLON
+       BL   @CMP1
+       JEQ  ISC7
+       LI   R3,SCOMMA
+       BL   @CMP1
+       JNE  ISC8
+       BL   @TTAKE
+       JMP  ISC1
+ISC7   LI   R4,1
+       JMP  ISC9
+ISC8   CLR  R4
+ISC9   LI   R1,PKSAV
+       BL   @CREST
+       MOV  R4,R0
+       .leave
+       RT
+
+* ACTN - an action name (a name or a keyword, as written).
+ACTN   .enter
+       MOV  @TKND,R0
+       CI   R0,TK.ID
+       JEQ  ACN1
+       CI   R0,TK.KW
+       JEQ  ACN1
+       LI   R0,PE.ACN
+       B    @PERR
+ACN1   BL   @TSTRT
+       BL   @TTAKE
+       .leave
+       RT
+
+* CASE - Action, Action: then statements (enders R4).
+CASE   .enter
+       .push R4
+       LI   R0,NT.CAS
+       MOV  @TLN,R1
+       BL   @TNODE
+       BL   @LBEG              the actions
+       BL   @ACTN
+       BL   @LINC
+CAS1   LI   R3,SCOMMA
+       BL   @CMP1
+       JNE  CAS2
+       BL   @TTAKE
+       BL   @ACTN
+       BL   @LINC
+       JMP  CAS1
+CAS2   BL   @LEND
+       LI   R3,SCOLON
+       BL   @EXPSYM
+       BL   @LBEG              the body
+       LI   R1,TK.NL
+       BL   @ATK
+       MOV  R0,R0
+       JNE  CAS3
+       BL   @STMT              Action:  statement   on the same line
+       BL   @LINC
+       JMP  CAS4
+CAS3   BL   @TTAKE
+CAS4   MOV  *R10,R4
+       BL   @ATENDS
+       MOV  R0,R0
+       JNE  CAS9
+       BL   @ISCASE
+       MOV  R0,R0
+       JNE  CAS9
+       LI   R1,TK.EOF
+       BL   @ATK
+       MOV  R0,R0
+       JEQ  CAS5
+       LI   R0,PE.END
+       B    @PERR
+CAS5   BL   @STMT
+       BL   @LINC
+       JMP  CAS4
+CAS9   BL   @LEND
+       .pop R4
+       .leave
+       RT
+
+* BLOCK - the end of the line, then statements up to the enders R4.
+BLOCK  .enter
+       BL   @EXPNL
+       CLR  R5
+       BL   @STMTS
+       .leave
+       RT
+
+* STMT - one statement.
+STMT   .enter
+       MOV  @TLN,R6            p: the statement's line
+       .push R6
+       MOV  @TKND,R0
+       CI   R0,TK.KW
+       JEQ  STM0
+       B    @STM50
+STM0   MOV  @TVAL,R0
+       CI   R0,KW.IF
+       JNE  STM10
+       BL   @TTAKE             IF
+       LI   R0,NT.IF
+       MOV  *R10,R1
+       BL   @TNODE
+       BL   @LBEG              the arms: (cond, body) tuples
+STM1   LI   R0,>0600
+       BL   @TPUT
+       LI   R0,>0200
+       BL   @TPUT
+       BL   @EXPRT
+       LI   R4,EN.EIF+EN.ELS+EN.END
+       BL   @BLOCK
+       BL   @LINC
+       LI   R1,KW.EIF
+       BL   @ATKW
+       MOV  R0,R0
+       JEQ  STM2
+       BL   @TTAKE
+       JMP  STM1
+STM2   BL   @LEND
+       LI   R1,KW.ELS
+       BL   @ATKW
+       MOV  R0,R0
+       JEQ  STM3
+       BL   @TTAKE
+       LI   R4,EN.END
+       BL   @BLOCK
+       JMP  STM4
+STM3   BL   @TNONE
+STM4   LI   R1,KW.END
+       BL   @EXPKW
+       BL   @EXPNL
+       B    @STM99
+STM10  CI   R0,KW.WHL
+       JNE  STM12
+       BL   @TTAKE             WHILE
+       LI   R0,NT.WHL
+       MOV  *R10,R1
+       BL   @TNODE
+       BL   @EXPRT
+       LI   R4,EN.END
+       BL   @BLOCK
+       LI   R1,KW.END
+       BL   @EXPKW
+       BL   @EXPNL
+       B    @STM99
+STM12  CI   R0,KW.FOR
+       JNE  STM14
+       BL   @TTAKE             FOR EACH v IN expr
+       LI   R1,KW.EAC
+       BL   @EXPKW
+       LI   R0,NT.FOR
+       MOV  *R10,R1
+       BL   @TNODE
+       BL   @IDENT
+       LI   R1,KW.IN
+       BL   @EXPKW
+       BL   @EXPRT
+       LI   R4,EN.END
+       BL   @BLOCK
+       LI   R1,KW.END
+       BL   @EXPKW
+       BL   @EXPNL
+       B    @STM99
+STM14  CI   R0,KW.LOC
+       JNE  STM16
+       BL   @TTAKE             LOCAL a, b
+       LI   R0,NT.LOC
+       MOV  *R10,R1
+       BL   @TNODE
+       BL   @LBEG
+       BL   @IDENT
+       BL   @LINC
+STM15  LI   R3,SCOMMA
+       BL   @CMP1
+       JNE  STM15A
+       BL   @TTAKE
+       BL   @IDENT
+       BL   @LINC
+       JMP  STM15
+STM15A BL   @LEND
+       BL   @EXPNL
+       B    @STM99
+STM16  CI   R0,KW.PRI
+       JEQ  STM17
+       CI   R0,KW.WRI
+       JNE  STM20
+STM17  CLR  R5                 PRINT / WRITE: newline for PRINT
+       CI   R0,KW.PRI
+       JNE  STM17A
+       LI   R5,1
+STM17A .push R5
+       BL   @TTAKE
+       LI   R0,NT.PRN
+       MOV  @2(R10),R1
+       BL   @TNODE
+       BL   @LBEG
+       LI   R1,TK.NL
+       BL   @ATK
+       MOV  R0,R0
+       JNE  STM19
+       BL   @PITEM
+       BL   @LINC
+STM18  LI   R3,SCOMMA
+       BL   @CMP1
+       JNE  STM19A
+       BL   @TTAKE
+       BL   @PITEM
+       BL   @LINC
+       JMP  STM18
+STM19  MOV  *R10,R0            nothing: fine for PRINT, not for WRITE
+       JNE  STM19A
+       LI   R0,PE.WRI
+       B    @PERR
+STM19A BL   @LEND
+       .pop R0
+       BL   @TBOOL
+       BL   @EXPNL
+       B    @STM99
+STM20  CI   R0,KW.MOV
+       JNE  STM22
+       BL   @TTAKE             MOVE o TO d
+       LI   R0,NT.MOV
+       MOV  *R10,R1
+       BL   @TNODE
+       BL   @EXPRT
+       LI   R1,KW.TO
+       BL   @EXPKW
+       BL   @EXPRT
+       BL   @EXPNL
+       B    @STM99
+STM22  CI   R0,KW.REM
+       JNE  STM24
+       BL   @TTAKE             REMOVE o
+       LI   R0,NT.REM
+       MOV  *R10,R1
+       BL   @TNODE
+       BL   @EXPRT
+       BL   @EXPNL
+       B    @STM99
+STM24  CI   R0,KW.GIV
+       JNE  STM26
+       BL   @TTAKE             GIVE postfix attrs
+       LI   R0,NT.GIV
+       MOV  *R10,R1
+       BL   @TNODE
+       CLR  @EXP
+       BL   @EPOST
+       BL   @EFLUSH
+       BL   @ATTRS
+       BL   @EXPNL
+       B    @STM99
+STM26  CI   R0,KW.RET
+       JNE  STM28
+       BL   @TTAKE             RETURN [expr]
+       LI   R0,NT.RET
+       MOV  *R10,R1
+       BL   @TNODE
+       LI   R1,TK.NL
+       BL   @ATK
+       MOV  R0,R0
+       JEQ  STM27
+       BL   @TNONE
+       JMP  STM27A
+STM27  BL   @EXPRT
+STM27A BL   @EXPNL
+       B    @STM99
+STM28  CI   R0,KW.PIC
+       JNE  STM50
+       BL   @TTAKE             PICTURE expr
+       LI   R0,NT.PST
+       MOV  *R10,R1
+       BL   @TNODE
+       BL   @EXPRT
+       BL   @EXPNL
+       B    @STM99
+* target = value, or an expression (a call): see parser.py's stmt
+STM50  LI   R1,TTSAV           (here, to come back to)
+       BL   @CSAVE
+       LI   R1,TK.ID
+       BL   @ATK
+       MOV  R0,R0
+       JNE  STM51
+       LI   R1,KW.SLF
+       BL   @ATKW
+       MOV  R0,R0
+       JEQ  STM55
+STM51  CLR  @EXP               a target
+       BL   @EPOST
+       LI   R3,SEQ
+       BL   @CMP1
+       JNE  STM54
+       MOVB @EXB+1,R0          = follows: an assignment
+       SRL  R0,8
+       CI   R0,NT.NAM
+       JEQ  STM52
+       CI   R0,NT.PRF
+       JEQ  STM52
+       CI   R0,NT.CAL
+       JEQ  STM52
+       LI   R0,PE.ASG
+       B    @PERR
+STM52  LI   R0,NT.ASG
+       MOV  *R10,R1
+       BL   @TNODE
+       BL   @EFLUSH
+       BL   @TTAKE
+       BL   @EXPRT
+       BL   @EXPNL
+       B    @STM99
+STM54  LI   R1,TTSAV           no =: back, and read it as an expression
+       BL   @CREST
+STM55  MOV  @TLN,R7            (t0's line)
+       .push R7
+       CLR  @EXP
+       BL   @EXPRI
+       .pop R7
+       MOVB @EXB+1,R0
+       SRL  R0,8
+       CI   R0,NT.BIN          a = b on its own: an error
+       JNE  STM56
+       CB   @EXB+7,@BEQSGN
+       JNE  STM56
+       CB   @EXB+6,@BONE
+       JNE  STM56
+       LI   R0,PE.ASG
+       B    @PERRL
+STM56  CI   R0,NT.CAL
+       JEQ  STM57
+       CI   R0,NT.NAM
+       JEQ  STM57
+       CI   R0,NT.PRF
+       JEQ  STM57
+       LI   R0,PE.VAL
+       B    @PERRL
+STM57  LI   R0,NT.EST
+       MOV  *R10,R1
+       BL   @TNODE
+       BL   @EFLUSH
+       BL   @EXPNL
+STM99  INCT R10
+       .leave
+       RT
+BEQSGN BYTE '='
+BONE   BYTE 1
+       EVEN
+
+* PITEM - (form) expr, or expr.
+PITEM  .enter
+       .push @TLN
+       LI   R3,SLPAR
+       BL   @CMP1
+       JNE  PIT8
+       LI   R1,PKSAV           look ahead: a form name, then )
+       BL   @CSAVE
+       BL   @TTAKE
+       MOV  @TKND,R0
+       CI   R0,TK.ID
+       JEQ  PIT1
+       CI   R0,TK.KW
+       JNE  PIT7
+PIT1   LI   R4,FORMS           its text one of the forms (spelling matters)?
+PIT2   MOVB *R4,R0
+       JEQ  PIT7
+       MOV  R4,R1
+       BL   @TTXEQ
+       MOV  R0,R0
+       JNE  PIT3
+       MOVB *R4+,R0
+       SRL  R0,8
+       A    R0,R4
+       JMP  PIT2
+PIT3   MOV  @TXPG,@PFPG        (where the form's text is)
+       MOV  @TXOF,@PFOF
+       MOV  @TLEN,@PFLN
+       BL   @TTAKE
+       LI   R3,SRPAR
+       BL   @CMP1
+       JNE  PIT7
+       LI   R1,PKSAV           yes: (form) expr
+       BL   @CREST
+       LI   R0,NT.PIT
+       MOV  *R10,R1
+       BL   @TNODE
+       MOV  @PFLN,R2
+       MOV  @PFPG,R3
+       MOV  @PFOF,R4
+       BL   @TSTRAT
+       BL   @TTAKE             ( form )
+       BL   @TTAKE
+       BL   @TTAKE
+       BL   @EXPRT
+       JMP  PIT9
+PIT7   LI   R1,PKSAV
+       BL   @CREST
+PIT8   LI   R0,NT.PIT
+       MOV  *R10,R1
+       BL   @TNODE
+       BL   @TNONE
+       BL   @EXPRT
+PIT9   INCT R10
+       .leave
+       RT
+FORMS  BYTE 3
+       TEXT 'the'
+       BYTE 3
+       TEXT 'The'
+       BYTE 1
+       TEXT 'a'
+       BYTE 1
+       TEXT 'A'
+       BYTE 2
+       TEXT 'an'
+       BYTE 2
+       TEXT 'An'
+       BYTE 4
+       TEXT 'name'
+       BYTE 6
+       TEXT 'number'
+       BYTE 4
+       TEXT 'char'
+       BYTE 6
+       TEXT 'string'
+       BYTE 0
+       EVEN
+
+* ATTRS - [NOT] attr ... as (name, on) tuples; at least one.
+ATTRS  .enter
+       BL   @LBEG
+ATR1   LI   R1,TK.ID
+       BL   @ATK
+       MOV  R0,R0
+       JNE  ATR2
+       LI   R1,KW.NOT
+       BL   @ATKW
+       MOV  R0,R0
+       JEQ  ATR8
+ATR2   LI   R5,1
+       LI   R1,KW.NOT
+       BL   @ATKW
+       MOV  R0,R0
+       JEQ  ATR3
+       BL   @TTAKE
+       CLR  R5
+ATR3   .push R5
+       LI   R0,>0600
+       BL   @TPUT
+       LI   R0,>0200
+       BL   @TPUT
+       BL   @IDENT
+       .pop R0
+       BL   @TBOOL
+       BL   @LINC
+       JMP  ATR1
+ATR8   MOV  @LSP,R1            none at all: an error
+       DECT R1
+       MOV  *R1,R1
+       JNE  ATR9
+       LI   R0,PE.ATT
+       B    @PERR
+ATR9   BL   @LEND
+       .leave
+       RT
+
+* ---- declarations -----------------------------------------------------------------
+* PARSE - the whole token stream into the tree: R0 = 0, or an error.
+PARSE  .enter
+       MOV  R10,@PSTKS         (an error comes back to here)
+       CLR  @WBERR
+       CLR  @EXP
+       SETO @MAPEP
+       LI   R0,LSTK
+       MOV  R0,@LSP
+       LI   R0,TOKPG           the first token
+       MOV  R0,@TCPG
+       CLR  @TCOF
+       BL   @TLOAD
+       LI   R0,TREEPG          the tree from its first page
+       MOV  R0,@TKPAGE
+       CLR  @TKOFF
+       LI   R1,>F
+       BL   @MAPPG
+       BL   @LBEG              file := decl*
+PAR1   LI   R1,TK.EOF
+       BL   @ATK
+       MOV  R0,R0
+       JNE  PAR9
+       BL   @DECL
+       BL   @LINC
+       JMP  PAR1
+PAR9   BL   @LEND
+PARSX  MOV  @WBERR,R0
+       .leave
+       RT
+
+* DECL - one declaration.
+DECL   .enter
+       .push @TLN              p
+       LI   R1,TK.ID           MUSIC / SOUND name "file"
+       BL   @ATK
+       MOV  R0,R0
+       JEQ  DCL2
+       LI   R4,SMUSIC
+       BL   @TTXEQI
+       MOV  R0,R0
+       JNE  DCL1
+       LI   R4,SSOUND
+       BL   @TTXEQI
+       MOV  R0,R0
+       JEQ  DCL1X
+DCL1   LI   R1,PKSAV           ... when a name follows
+       BL   @CSAVE
+       BL   @TTAKE
+       MOV  @TKND,R5
+       LI   R1,PKSAV
+       BL   @CREST
+       CI   R5,TK.ID
+       JNE  DCL1X
+       BL   @TTAKE
+       LI   R0,NT.SND
+       MOV  *R10,R1
+       BL   @TNODE
+       MOV  R4,R1              its kind: MUSIC or SOUND
+       BL   @TSTRC
+       BL   @IDENT
+       BL   @ISTR
+       BL   @EXPNL
+       B    @DCL99
+DCL1X  LI   R0,PE.DCL
+       B    @PERR
+DCL2   LI   R1,TK.KW
+       BL   @ATK
+       MOV  R0,R0
+       JNE  DCL3
+       LI   R0,PE.DCL
+       B    @PERR
+DCL3   MOV  @TVAL,R6           the keyword
+       .push R6
+       BL   @TTAKE
+       .pop R6
+       CI   R6,KW.INC
+       JNE  DCL10
+       LI   R0,NT.INC          INCLUDE "file"
+       MOV  *R10,R1
+       BL   @TNODE
+       BL   @ISTR
+       B    @DCL90
+DCL10  CI   R6,KW.CON
+       JNE  DCL12
+       LI   R0,NT.CON          CONSTANT n = expr
+       MOV  *R10,R1
+       BL   @TNODE
+       BL   @IDENT
+       LI   R3,SEQ
+       BL   @EXPSYM
+       BL   @EXPRT
+       B    @DCL90
+DCL12  CI   R6,KW.GLO
+       JNE  DCL14
+       LI   R0,NT.GLO          GLOBAL n [= expr]
+       MOV  *R10,R1
+       BL   @TNODE
+       BL   @IDENT
+       LI   R3,SEQ
+       BL   @CMP1
+       JNE  DCL13
+       BL   @TTAKE
+       BL   @EXPRT
+       B    @DCL90
+DCL13  BL   @TNONE
+       B    @DCL90
+DCL14  CI   R6,KW.ARR
+       JNE  DCL18
+       LI   R0,NT.ARR          ARRAY n size | ARRAY n = e, e ...
+       MOV  *R10,R1
+       BL   @TNODE
+       BL   @IDENT
+       LI   R3,SEQ
+       BL   @CMP1
+       JNE  DCL16
+       BL   @TTAKE
+       BL   @TNONE
+       BL   @LBEG
+       BL   @EXPRT
+       BL   @LINC
+DCL15  LI   R3,SCOMMA
+       BL   @CMP1
+       JNE  DCL15A
+       BL   @TTAKE
+       BL   @EXPRT
+       BL   @LINC
+       JMP  DCL15
+DCL15A BL   @LEND
+       B    @DCL90
+DCL16  LI   R1,TK.NUM
+       BL   @ATK
+       MOV  R0,R0
+       JNE  DCL17
+       LI   R0,PE.EXP
+       B    @PERR
+DCL17  MOV  @TVAL,R0
+       BL   @TINT
+       BL   @TTAKE
+       BL   @TNONE
+       B    @DCL90
+DCL18  CI   R6,KW.ATT
+       JEQ  DCL19
+       CI   R6,KW.PRO
+       JNE  DCL22
+DCL19  LI   R0,NT.ATT          ATTRIBUTE / PROPERTY names
+       CI   R6,KW.ATT
+       JEQ  DCL19A
+       LI   R0,NT.PRO
+DCL19A MOV  *R10,R1
+       BL   @TNODE
+       BL   @LBEG
+       BL   @IDENT
+       BL   @LINC
+DCL20  LI   R1,TK.ID
+       BL   @ATK
+       MOV  R0,R0
+       JEQ  DCL21
+       BL   @TSTRT
+       BL   @TTAKE
+       BL   @LINC
+       JMP  DCL20
+DCL21  BL   @LEND
+       B    @DCL90
+DCL22  CI   R6,KW.PIC
+       JNE  DCL24
+       LI   R0,NT.PIC          PICTURE n "file"
+       MOV  *R10,R1
+       BL   @TNODE
+       BL   @IDENT
+       BL   @ISTR
+       B    @DCL90
+DCL24  CI   R6,KW.CLA
+       JEQ  DCL25
+       CI   R6,KW.OBJ
+       JEQ  DCL25
+       CI   R6,KW.ROO
+       JNE  DCL26
+DCL25  MOV  R6,R4
+       MOV  *R10,R5
+       BL   @OBJDCL
+       B    @DCL99
+DCL26  CI   R6,KW.VRB
+       JNE  DCL28
+       LI   R0,NT.VRB          VERB "w" ... then lines
+       MOV  *R10,R1
+       BL   @TNODE
+       BL   @LBEG
+       BL   @ISTR
+       BL   @LINC
+DCL27  LI   R1,TK.STR
+       BL   @ATK
+       MOV  R0,R0
+       JEQ  DCL27A
+       BL   @TSTRT
+       BL   @TTAKE
+       BL   @LINC
+       JMP  DCL27
+DCL27A BL   @LEND
+       BL   @EXPNL
+       BL   @VLINES
+       B    @DCL99
+DCL28  CI   R6,KW.EXT
+       JNE  DCL30
+       LI   R0,NT.EXT          EXTEND "w" [FIRST] then lines
+       MOV  *R10,R1
+       BL   @TNODE
+       BL   @ISTR
+       LI   R1,KW.FST
+       BL   @ATKW
+       MOV  R0,R0
+       JEQ  DCL29
+       BL   @TTAKE
+       BL   @TTRUE
+       JMP  DCL29A
+DCL29  BL   @TFALSE
+DCL29A BL   @EXPNL
+       BL   @VLINES
+       B    @DCL99
+DCL30  CI   R6,KW.REP
+       JNE  DCL32
+       LI   R0,NT.REP          REPLACE n
+       MOV  *R10,R1
+       BL   @TNODE
+       BL   @IDENT
+       B    @DCL90
+DCL32  CI   R6,KW.ROU
+       JNE  DCL36
+       LI   R0,NT.ROU          ROUTINE n [p, p] then statements
+       MOV  *R10,R1
+       BL   @TNODE
+       BL   @IDENT
+       BL   @LBEG
+       LI   R1,TK.ID
+       BL   @ATK
+       MOV  R0,R0
+       JEQ  DCL34
+       BL   @TSTRT
+       BL   @TTAKE
+       BL   @LINC
+DCL33  LI   R3,SCOMMA
+       BL   @CMP1
+       JNE  DCL34
+       BL   @TTAKE
+       BL   @IDENT
+       BL   @LINC
+       JMP  DCL33
+DCL34  BL   @LEND
+       BL   @EXPNL
+       LI   R4,EN.END
+       CLR  R5
+       BL   @STMTS
+       LI   R1,KW.END
+       BL   @EXPKW
+       BL   @EXPNL
+       B    @DCL99
+DCL36  LI   R0,PE.NOD          a keyword that cannot start a declaration
+       MOV  *R10,R7
+       B    @PERRL
+DCL90  BL   @EXPNL
+DCL99  INCT R10
+       .leave
+       RT
+
+* TTXEQI - R0 = 1 if the current token's text, in capitals, is the
+* length-prefixed constant (capitals) at R4.  Keeps R4.
+TTXEQI .enter
+       MOVB *R4,R0
+       SRL  R0,8
+       C    R0,@TLEN
+       JNE  TQI8
+       MOV  R0,R3
+       MOV  R4,R2
+       INC  R2
+       MOV  @TXPG,@RDPG
+       MOV  @TXOF,@RDOF
+TQI1   MOV  R3,R3
+       JEQ  TQI7
+       BL   @TRB
+       CI   R0,'a'
+       JL   TQI2
+       CI   R0,'z'
+       JH   TQI2
+       AI   R0,-32
+TQI2   SWPB R0
+       CB   R0,*R2+
+       JNE  TQI8
+       DEC  R3
+       JMP  TQI1
+TQI7   LI   R0,1
+       JMP  TQI9
+TQI8   CLR  R0
+TQI9   .leave
+       RT
+
+* OBJDCL - CLASS / OBJECT / ROOM (keyword R4, line R5).
+OBJDCL .enter
+       .push R4
+       LI   R0,NT.OBJ
+       MOV  R5,R1
+       BL   @TNODE
+       MOV  *R10,R4            its kind's name
+       LI   R1,SCLASS
+       CI   R4,KW.CLA
+       JEQ  OBJ1
+       LI   R1,SOBJECT
+       CI   R4,KW.OBJ
+       JEQ  OBJ1
+       LI   R1,SROOM
+OBJ1   BL   @TSTRC
+       BL   @IDENT             its name
+       MOV  *R10,R4            its short name (not for a class)
+       CI   R4,KW.CLA
+       JEQ  OBJ2
+       LI   R1,TK.STR
+       BL   @ATK
+       MOV  R0,R0
+       JEQ  OBJ2
+       BL   @TSTRT
+       BL   @TTAKE
+       JMP  OBJ3
+OBJ2   BL   @TNONE
+OBJ3   MOV  *R10,R4            IN parent (objects only)
+       CI   R4,KW.OBJ
+       JNE  OBJ4
+       LI   R1,KW.IN
+       BL   @ATKW
+       MOV  R0,R0
+       JEQ  OBJ4
+       BL   @TTAKE
+       BL   @IDENT
+       JMP  OBJ5
+OBJ4   BL   @TNONE
+OBJ5   BL   @EXPNL
+       BL   @LBEG              the body
+OBJ6   LI   R1,KW.END
+       BL   @ATKW
+       MOV  R0,R0
+       JNE  OBJ8
+       LI   R1,TK.EOF
+       BL   @ATK
+       MOV  R0,R0
+       JEQ  OBJ7
+       LI   R0,PE.NEN
+       B    @PERR
+OBJ7   BL   @BITEM
+       BL   @LINC
+       JMP  OBJ6
+OBJ8   BL   @LEND
+       BL   @TTAKE
+       BL   @EXPNL
+       INCT R10
+       .leave
+       RT
+
+* BITEM - an object body item.
+BITEM  .enter
+       .push @TLN              p
+       MOV  @TKND,R0
+       CI   R0,TK.KW
+       JNE  BIT20
+       MOV  @TVAL,R0
+       CI   R0,KW.HAS
+       JNE  BIT10
+       BL   @TTAKE             HAS attrs
+       LI   R0,NT.HAS
+       MOV  *R10,R1
+       BL   @TNODE
+       BL   @ATTRS
+       BL   @EXPNL
+       B    @BIT99
+BIT10  CI   R0,KW.CLA
+       JNE  BIT12
+       BL   @TTAKE             CLASS names
+       LI   R0,NT.CLS
+       MOV  *R10,R1
+       BL   @TNODE
+       BL   @LBEG
+       BL   @IDENT
+       BL   @LINC
+BIT11  LI   R1,TK.ID
+       BL   @ATK
+       MOV  R0,R0
+       JEQ  BIT11A
+       BL   @TSTRT
+       BL   @TTAKE
+       BL   @LINC
+       JMP  BIT11
+BIT11A BL   @LEND
+       BL   @EXPNL
+       B    @BIT99
+BIT12  CI   R0,KW.IN
+       JNE  BIT14
+       BL   @TTAKE             IN parent
+       LI   R0,NT.INP
+       MOV  *R10,R1
+       BL   @TNODE
+       BL   @IDENT
+       BL   @EXPNL
+       B    @BIT99
+BIT14  CI   R0,KW.NAM
+       JNE  BIT30
+       BL   @TTAKE             NAME "w" ...
+       LI   R0,NT.NMS
+       MOV  *R10,R1
+       BL   @TNODE
+       BL   @LBEG
+       BL   @ISTR
+       BL   @LINC
+BIT15  LI   R1,TK.STR
+       BL   @ATK
+       MOV  R0,R0
+       JEQ  BIT15A
+       BL   @TSTRT
+       BL   @TTAKE
+       BL   @LINC
+       JMP  BIT15
+BIT15A BL   @LEND
+       BL   @EXPNL
+       B    @BIT99
+BIT20  CI   R0,TK.ID
+       JNE  BIT30
+       MOV  @TXPG,@PPPG        a property: its name kept
+       MOV  @TXOF,@PPOF
+       MOV  @TLEN,@PPLN
+       BL   @TTAKE
+       LI   R1,TK.NL
+       BL   @ATK
+       MOV  R0,R0
+       JEQ  BIT24
+       LI   R0,NT.PBL          ... then the end of the line: a routine block
+       MOV  *R10,R1
+       BL   @TNODE
+       MOV  @PPLN,R2
+       MOV  @PPPG,R3
+       MOV  @PPOF,R4
+       BL   @TSTRAT
+       BL   @TTAKE
+       LI   R4,EN.END
+       LI   R5,1
+       BL   @STMTS
+       LI   R1,KW.END
+       BL   @EXPKW
+       BL   @EXPNL
+       B    @BIT99
+BIT24  LI   R0,NT.PVL          ... otherwise values
+       MOV  *R10,R1
+       BL   @TNODE
+       MOV  @PPLN,R2
+       MOV  @PPPG,R3
+       MOV  @PPOF,R4
+       BL   @TSTRAT
+       BL   @LBEG
+       BL   @EXPRT
+       BL   @LINC
+BIT25  LI   R1,TK.NL
+       BL   @ATK
+       MOV  R0,R0
+       JNE  BIT26
+       BL   @EXPRT
+       BL   @LINC
+       JMP  BIT25
+BIT26  BL   @LEND
+       BL   @EXPNL
+       B    @BIT99
+BIT30  LI   R0,PE.BDY
+       B    @PERR
+BIT99  INCT R10
+       .leave
+       RT
+
+* VLINES - grammar lines up to END.
+VLINES .enter
+       BL   @LBEG
+VLN1   LI   R1,KW.END
+       BL   @ATKW
+       MOV  R0,R0
+       JEQ  VLN2
+       B    @VLN9
+VLN2   LI   R1,TK.EOF
+       BL   @ATK
+       MOV  R0,R0
+       JEQ  VLN3
+       LI   R0,PE.VEN
+       B    @PERR
+VLN3   .push @TLN              lp
+       LI   R0,NT.GLN
+       MOV  *R10,R1
+       BL   @TNODE
+       BL   @LBEG              its tokens
+VLN4   LI   R3,SARROW
+       BL   @CMP1
+       JEQ  VLN8
+       LI   R1,TK.STR
+       BL   @ATK
+       MOV  R0,R0
+       JEQ  VLN5
+       LI   R0,NT.GTK          "word"
+       MOV  *R10,R1
+       BL   @TNODE
+       LI   R1,SWORD
+       BL   @TSTRC
+       BL   @TSTRT
+       BL   @TTAKE
+       BL   @TNONE
+       BL   @LINC
+       JMP  VLN4
+VLN5   LI   R1,TK.ID
+       BL   @ATK
+       MOV  R0,R0
+       JNE  VLN6
+       LI   R0,PE.GTK
+       B    @PERR
+VLN6   LI   R0,NT.GTK          slot [= routine]
+       MOV  *R10,R1
+       BL   @TNODE
+       LI   R1,SSLOT
+       BL   @TSTRC
+       BL   @TSTRT
+       BL   @TTAKE
+       LI   R3,SEQ
+       BL   @CMP1
+       JNE  VLN7
+       BL   @TTAKE
+       BL   @IDENT
+       JMP  VLN7A
+VLN7   BL   @TNONE
+VLN7A  BL   @LINC
+       JMP  VLN4
+VLN8   BL   @LEND
+       BL   @TTAKE             ->
+       BL   @ACTN
+       LI   R1,KW.REV
+       BL   @ATKW
+       MOV  R0,R0
+       JEQ  VLN8A
+       BL   @TTAKE
+       BL   @TTRUE
+       JMP  VLN8B
+VLN8A  BL   @TFALSE
+VLN8B  BL   @EXPNL
+       INCT R10
+       BL   @LINC
+       B    @VLN1
+VLN9   BL   @LEND
+       BL   @TTAKE
+       BL   @EXPNL
+       .leave
+       RT
+
+* strings the parser writes or compares
+SOR    BYTE 2
+       TEXT 'OR'
+SAND   BYTE 3
+       TEXT 'AND'
+SNOT   BYTE 3
+       TEXT 'NOT'
+SEQ    BYTE 1
+       TEXT '='
+SNE    BYTE 2
+       TEXT '<>'
+SLT    BYTE 1
+       TEXT '<'
+SGT    BYTE 1
+       TEXT '>'
+SLE    BYTE 2
+       TEXT '<='
+SGE    BYTE 2
+       TEXT '>='
+SHAS   BYTE 3
+       TEXT 'HAS'
+SHASNT BYTE 5
+       TEXT 'HASNT'
+SIN    BYTE 2
+       TEXT 'IN'
+SNOTIN BYTE 5
+       TEXT 'NOTIN'
+SPLUS  BYTE 1
+       TEXT '+'
+SMINUS BYTE 1
+       TEXT '-'
+STIMES BYTE 1
+       TEXT '*'
+SDIV   BYTE 1
+       TEXT '/'
+SMOD   BYTE 3
+       TEXT 'MOD'
+SDOT   BYTE 1
+       TEXT '.'
+SLPAR  BYTE 1
+       TEXT '('
+SRPAR  BYTE 1
+       TEXT ')'
+SCOMMA BYTE 1
+       TEXT ','
+SCOLON BYTE 1
+       TEXT ':'
+SARROW BYTE 2
+       TEXT '->'
+SNAME  BYTE 4
+       TEXT 'NAME'
+STRUE  BYTE 4
+       TEXT 'TRUE'
+SFALSE BYTE 5
+       TEXT 'FALSE'
+SNOTHG BYTE 7
+       TEXT 'NOTHING'
+SSELF  BYTE 4
+       TEXT 'SELF'
+SMUSIC BYTE 5
+       TEXT 'MUSIC'
+SSOUND BYTE 5
+       TEXT 'SOUND'
+SCLASS BYTE 5
+       TEXT 'CLASS'
+SOBJECT BYTE 6
+       TEXT 'OBJECT'
+SROOM  BYTE 4
+       TEXT 'ROOM'
+SWORD  BYTE 4
+       TEXT 'word'
+SSLOT  BYTE 4
+       TEXT 'slot'
+       EVEN

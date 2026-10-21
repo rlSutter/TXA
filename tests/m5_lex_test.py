@@ -57,6 +57,10 @@ def ti_dump(m):
         k = data[p]; line = (data[p + 1] << 8) | data[p + 2]; ln = (data[p + 3] << 8) | data[p + 4]
         txt = bytes(data[p + 5:p + 5 + ln]).decode('latin-1'); p += 5 + ln
         kind = KIND.get(k, f'?{k}')
+        if kind == 'KW':                      # the text as written, then the keyword's number
+            p += 2
+            out.append(f'{line} KW {txt.upper()}')
+            continue
         if kind == 'NUM':
             v = (data[p] << 8) | data[p + 1]; p += 2
             if txt.startswith('>') and v > 0x7FFF:
@@ -93,7 +97,7 @@ for f in corpus(which):
     text = wrap_text(open(f).read())
     want = dump.tokens(tokenize(text, os.path.basename(f)))
     m, insns = run_ti(text)
-    got = ti_dump(m) if m.rw(sy['WBDONE']) == 2 else f'(not lexed: done={m.rw(sy["WBDONE"])} error={m.rw(sy["WBERR"])} line={m.rw(sy["WBERRL"])})'
+    got = ti_dump(m) if m.rw(sy['WBDONE']) in (2, 3) else f'(not lexed: done={m.rw(sy["WBDONE"])} error={m.rw(sy["WBERR"])} line={m.rw(sy["WBERRL"])})'
     total_insns += insns; total_bytes += len(text)
     check(f'{os.path.relpath(f, ROOT)}: {want.count(chr(10))} tokens identical ({insns / 1e6:.1f}M instructions, ~{insns / 3e5:.0f} s on a TI)',
           got == want, first_diff(want, got))
@@ -110,6 +114,8 @@ if which in ('errors', 'all'):
             pcode, pline = code, e.line
         m, _ = run_ti(text)
         tcode, tline = m.rw(sy['WBERR']), m.rw(sy['WBERRL'])
+        if tcode >= 10:                       # a parse error, after the lexer was content
+            tcode, tline = 0, 0
         check(f'error case {text.splitlines()[-1][:20]!r}: python line {pline}, ti code {tcode} line {tline}',
               (tcode, tline) == (pcode, pline) and pcode == code and pline == line, (tcode, tline, pcode, pline))
 print('ALL PASS' if not fails else f'{fails} FAILED')

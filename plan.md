@@ -690,12 +690,39 @@ for a key without saying so, and went back to a prompt that looked
 unchanged.  Now it says "Press a key to choose another file." and clears
 the results when it asks again (tested).
 
+M5 part 3 done (21 October 2026): the parser on the TI.
+- The tree encoding (tools/txc/dump.py: tree_bytes, tree_text): pre-
+  order, self-describing (None, True, False, integer, string, list,
+  tuple, node = type + line + fields in ast.py's order).  The TI writes
+  exactly these bytes; the test compares them with the Python parser's.
+- Keyword tokens now keep their text as written plus their keyword
+  number (action names such as Give keep their spelling in the tree).
+- src/wparse.a99 (about 2,100 lines): parser.py routine for routine.
+  Statements and declarations go straight into the tree (SAMS from page
+  96, window F); expressions are built in EXB (2K RAM over the font),
+  where a node header is put in front of an operand already built
+  (Binary, Unary, PropRef, Call), then copied in; -n folds into Num in
+  place.  List counts are placeholders patched at the list's end (LSTK).
+  A statement starting with a name is read as a target first (in EXB); if
+  no = follows, the token cache goes back and it is read as an
+  expression.  Errors reset the return stack to PARSE's.
+- tests/m5_parse_test.py: trees identical for the whole corpus
+  (Lamplight 12,898 bytes, parser.txa 30,043, every library file, the
+  demo, every m2/m3 world) and a small program of most constructs; 19
+  malformed programs give the same error on the same line.
+- Speed: parsing about 0.6M instructions for Lamplight's 12K (2 s on a
+  TI); the whole of Lamplight with its library about 22 s.
+- Bugs found: CMP1/CMP2 returned a status flag through .leave, whose MOV
+  spoils it (now the CI is last before B *R11); EINS indexed with R0
+  (the TMS9900 cannot); a call's argument count written low byte first.
+
 ## Next
 
-1. M5 part 3: the parser on the TI (a compact tree in SAMS; its canonical
-   text dump to add to dump.py; trees identical for the corpus; the
-   first parse error identical for malformed programs).
-2. M5 parts 4-6 as in the design doc.
+1. M5 part 4: meaning on the TI (sema.py: the symbol table, numbering,
+   objects and classes, REPLACE and EXTEND, grammar tables; a symbol
+   dump to add to dump.py; identical for the corpus; the semantic errors
+   identical).
+2. M5 parts 5-6 as in the design doc.
 
 ## (was) M5 (waiting on D1-D4): the native compiler (the workbench cartridge: source loading,
    three passes, the precompiled library, error list; done when the TI
@@ -748,6 +775,7 @@ text output, word wrap and [MORE]; bold and underline glyph sets.
 
 ## History
 
+- 2026-10-21 M5 part 3: the parser on the TI, trees identical to Python for the corpus.
 - 2026-10-21 M5 part 2: the lexer on the TI, identical to Python for the corpus.
 - 2026-10-21 M5 part 1: D1, txa_wrap, DV80 record reading, the workbench skeleton, the token dump.
 - 2026-10-21 M4 complete: scrollback; startup code moved to the startup segment.
