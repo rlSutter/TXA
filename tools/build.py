@@ -136,6 +136,8 @@ def assemble_engine(out_name='TXAE1'):
             sys.exit('the kernel reaches >2FFE (AMSSIZ uses it)')
         if addr == 0xA000 and addr + len(data) > 0xD000:
             sys.exit(f'the resident engine ends at >{addr + len(data):04X}, past >D000 (window D)')
+        if addr == 0x3000 and addr + len(data) > 0x3800:
+            sys.exit(f'the startup segment ends at >{addr + len(data):04X}, past >3800 (the variables, which START clears)')
     fend = symbols(os.path.join(B, 'engine.equ')).get('FASTND', 0)
     if fend > 0x83E0:
         sys.exit(f'the scratchpad block ends at >{fend:04X}, past >83E0 (the GPL workspace)')

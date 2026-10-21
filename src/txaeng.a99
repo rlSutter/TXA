@@ -35,9 +35,13 @@ KENTRY B    @START             the entry: E/A 5 and the cartridge start here
 * KERNND: first free byte of the kernel window
 KERNND
 
-* The font is read only at startup (FONTLD, FONTUL, the no-F18A screen),
-* so it loads where the value stack will be: once the story runs, the
-* stack overwrites it.  (It used to fill 768 bytes of the kernel window.)
+* The startup code and the font are used only before the story runs, so
+* they load where the value stack and the frames will be: once the story
+* runs, the stack overwrites them.  (They used to fill the kernel and
+* resident windows.)  build.py checks this segment ends below >3800.
        AORG VSTK
+       COPY "startup.a99"
        COPY "gen/font.a99"
+* STUPND: first byte past the startup segment
+STUPND
        END  START

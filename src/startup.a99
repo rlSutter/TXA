@@ -1,0 +1,343 @@
+*======================================================================
+* startup.a99 - the engine's start: everything run once, before the
+* story.  It is assembled at VSTK (>3000) with the font, in the value
+* stack's and the frames' space: START ends by branching to VMRUN
+* (resident), and from then on the stack overwrites all of this.
+* Nothing here may be called once the story runs (FATAL is for errors
+* found while starting).  build.py checks it ends below RAMVAR (>3800),
+* which START clears.
+*======================================================================
+
+START  LIMI 0
+       LWPI WS
+       LI   R10,STACKT
+       LI   R1,FSTSRC          the fast block into the scratchpad
+       LI   R2,NEXT
+       LI   R3,(FASTND-NEXT)/2
+STR0   MOV  *R1+,*R2+
+       DEC  R3
+       JNE  STR0
+       LI   R1,RAMVAR          clear the variables (>3800->3EFF)
+       LI   R2,>700/2
+STR1   CLR  *R1+
+       DEC  R2
+       JNE  STR1
+       BL   @F18UNL
+       BL   @F18DET
+       BL   @AMSDET
+       MOV  R0,R0
+       JEQ  STR2
+       BL   @AMSINI
+       BL   @AMSSIZ
+STR2   MOV  @F18FLG,R0
+       JNE  STR3
+       B    @NOF18
+STR3   LI   R0,30              the screen
+       MOV  R0,@ROWS
+       BL   @T80ON
+       BL   @TXCLS
+       BL   @FONTLD
+       BL   @FONTUL            underlined glyphs in 160-254
+       LI   R0,ATRTAB          every cell in normal colours ...
+       LI   R1,ATNORM*256
+       LI   R2,30*COLS
+       BL   @VFILL
+       LI   R0,>B202           ... and position attributes on (VR50)
+       BL   @VDPWR
+       LI   R0,14              palette 14 (normal) and 15 (bold)
+       LI   R1,TXTPAL
+       LI   R2,2
+       BL   @F18PAL
+       LI   R0,ATNORM
+       MOV  R0,@CURAT
+       CLR  @CURUL
+       LI   R0,SPRPAT          sprites off for good (see probe.a99)
+       CLR  R1
+       LI   R2,>800
+       BL   @VFILL
+       LI   R0,SPRATT
+       LI   R1,>D000
+       LI   R2,128
+       BL   @VFILL
+       C    @AMSPGS,@D128
+       JHE  STR4
+       LI   R1,SNOSMS
+       B    @FATAL
+STR4   MOV  @STMODE,R0         the story into SAMS: from the cartridge,
+       JNE  STR4A              or from disk files
+       BL   @LOADST
+       JMP  STR4B
+STR4A  BL   @LOADDK
+STR4B
+       BL   @CHKST             header and checksum
+       BL   @KEEPDY            the pristine dynamic area
+       BL   @GLOAD             the globals into RAM
+       BL   @UINIT             undo: LAST = the starting state, no records
+       CLR  @CURPIC            no picture yet
+       SETO @SMAPD             sound: window D untouched, D on its own page,
+       LI   R0,13              no voices, the chip quiet
+       MOV  R0,@DPAGE
+       BLWP @SOFFV
+       CLR  R0                 the status line: the title, in reverse
+       LI   R1,1
+       BL   @TXAT
+       LI   R1,TITLEB
+       CLR  R2
+       BL   @TXSTR
+       CLR  R0
+       LI   R2,COLS
+       BL   @REVSPN
+       LI   R0,1
+       MOV  R0,@TXTTOP
+       MOV  R0,@CROW
+       CLR  @LLEN
+       CLR  @MORECT
+       LI   R0,1
+       MOV  R0,@SEED
+       B    @VMRUN             the story starts (VMRUN is resident: from here
+*                              on the value stack overwrites this segment)
+
+LOADST .enter
+       MOV  @STLENH,R0         banks = (length + 8191) / 8192
+       MOV  @STLENL,R1
+       AI   R1,>1FFF
+       JNC  LDS0
+       INC  R0
+LDS0   SRL  R1,13
+       SLA  R0,3
+       SOC  R0,R1
+       MOV  R1,@VT1            banks to copy
+       CLR  @VT2               bank index
+LDS1   MOV  @VT2,R2            story pages 2k and 2k+1
+       SLA  R2,1
+       LI   R3,MAPRGA
+       BL   @MAPWIN
+       MOV  @VT2,R2
+       SLA  R2,1
+       INC  R2
+       LI   R3,MAPRGB
+       BL   @MAPWIN
+       MOV  @VT2,R0            select the bank: write to >6000 + 2n
+       A    @STBNK1,R0
+       SLA  R0,1
+       AI   R0,>6000
+       CLR  *R0
+       LI   R0,>6000
+       LI   R1,WINA
+       LI   R2,4096
+LDS2   MOV  *R0+,*R1+
+       DEC  R2
+       JNE  LDS2
+       CLR  @>6000             bank 0 again
+       INC  @VT2
+       C    @VT2,@VT1
+       JL   LDS1
+       SETO @CURBH
+       .leave
+       RT
+
+* LOADDK - the story from disk: files STNAME01, STNAME02 ... (STNAME
+* from storysrc.a99, e.g. DSK1.LAMPS), 4K each, one SAMS page apiece,
+* through the file buffer in VRAM.  "Loading" and a dot a file on the
+* screen; a file that cannot be read stops with its name.
+LOADDK .enter
+       LI   R0,2
+       LI   R1,2
+       BL   @TXAT
+       LI   R1,SLOAD
+       CLR  R2
+       BL   @TXSTR
+       MOV  @STLENH,R0         files = (length + 4095) / 4096
+       MOV  @STLENL,R1
+       AI   R1,>0FFF
+       JNC  LDK0
+       INC  R0
+LDK0   SRL  R1,12
+       SLA  R0,4
+       SOC  R0,R1
+       MOV  R1,@VT1
+       CLR  @VT2               file index
+LDK1   LI   R1,STNAME          the name: STNAME and two digits
+       LI   R2,FNBUF
+       MOVB *R1,R3
+       SRL  R3,8
+       MOV  R3,R0
+       INC  R0
+LDK2   MOVB *R1+,*R2+
+       DEC  R0
+       JNE  LDK2
+       MOV  @VT2,R1            index + 1, in two digits
+       INC  R1
+       CLR  R0
+       DIV  @D10,R0
+       AI   R0,'0'
+       SWPB R0
+       MOVB R0,*R2+
+       AI   R1,'0'
+       SWPB R1
+       MOVB R1,*R2+
+       INCT R3
+       SWPB R3
+       MOVB R3,@FNBUF
+       LI   R0,5               the DSR's LOAD
+       LI   R1,DSKMAX
+       BL   @DSKCAL
+       MOV  R0,R0
+       JNE  LDK9
+       MOV  @VT2,R2            its page into window B ...
+       LI   R3,MAPRGB
+       BL   @MAPWIN
+       LI   R0,FBUF            ... and the 4K from VRAM into it
+       LI   R1,WINB
+       LI   R2,4096
+       BL   @VMBR
+       MOV  @VT2,R0            a dot for it
+       AI   R0,(2*COLS)+10
+       LI   R1,'.'*256
+       BL   @VSBW
+       INC  @VT2
+       C    @VT2,@VT1
+       JL   LDK1
+       BL   @SPRZER
+       SETO @CURBH
+       LI   R0,2               the loading line cleared
+       BL   @ECLR
+       .leave
+       RT
+LDK9   BL   @SPRZER            stop, naming the file
+       LI   R0,4
+       LI   R1,2
+       BL   @TXAT
+       LI   R1,SNOFIL
+       CLR  R2
+       BL   @TXSTR
+       LI   R1,FNBUF
+       CLR  R2
+       BL   @TXSTR
+       BL   @WAITKY
+       B    @QUIT
+SLOAD  BYTE SLOADX-SLOAD-1
+       TEXT 'Loading'
+SLOADX
+SNOFIL BYTE SNOFLX-SNOFIL-1
+       TEXT 'Cannot read the story file '
+SNOFLX
+       EVEN
+
+* CHKST - the header into HDRCPY, then check the magic and the
+* checksum (all bytes after the header, mod 65536).
+CHKST  .enter
+       CLR  R1                 header: 32 words
+       LI   R14,HDRCPY
+CHK1   BL   @RDW
+       MOV  R0,*R14+
+       INCT R1
+       CI   R1,64
+       JL   CHK1
+       LI   R0,>1000           the title's length byte for TXSTR (over
+       MOVB R0,@TITLEB         the copy's last date byte, not used)
+       C    @HDRCPY,@MAGIC1
+       JNE  CHK8
+       C    @HDRCPY+2,@MAGIC2
+       JNE  CHK8
+       CLR  R14                sum
+       MOV  @H.LENH,R0         pages = length / 4096 (+1 for a part)
+       MOV  @H.LENL,R1
+       MOV  R1,R15
+       ANDI R15,>0FFF          bytes in the last page
+       SRL  R1,12
+       SLA  R0,4
+       SOC  R0,R1
+       MOV  R1,@VT1            full pages
+       CLR  @VT2               page
+CHK2   MOV  @VT2,R2
+       LI   R3,MAPRGB
+       BL   @MAPWIN
+       LI   R1,WINB
+       LI   R2,>1000           a full page ...
+       C    @VT2,@VT1
+       JL   CHK3
+       MOV  R15,R2             ... or the part of the last one
+       JEQ  CHK6
+CHK3   MOV  @VT2,R0
+       JNE  CHK4
+       AI   R1,64              page 0: the header is not counted
+       AI   R2,-64
+CHK4   CLR  R0
+CHK5   MOVB *R1+,R0
+       SWPB R0
+       A    R0,R14
+       CLR  R0
+       DEC  R2
+       JNE  CHK5
+       INC  @VT2
+       C    @VT2,@VT1
+       JLE  CHK2
+CHK6   SETO @CURBH
+       C    R14,@H.CSUM
+       JNE  CHK9
+       .leave
+       RT
+CHK8   LI   R1,SNOTST
+       B    @FATAL
+CHK9   LI   R1,SBADCK
+       B    @FATAL
+MAGIC1 TEXT 'TX'
+MAGIC2 TEXT 'A1'
+
+* KEEPDY / PRISTN - copy the dynamic area (at most 16K: story pages 0-3)
+* to pages PRPAGE on, or back.  Window A shows the story page, window B
+* the copy's page; MAPWIN adds STPAGE, so the copy's pages are named
+* PRPAGE-STPAGE+i.
+
+FATAL  MOV  R1,@VT1
+       LI   R0,2
+       LI   R1,2
+       BL   @TXAT
+       MOV  @VT1,R1
+       CLR  R2
+       BL   @TXSTR
+       BL   @WAITKY
+       B    @QUIT
+
+* NOF18 - no F18A: Graphics I, which every VDP shows.
+NOF18  LI   R1,NOFREG
+NOF1   MOV  *R1+,R0
+       JEQ  NOF2
+       BL   @VDPWR
+       JMP  NOF1
+NOF2   LI   R0,NAMTAB
+       LI   R1,>2000
+       LI   R2,768
+       BL   @VFILL
+       LI   R0,GM1COL
+       LI   R1,>F100
+       LI   R2,32
+       BL   @VFILL
+       LI   R0,PATTAB+(32*8)
+       LI   R1,FONT
+       LI   R2,95*8
+       BL   @VMBW
+       LI   R0,NAMTAB+(10*32)+2
+       LI   R1,SNOF18+1
+       LI   R2,SNOF18X-SNOF18-1
+       BL   @VMBW
+       BL   @WAITKY
+       B    @QUIT
+NOFREG DATA >8000,>81E0,>8200,>8300+(GM1COL/>40),>8400+(PATTAB/>800),>8500+(SPRATT/>80),>8604,>8701,0
+
+* QUIT - the hardware back as the console expects it, then its title.
+
+SNOSMS BYTE SNOSMSX-SNOSMS-1
+       TEXT 'TXA needs a SAMS card of 512K or more on this TI.'
+SNOSMSX
+SNOTST BYTE SNOTSTX-SNOTST-1
+       TEXT 'There is no TXA story in this cartridge.'
+SNOTSTX
+SBADCK BYTE SBADCKX-SBADCK-1
+       TEXT 'The story is damaged: its checksum does not match.'
+SBADCKX
+SNOF18 BYTE SNOF18X-SNOF18-1
+       TEXT 'TXA NEEDS AN F18A OR PICO9918'
+SNOF18X
+* run-time error messages (bytes 1-3: ERRN1-3)
