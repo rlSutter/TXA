@@ -1,0 +1,105 @@
+*======================================================================
+* diskrec.a99 - record files through the disk DSR: DIS/VAR 80 text, as
+* TI-Writer and Press 2.0 write it.  For the workbench (the engine needs
+* only disk.a99's PROGRAM-file LOAD and SAVE).  Uses disk.a99's DSRLNK,
+* the PAB at PABADR and the record buffer at FBUF.
+*======================================================================
+
+* DVRB - R1 (high byte) = the VRAM byte at R0.
+DVRB   SWPB R0
+       MOVB R0,@VDPWA
+       SWPB R0
+       MOVB R0,@VDPWA
+       NOP
+       MOVB @VDPRD,R1
+       RT
+
+* ---- record files (DIS/VAR 80: TI-Writer and Press 2.0 text) ------------
+* DVOPEN - open the file named in FNBUF for reading, DISPLAY VARIABLE 80.
+* R0 = 0 if it opened, else the DSR's error code (or >FF: no controller).
+* The PAB stays at PABADR while the file is open; records arrive at FBUF.
+DVOPEN .enter
+       LI   R2,ROWBUF          the PAB: OPEN, DIS/VAR input, 80-byte records
+       LI   R0,>0014           opcode 0, flags >14 (variable, input)
+       MOVB R0,*R2+
+       SWPB R0
+       MOVB R0,*R2+
+       LI   R0,FBUF
+       MOVB R0,*R2+
+       SWPB R0
+       MOVB R0,*R2+
+       LI   R0,80*256          record length 80, character count 0
+       MOVB R0,*R2+
+       CLR  R0
+       MOVB R0,*R2+
+       MOVB R0,*R2+            record number 0
+       MOVB R0,*R2+
+       MOVB R0,*R2+            screen offset
+       LI   R1,FNBUF           the name, with its length byte
+       MOVB *R1,R0
+       SRL  R0,8
+       INC  R0
+DVO1   MOVB *R1+,*R2+
+       DEC  R0
+       JNE  DVO1
+       LI   R0,PABADR
+       LI   R1,ROWBUF
+       AI   R2,-ROWBUF
+       BL   @VMBW
+       BL   @DVCALL
+       .leave
+       RT
+
+* DVREAD - the next record into FBUF.  R0 = its length (0-80), or -1 at the
+* end of the file (or on an error).
+DVREAD .enter
+       LI   R0,PABADR          opcode 2: READ
+       LI   R1,>0200
+       BL   @VSBW
+       BL   @DVCALL
+       MOV  R0,R0
+       JEQ  DVR1
+       SETO R0
+       JMP  DVR9
+DVR1   LI   R0,PABADR+5        the character count
+       BL   @DVRB
+       SRL  R1,8
+       MOV  R1,R0
+DVR9   .leave
+       RT
+
+* DVCLOSE - close the file.
+DVCLOS .enter
+       LI   R0,PABADR
+       LI   R1,>0100
+       BL   @VSBW
+       BL   @DVCALL
+       .leave
+       RT
+
+* DVCALL - call the DSR on the PAB at PABADR as it stands: R0 = 0, or the
+* error code from the PAB's flag byte (>FF: no controller answered).
+DVCALL .enter
+       MOV  R4,@SVREG
+       MOV  R5,@SVREG+2
+       MOV  R6,@SVREG+4
+       MOV  R7,@SVR7
+       MOV  R8,@SVR8
+       LI   R0,PABADR+9
+       MOV  R0,@>8356
+       BL   @DSRLNK
+       MOV  R0,@DSKRES
+       BL   @DSKFIX
+       MOV  @SVREG,R4
+       MOV  @SVREG+2,R5
+       MOV  @SVREG+4,R6
+       MOV  @SVR7,R7
+       MOV  @SVR8,R8
+       MOV  @DSKRES,R0
+       JNE  DVC9               no controller, or the DSR's own error
+       LI   R0,PABADR+1        the flag byte's error bits
+       BL   @DVRB
+       SRL  R1,13
+       MOV  R1,R0
+DVC9   .leave
+       RT

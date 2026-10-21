@@ -1,0 +1,301 @@
+*======================================================================
+* wbench.a99 - the TXA Workbench (M5): the native compiler's cartridge.
+*
+* Part 1, the skeleton: on the engine's kernel (80 columns, SAMS, disk),
+* it asks for a source file and reads it, DIS/VAR 80 as Press 2.0 and
+* TI-Writer write it, record by record into SAMS from page SRCPG, each
+* record followed by a line feed.  The compiler's stages (lexer, parser,
+* meaning, code, linking) come in the following parts.
+*======================================================================
+       COPY "macros.a99"
+       COPY "defs.a99"
+
+* The workbench's own variables, in RAM the engine uses only for UNDO's
+* record index (URECS): the two never run together.  (defs.a99, shared
+* with the engine, is checked for overlaps by build.py; these are not in it.)
+SRCPG  EQU  32                 SAMS page where loaded source text starts
+WBLNS  EQU  URECS+>00          lines read
+WBLENL EQU  URECS+>02          bytes read (low word) ...
+WBLENH EQU  URECS+>04          ... and high word
+WBPAGE EQU  URECS+>06          the page being filled
+WBOFF  EQU  URECS+>08          the next byte in it (0-4095)
+WBDONE EQU  URECS+>0A          1 once a file has been read, -1 if it would not open
+WBNLEN EQU  URECS+>0C          the name being typed: its length
+WBRET  EQU  URECS+>0E          a saved return
+WBRET2 EQU  URECS+>10          another
+WBNAME EQU  URECS+>20          28 bytes: the name being typed
+
+       AORG >A000
+WSTART LIMI 0
+       LWPI WS
+       LI   R10,STACKT
+       LI   R1,RAMVAR          the variables cleared
+       LI   R2,>700/2
+WS1    CLR  *R1+
+       DEC  R2
+       JNE  WS1
+       BL   @F18UNL
+       BL   @F18DET
+       BL   @AMSDET
+       MOV  R0,R0
+       JEQ  WS2
+       BL   @AMSINI
+WS2    LI   R0,30              80 columns, 30 rows, the font, colours
+       MOV  R0,@ROWS
+       BL   @T80ON
+       BL   @TXCLS
+       BL   @FONTLD
+       LI   R0,ATRTAB
+       LI   R1,ATNORM*256
+       LI   R2,30*COLS
+       BL   @VFILL
+       LI   R0,>B202           position attributes (VR50)
+       BL   @VDPWR
+       LI   R0,14
+       LI   R1,WBPAL
+       LI   R2,2
+       BL   @F18PAL
+       LI   R0,SPRPAT          sprites off
+       CLR  R1
+       LI   R2,>800
+       BL   @VFILL
+       LI   R0,SPRATT
+       LI   R1,>D000
+       LI   R2,128
+       BL   @VFILL
+       LI   R0,ATRTAB          the title bar, in reverse
+       LI   R1,ATREV*256
+       LI   R2,COLS
+       BL   @VFILL
+       CLR  R0
+       LI   R1,1
+       BL   @TXAT
+       LI   R1,STITLE
+       CLR  R2
+       BL   @TXSTR
+
+* ---- the prompt -------------------------------------------------------------
+WPROMP LI   R1,SDEFLT          the default name
+       LI   R2,WBNAME
+       MOVB *R1+,R0
+       SRL  R0,8
+       MOV  R0,@WBNLEN
+WP1    MOVB *R1+,*R2+
+       DEC  R0
+       JNE  WP1
+       SETO R9                 (the first key typed replaces the default)
+WP2    LI   R0,2               draw "Source file: " and the name
+       BL   @WCLR
+       LI   R0,2
+       LI   R1,1
+       BL   @TXAT
+       LI   R1,SASK
+       CLR  R2
+       BL   @TXSTR
+       LI   R0,2*COLS+14
+       LI   R1,WBNAME
+       MOV  @WBNLEN,R2
+       JEQ  WP3
+       BL   @VMBW
+WP3    BL   @WKEY              a key
+       CI   R0,13
+       JEQ  WLOAD
+       CI   R0,8
+       JNE  WP4
+       MOV  @WBNLEN,R0         rub out
+       JEQ  WP2
+       DEC  @WBNLEN
+       CLR  R9
+       JMP  WP2
+WP4    CI   R0,' '
+       JLE  WP3
+       CI   R0,'a'             upper case, as TI file names are
+       JL   WP5
+       CI   R0,'z'
+       JH   WP5
+       AI   R0,-32
+WP5    MOV  R9,R9
+       JEQ  WP6
+       CLR  @WBNLEN
+       CLR  R9
+WP6    MOV  @WBNLEN,R1
+       CI   R1,26
+       JHE  WP2
+       SWPB R0
+       MOVB R0,@WBNAME(R1)
+       INC  @WBNLEN
+       JMP  WP2
+
+* ---- reading the file ----------------------------------------------------------
+WLOAD  MOV  @WBNLEN,R0         FNBUF = the name, with its length byte
+       JEQ  WP2
+       SWPB R0
+       MOVB R0,@FNBUF
+       SWPB R0
+       LI   R1,WBNAME
+       LI   R2,FNBUF+1
+WL1    MOVB *R1+,*R2+
+       DEC  R0
+       JNE  WL1
+       LI   R0,4
+       BL   @WCLR
+       BL   @DVOPEN
+       MOV  R0,R0
+       JEQ  WL2
+       SETO @WBDONE            it would not open: say so, ask again
+       LI   R0,4
+       LI   R1,1
+       BL   @TXAT
+       LI   R1,SNOPEN
+       CLR  R2
+       BL   @TXSTR
+       JMP  WP2
+WL2    CLR  @WBLNS
+       CLR  @WBLENL
+       CLR  @WBLENH
+       LI   R0,SRCPG
+       MOV  R0,@WBPAGE
+       CLR  @WBOFF
+       BL   @WMAP
+WL3    BL   @DVREAD            a record, then a line feed
+       MOV  R0,R0
+       JLT  WL6
+       MOV  R0,R15             its length
+       LI   R0,FBUF
+       LI   R1,ROWBUF
+       MOV  R15,R2
+       JEQ  WL4
+       BL   @VMBR
+WL4    LI   R14,ROWBUF
+WL5    MOV  R15,R15
+       JEQ  WL5A
+       MOVB *R14+,R0
+       BL   @WPUT
+       DEC  R15
+       JMP  WL5
+WL5A   LI   R0,>0A00
+       BL   @WPUT
+       INC  @WBLNS
+       JMP  WL3
+WL6    BL   @DVCLOS
+       LI   R0,1
+       MOV  R0,@WBDONE
+       LI   R0,4               "Read n lines, m bytes."
+       LI   R1,1
+       BL   @TXAT
+       LI   R1,SREAD1
+       CLR  R2
+       BL   @TXSTR
+       MOV  @WBLNS,R0          (TXDEC: the number in R0, width R1, style R2)
+       CLR  R1
+       CLR  R2
+       BL   @TXDEC
+       LI   R1,SREAD2
+       CLR  R2
+       BL   @TXSTR
+       MOV  @WBLENL,R0         (the low word: files up to 64K for now)
+       CLR  R1
+       CLR  R2
+       BL   @TXDEC
+       LI   R1,SREAD3
+       CLR  R2
+       BL   @TXSTR
+WL9    BL   @WKEY              then the prompt again
+       B    @WPROMP
+
+* WPUT - the byte in R0's high byte into the source text.  Uses R0-R3, R12.
+WPUT   MOV  R11,R13
+       MOV  @WBOFF,R1
+       MOVB R0,@>E000(R1)
+       INC  @WBLENL
+       JNC  WPU1
+       INC  @WBLENH
+WPU1   INC  R1
+       CI   R1,4096
+       JL   WPU2
+       INC  @WBPAGE            the next page
+       CLR  R1
+       MOV  R1,@WBOFF
+       BL   @WMAP
+       B    *R13
+WPU2   MOV  R1,@WBOFF
+       B    *R13
+* WMAP - window >E000 onto page WBPAGE.
+WMAP   MOV  R11,R12
+       MOV  R12,@WBRET
+       MOV  @WBPAGE,R0
+       LI   R1,>E
+       BL   @MAPPG
+       MOV  @WBRET,R11
+       RT
+
+* WKEY - R0 = the next key pressed, as a character code (ENTER 13).
+* KEYGET reports a key once per press (it returns 0 while the same key is
+* held) and ignores FCTN, so this skeleton prompt has no rub-out: typing
+* replaces the default name.  (M6 brings the full line editor.)
+WKEY   MOV  R11,@WBRET2
+WK1    BL   @KSCAN
+       BL   @KEYGET
+       MOV  R0,R0
+       JEQ  WK1
+       SRL  R0,8               (KEYGET gives the character in the high byte)
+       MOV  @WBRET2,R11
+       RT
+
+* WCLR - row R0 blank, in normal colours.  Uses R0-R2.
+WCLR   MOV  R11,@WBRET
+       MPY  @D80W,R0           R1 = row * 80
+       MOV  R1,R0
+       MOV  R1,@WBRET2
+       LI   R1,>2000
+       LI   R2,COLS
+       BL   @VFILL
+       MOV  @WBRET2,R0
+       AI   R0,ATRTAB
+       LI   R1,ATNORM*256
+       LI   R2,COLS
+       BL   @VFILL
+       MOV  @WBRET,R11
+       RT
+D80W   DATA 80
+
+* DSKFIX - nothing to repair after a disk call (no fast block here).
+DSKFIX RT
+
+WBPAL  DATA >0AAA,>0FFF        palette 14 (soft gray), 15 (white)
+STITLE BYTE STITLX-STITLE-1
+       TEXT 'TXA Workbench'
+STITLX
+SDEFLT BYTE SDEFLX-SDEFLT-1
+       TEXT 'DSK1.LAMPLIGHT'
+SDEFLX
+SASK   BYTE SASKX-SASK-1
+       TEXT 'Source file: '
+SASKX
+SNOPEN BYTE SNOPNX-SNOPEN-1
+       TEXT 'Cannot open that file.'
+SNOPNX
+SREAD1 BYTE SREA1X-SREAD1-1
+       TEXT 'Read '
+SREA1X
+SREAD2 BYTE SREA2X-SREAD2-1
+       TEXT ' lines, '
+SREA2X
+SREAD3 BYTE SREA3X-SREAD3-1
+       TEXT ' bytes.'
+SREA3X
+       EVEN
+WBEND
+
+       AORG >2000
+WENTRY B    @WSTART
+       COPY "vdp.a99"
+       COPY "f18a.a99"
+       COPY "pager.a99"
+       COPY "keys.a99"
+       COPY "text80.a99"
+       COPY "disk.a99"
+       COPY "diskrec.a99"
+       AORG >3000
+       COPY "gen/font.a99"
+       END  WSTART

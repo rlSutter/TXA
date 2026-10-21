@@ -56,12 +56,8 @@ DKC1   MOVB *R1+,*R2+
        MOV  R0,@>8356
        BL   @DSRLNK
        MOV  R0,@DSKRES         (the result, kept past the restoring below)
-       LI   R1,FSTSRC          the fast block back into the scratchpad
-       LI   R2,NEXT
-       LI   R3,(FASTND-NEXT)/2
-DKC2   MOV  *R1+,*R2+
-       DEC  R3
-       JNE  DKC2
+       BL   @DSKFIX            the program's own repairs (the engine: its
+*                              fast block back into the scratchpad)
        MOV  @SVREG,R4
        MOV  @SVREG+2,R5
        MOV  @SVREG+4,R6
@@ -201,3 +197,4 @@ DLGPL  MOV  @DSRCRU,R12
 HAA    BYTE >AA
 DOT    BYTE '.'
        EVEN
+

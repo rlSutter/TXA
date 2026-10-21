@@ -222,3 +222,13 @@ EBADOP BYTE EBADOPX-EBADOP-1
 EBADOPX
        EVEN
 TITLEB EQU  H.TITL-1           a length byte (16), set by CHKST, then the title
+
+* DSKFIX - after a disk call (disk.a99): the fast block back into the
+* scratchpad, which a DSR overwrites from >834A.
+DSKFIX LI   R1,FSTSRC
+       LI   R2,NEXT
+       LI   R3,(FASTND-NEXT)/2
+DFX1   MOV  *R1+,*R2+
+       DEC  R3
+       JNE  DFX1
+       RT

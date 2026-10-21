@@ -639,12 +639,30 @@ M5 part 1 under way:
 - tests/txc_wrap_test.py: the library, Lamplight and every m2/m3 world,
   wrapped, compile to identical images.
 
+M5 part 1 done (21 October 2026):
+- D1, tools/txa_wrap.py, the library's long lines (above).
+- The simulator's disk does DIS/VAR files (OPEN, READ, CLOSE: a text
+  file a record a line; error 5 past the end, 7 when missing).
+- src/diskrec.a99 (the workbench's, not the engine's): DVOPEN, DVREAD,
+  DVCLOS on the shared DSRLNK and PAB.  disk.a99's DSKCAL now calls the
+  program's DSKFIX after a disk call (the engine: the fast block back;
+  the workbench: nothing).
+- src/wbench.a99, the workbench cartridge skeleton (build.workbench_cart):
+  80 columns on the engine's kernel; asks for a source file (default
+  DSK1.LAMPLIGHT; the kernel's KEYGET has no FCTN, so no rub-out until
+  M6's line editor); reads it record by record into SAMS from page 32,
+  a line feed after each; reports lines and bytes.  Its variables live
+  in wbench.a99 (over the engine's URECS), not defs.a99.
+- tools/txc/dump.py: the canonical token dump (line kind value).
+- tests/m5_load_test.py: Lamplight wrapped to 80 columns read into SAMS
+  byte for byte (428 lines, 12090 bytes); a missing file reported.
+
 ## Next
 
-1. M5 part 1 (rest): DV80 reading on the TI (record I/O: OPEN, READ,
-   CLOSE; the simulator's disk needs it too), the workbench cartridge
-   skeleton on the engine's kernel, the token dump format.
-2. M5 parts 2-6 as in the design doc.
+1. M5 part 2: the lexer on the TI (tokens identical to dump.tokens for
+   the corpus; the first speed measurement).  The corpus on the TI side
+   is the wrapped source (txa_wrap), including the library files.
+2. M5 parts 3-6 as in the design doc.
 
 ## (was) M5 (waiting on D1-D4): the native compiler (the workbench cartridge: source loading,
    three passes, the precompiled library, error list; done when the TI
@@ -697,6 +715,7 @@ text output, word wrap and [MORE]; bold and underline glyph sets.
 
 ## History
 
+- 2026-10-21 M5 part 1: D1, txa_wrap, DV80 record reading, the workbench skeleton, the token dump.
 - 2026-10-21 M4 complete: scrollback; startup code moved to the startup segment.
 - 2026-10-21 M4 part 5: sound and music (notation, sound area, TI player identical to the reference, library, Lamplight's tunes and effects).
 - 2026-10-21 M4 part 4: pictures (converter, picture area, pane, library, Lamplight's three pictures).

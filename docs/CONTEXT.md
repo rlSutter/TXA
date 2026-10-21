@@ -67,6 +67,11 @@ owns it; Claude builds it. The engine comes first; the story later.
 | `src/save.a99` | SAVE/RESTORE: the portable save file built in and read from VRAM; FNAME (DSK1. prefix) |
 | `tools/txa_game.py` | the game writer: E/A 5 engine files, 4K story (and picture) files, disk image, optional cartridge |
 | `src/picture.a99` | PICTURE: the picture area through window D into the bitmap layer; PICOFF, PICRDW (kernel window) |
+| `src/wbench.a99` | the TXA Workbench cartridge (M5): the native compiler's home; part 1 reads DV80 source into SAMS |
+| `src/diskrec.a99` | DIS/VAR record files (DVOPEN, DVREAD, DVCLOS) for the workbench |
+| `tools/txa_wrap.py` | TXA source to 80 columns (D1 continuation), for DV80 files |
+| `tools/txc/dump.py` | canonical dumps of the compiler's stages (tokens so far), for M5's comparisons |
+| `tests/m5_load_test.py`, `tests/txc_wrap_test.py` | the workbench reading DV80 source; D1 wrapping compiles to identical images |
 | `src/startup.a99` | START and everything run once before the story (loaders, CHKST, FATAL); assembled at VSTK with the font |
 | `tests/m4_scrollback_test.py` | the scrollback viewer and the screen restored after it |
 | `src/sound.a99` | MUSIC/SOUND and the frame-ticked player (kernel window; its own workspace >83E0) |
@@ -101,7 +106,8 @@ owns it; Claude builds it. The engine comes first; the story later.
    `sample_test.py --quick`; the slow engine ones, `m1_vm_test.py`,
    `m2_engine_test.py`, `m3_engine_test.py`, `sample_test.py`,
    `m4_save_test.py`, `m4_disk_test.py`, `m4_picture_test.py`, `m4_quit_test.py`,
-   `m4_sound_test.py`, `m4_scrollback_test.py`, run 1-4 minutes each.  Start each
+   `m4_sound_test.py`, `m4_scrollback_test.py`, `m5_load_test.py`, run
+   1-4 minutes each.  Quick: `txc_wrap_test.py`.  Start each
    in the background with output to a file and collect it in a later
    call: the tool stops any command after 300 s.  Run them one after
    another, never two at once, and never build anything while they run
@@ -119,6 +125,10 @@ owns it; Claude builds it. The engine comes first; the story later.
 
 ## Things learned the hard way
 
+- The kernel's KEYGET returns the character in the HIGH byte (ENTER is
+  >0D00) and ignores FCTN; the engine's KEYGT2 (input.a99) is the one
+  with FCTN keys and a low-byte code.
+- The TI number printer TXDEC takes the number in R0 (R1 width, R2 style).
 - xas99 has NO operator precedence: expressions go left to right, so
   VOICES+4*VSIZE means (VOICES+4)*VSIZE.  Parenthesise every mixed
   expression.

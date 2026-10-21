@@ -143,6 +143,16 @@ def assemble_engine(out_name='TXAE1'):
         sys.exit(f'the scratchpad block ends at >{fend:04X}, past >83E0 (the GPL workspace)')
     return segs
 
+def workbench_cart(name='TXA WORKBENCH'):
+    """The workbench cartridge (src/wbench.a99, M5): (cart bytes, segments)."""
+    for f in glob.glob(os.path.join(B, 'WBENC?')):
+        os.remove(f)
+    run([sys.executable, XAS, '-R', '-i', '-L', '../build/wbench.lst', '-E', '../build/wbench.equ', '-o', '../build/WBENC1', 'wbench.a99'],
+        cwd=os.path.join(ROOT, 'src'))
+    segs = ea5_segments('WBENC1')
+    cart, _ = cart_from_segments(segs, name, b'')
+    return cart, segs
+
 def engine_cart(story_image, name='TXA STORY', pictures=b'', sounds=b''):
     """Assemble the engine and build a cartridge carrying story_image.
     Two passes: the engine's size decides the story's first bank."""

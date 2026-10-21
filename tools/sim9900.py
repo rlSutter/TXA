@@ -339,6 +339,28 @@ class Machine:
                 data[20] ^= 0xFF; self.dsr_corrupt = False   # a test: spoil one save
             open(path, 'wb').write(bytes(data))
             return True
+        if op in (0, 1, 2):                           # OPEN, CLOSE, READ: DIS/VAR files, kept
+            files = self.__dict__.setdefault('dsr_files', {})   # as text, a record a line
+            if op == 0:
+                if not os.path.exists(path):
+                    fail(7); return True
+                files[pab] = [open(path, 'rb').read().split(b'\n'), 0]
+                if files[pab][0] and files[pab][0][-1] == b'':
+                    files[pab][0].pop()               # (a last newline ends the last record)
+                if self.vram[pab + 4] == 0:
+                    self.vram[pab + 4] = 80
+                return True
+            if op == 1:
+                files.pop(pab, None); return True
+            f = files.get(pab)
+            if f is None:
+                fail(7); return True
+            if f[1] >= len(f[0]):
+                fail(5); return True                  # past the end
+            rec = f[0][f[1]][:self.vram[pab + 4] or 80]; f[1] += 1
+            self.vram[buf: buf + len(rec)] = rec
+            self.vram[pab + 5] = len(rec)
+            return True
         if op == 5:                                   # LOAD
             if not os.path.exists(path):              # as a real controller does: it handled
                 fail(7)                               # the call (the skip return) and reports
