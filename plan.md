@@ -592,10 +592,32 @@ Part 5 done (21 October 2026): sound and music.
 - Bug found: xas99 has no operator precedence (left to right):
   VOICES+4*VSIZE assembled as (VOICES+4)*VSIZE; parenthesise.
 
+Scrollback done (21 October 2026): every line EMITLN shows is also kept
+in a ring of 50 slots (80 characters + 80 colour bytes) in SAMS pages
+25-26, carried through window B (a line may be shown during PRSTR, which
+owns D; CURBH is marked unknown afterwards).  BACK (FCTN 9) at the prompt
+opens the viewer: FCTN E back a line, FCTN X forward, ENTER or BACK
+return, a hint in reverse on the bottom row; on return the screen is
+drawn again from the ring (the rows above the prompt are always the
+latest lines) with the prompt and the typed text.  Centred lines come
+back left-aligned.  The undo records went from 7 pages to 5 (20K).
+To make room, the startup code (START, the loaders, CHKST, FATAL, the
+no-F18A screen) moved to the startup segment at VSTK with the font;
+START now ends with B @VMRUN (it used to fall through, which the move
+broke at first: the boot looped).  tests/m4_scrollback_test.py (5
+checks: the viewer's rows, the hint, the screen restored exactly, the
+next command normal).
+
+**M4 is complete** (engine 1.0 beta): save, restore, undo, status line,
+scrollback, pictures, sound and music, stories on disk and the game
+writer, the title page and the end screen.
+
 ## Next
 
-1. M4: scrollback (in M4's definition, not yet built).  Then the M4
-   checkpoint, and M5.
+1. M5: the native compiler (the workbench cartridge: source loading,
+   three passes, the precompiled library, error list; done when the TI
+   produces images byte-identical to the Python compiler for the whole
+   corpus).  Start with its design.
 
 ## (was) M4 part 5 (sound and music): MUSIC/SOUND declarations, MML notation
    for Rebecca's review, MIDI import, the TI player (frame-flag ticks in
@@ -643,6 +665,7 @@ text output, word wrap and [MORE]; bold and underline glyph sets.
 
 ## History
 
+- 2026-10-21 M4 complete: scrollback; startup code moved to the startup segment.
 - 2026-10-21 M4 part 5: sound and music (notation, sound area, TI player identical to the reference, library, Lamplight's tunes and effects).
 - 2026-10-21 M4 part 4: pictures (converter, picture area, pane, library, Lamplight's three pictures).
 - 2026-10-20 M2 follow-ups: command history (FCTN E/X) and the two-row, 160-character input line.

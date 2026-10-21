@@ -93,6 +93,7 @@ D6     DATA 6
 MODTAB DATA >1000,'S',8
        DATA >1000,'E',11       FCTN E: the up arrow (history back)
        DATA >1000,'X',12       FCTN X: the down arrow (history forward)
+       DATA >1000,'9',15       FCTN 9: BACK (the scrollback)
        DATA >1000,'I','?'
        DATA >1000,'O',>27
        DATA >1000,'P','"'
@@ -196,7 +197,11 @@ RDL2A  CI   R0,12
        INC  @HISPOS
        BL   @SHOWHS
        JMP  RDL2
-RDL2B  CI   R0,8
+RDL2B  CI   R0,15
+       JNE  RDL2C
+       BL   @SBVIEW            BACK: read the earlier text
+       JMP  RDL2
+RDL2C  CI   R0,8
        JNE  RDL3
        MOV  @ILEN,R0           rub out
        JEQ  RDL2

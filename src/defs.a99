@@ -93,8 +93,9 @@ NUMBUF EQU  RAMVAR+>40         8 bytes: number formatting
 ROWBUF EQU  RAMVAR+>80         80 bytes: one text row (scrolling)
 
 * ---- the story VM (engine) --------------------------------------------
-* SAMS pages: 0-15 the identity-mapped 32K and overlays; 16-26 the undo
-* ring (M4); 27 the command history (READ); 28-31 a pristine copy of the
+* SAMS pages: 0-15 the identity-mapped 32K and overlays; 16-24 undo
+* (16-19 the latest state, 20-24 the records); 25-26 scrollback (the
+* last 50 lines shown); 27 the command history (READ); 28-31 a pristine copy of the
 * dynamic area (RESTART); 32 on, the story image: story byte address a
 * lives in page 32 + a/4096.
 STPAGE EQU  32                 first SAMS page of the story image
@@ -216,8 +217,8 @@ HISCNT EQU  RAMVAR+>360        commands in the history (not >340: inside STBUF)
 HISPOS EQU  RAMVAR+>362        the one being shown (HISCNT = the new line)
 * ---- UNDO (undo.a99) -----------------------------------------------------
 UNDLST EQU  16                 SAMS pages 16-19: the state at the newest snapshot
-UNDRNG EQU  20                 pages 20-26: the snapshots' records
-UNDMAX EQU  7*4096             bytes of records
+UNDRNG EQU  20                 pages 20-24: the snapshots' records
+UNDMAX EQU  5*4096             bytes of records
 UCNT   EQU  RAMVAR+>370        snapshots kept
 UTOP   EQU  RAMVAR+>372        the first free byte of the records
 UDOFF  EQU  RAMVAR+>374        the record byte being read or written
@@ -284,3 +285,11 @@ VOICES EQU  RAMVAR+>660        120 bytes: six voices of 20 (0-3 music, 4-5 effec
 SNDARG EQU  RAMVAR+>0FC        MUSIC / SOUND: n
 SITEM  EQU  RAMVAR+>0FE        SLOAD: the item's offset
 SENT   EQU  RAMVAR+>032        SLOAD: the voice entry being read
+* ---- scrollback (output.a99) --------------------------------------------
+SBPAGE EQU  25                 SAMS pages 25-26: the last 50 lines shown
+SBLINE EQU  25                 lines a page (160 bytes each: 80 characters, 80 colours)
+SBMAX  EQU  50
+SBHEAD EQU  RAMVAR+>244        the slot the next line goes in
+SBCNT  EQU  RAMVAR+>246        lines kept (up to SBMAX)
+SBOFF  EQU  RAMVAR+>248        the viewer: lines scrolled back
+SBTMP  EQU  RAMVAR+>24A        scrollback scratch

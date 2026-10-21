@@ -188,6 +188,7 @@ Mostly a polite default response in this game: `push` / `press` / `shove` / `mov
 | FCTN S (left arrow) | Rubs out the last letter typed. |
 | FCTN E (up arrow) | Brings back your previous command; press again for earlier ones (the last 16 are kept). |
 | FCTN X (down arrow) | Steps forward again through recalled commands, back to an empty line. |
+| FCTN 9 (BACK) | Shows the earlier text (the last 50 lines); FCTN E / FCTN X scroll, ENTER returns. |
 | Long commands | Up to 160 characters; a command runs onto a second screen row. |
 
 ### Parser shortcuts
@@ -217,6 +218,14 @@ Start a new game for each group unless it says otherwise. The expected responses
 - [ ] FCTN X past the newest command gives an empty line.
 - [ ] Type a command longer than one screen row (for example `open drawer. take matches. take lantern. i. look. x keeper. ask brannock about tide`): the typing continues onto the second row, and every command runs.
 - [ ] Press ENTER on an empty line: "I beg your pardon?"
+
+### 5.1a Scrollback
+
+- [ ] After several commands, press BACK (FCTN 9) at the prompt: the text window shows the same lines, with "Earlier text: FCTN E back, FCTN X forward, ENTER to return" in reverse on the bottom row.
+- [ ] FCTN E scrolls back a line at a time, up to about 50 lines; FCTN X scrolls forward again.
+- [ ] Bold room names and reversed text come back with their styles.
+- [ ] ENTER (or BACK again) returns: the screen is exactly as it was, with anything you had half-typed still there and the cursor after it.
+- [ ] With a picture showing, the scrollback uses only the rows under the picture, and the picture stays.
 
 ### 5.2 The parser
 

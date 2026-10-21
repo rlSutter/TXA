@@ -81,6 +81,7 @@ CHO9   .leave
 * first if CROW is below the window.
 * Counts lines toward [MORE].
 EMITLN .enter
+       BL   @SBSAVE            into the scrollback too
        BL   @ROWFIT            CROW onto the screen (scrolling)
        MOV  @CROW,R0
        MPY  @D80,R0            R1 = row * 80
@@ -521,3 +522,221 @@ CLS1   MOV  @UTMP,R0
 CLS2   MOV  @TXTTOP,@CROW
        CLR  @MORECT
        B    @NEXT
+
+* ---- scrollback ---------------------------------------------------------------
+* Every line EMITLN shows is kept in a ring of SBMAX slots in SAMS pages
+* SBPAGE and SBPAGE+1 (80 characters, then 80 colour bytes; a centred line
+* is kept left-aligned).  Window B carries them: a line may be shown in the
+* middle of PRSTR, which owns window D, and RDW finds B again by itself
+* once CURBH is marked unknown.
+*
+* SBVIEW (BACK at the prompt) shows earlier lines in the text window, a
+* hint in reverse on its bottom row; FCTN E goes back a line, FCTN X
+* forward, ENTER or BACK return.  The screen is then drawn again from the
+* ring: the rows above the prompt are the latest lines (they always are:
+* a line reaches the screen only through EMITLN), then the prompt and
+* what has been typed, with the cursor.
+
+* SBMAP - window B onto the page of slot R1; R1 = the slot's address.
+* Uses R0-R3, R12.
+SBMAP  .enter
+       CLR  R0                 page = SBPAGE + slot / SBLINE
+       DIV  @DSBLN,R0          R0 = slot / 25, R1 = slot mod 25
+       MOV  R1,@SBTMP
+       MOV  R0,R2
+       AI   R2,SBPAGE-STPAGE
+       LI   R3,MAPRGB
+       BL   @MAPWIN
+       SETO @CURBH             (RDW must map B again for itself)
+       MOV  @SBTMP,R1
+       LI   R0,160
+       MPY  R0,R1              R1:R2 = offset
+       MOV  R2,R1
+       AI   R1,WINB
+       .leave
+       RT
+DSBLN  DATA SBLINE
+
+* SBSAVE - LBUF/ABUF (LLEN) into the next slot, padded.  Keeps every
+* register EMITLN's callers might hold.
+SBSAVE .enter
+       DECT R10
+       MOV  R0,*R10
+       DECT R10
+       MOV  R1,*R10
+       DECT R10
+       MOV  R2,*R10
+       DECT R10
+       MOV  R3,*R10
+       DECT R10
+       MOV  R12,*R10
+       MOV  @SBHEAD,R1
+       BL   @SBMAP
+       LI   R2,LBUF            the characters ...
+       MOV  @LLEN,R3
+       CLR  R0
+SBK1   C    R0,R3
+       JHE  SBK2
+       MOVB *R2+,*R1+
+       JMP  SBK3
+SBK2   MOVB @SPACE1,*R1+       (blank past the line's end)
+SBK3   INC  R0
+       CI   R0,COLS
+       JL   SBK1
+       LI   R2,ABUF            ... and their colours
+       CLR  R0
+SBK4   C    R0,R3
+       JHE  SBK5
+       MOVB *R2+,*R1+
+       JMP  SBK6
+SBK5   MOVB @ATNRM1,*R1+
+SBK6   INC  R0
+       CI   R0,COLS
+       JL   SBK4
+       INC  @SBHEAD            the next slot, round the ring
+       C    @SBHEAD,@DSBMX
+       JL   SBK7
+       CLR  @SBHEAD
+SBK7   C    @SBCNT,@DSBMX
+       JHE  SBK8
+       INC  @SBCNT
+SBK8   MOV  *R10+,R12
+       MOV  *R10+,R3
+       MOV  *R10+,R2
+       MOV  *R10+,R1
+       MOV  *R10+,R0
+       .leave
+       RT
+DSBMX  DATA SBMAX
+SPACE1 BYTE >20
+ATNRM1 BYTE ATNORM
+
+* SBROW - draw the line R4 lines back from the newest (0: the newest) on
+* screen row R5; a blank row if there is none.  Uses R0-R3, R12, R14.
+SBROW  .enter
+       MOV  R5,R14             the row's address
+       MPY  @D80,R14
+       MOV  R15,R14
+       C    R4,@SBCNT
+       JHE  SBR8
+       MOV  @SBHEAD,R1         slot = head - 1 - back, round the ring
+       DEC  R1
+       S    R4,R1
+       JGT  SBR1
+       JEQ  SBR1
+       A    @DSBMX,R1
+SBR1   BL   @SBMAP
+       MOV  R1,@SBTMP
+       MOV  R14,R0             characters
+       MOV  @SBTMP,R1
+       LI   R2,COLS
+       BL   @VMBW
+       MOV  R14,R0             colours
+       AI   R0,ATRTAB
+       MOV  @SBTMP,R1
+       AI   R1,COLS
+       LI   R2,COLS
+       BL   @VMBW
+       JMP  SBR9
+SBR8   MOV  R5,R0              nothing kept that far back: blank
+       BL   @ECLR
+SBR9   .leave
+       RT
+
+* SBVIEW - the scrollback viewer (from RDLINE: BACK).
+SBVIEW .enter
+       DECT R10
+       MOV  R4,*R10
+       DECT R10
+       MOV  R5,*R10
+       BL   @CURSOF
+       CLR  @SBOFF
+SBV1   MOV  @ROWS,R5           draw: rows TXTTOP to the one above the hint,
+       DECT R5                 the newest at the bottom
+       MOV  @SBOFF,R4
+SBV2   C    R5,@TXTTOP
+       JLT  SBV3
+       BL   @SBROW
+       INC  R4
+       DEC  R5
+       JMP  SBV2
+SBV3   MOV  @ROWS,R0           the hint, in reverse, on the bottom row
+       DEC  R0
+       BL   @ECLR
+       MOV  @ROWS,R0
+       DEC  R0
+       LI   R1,0
+       BL   @TXAT
+       LI   R1,SBHINT
+       CLR  R2
+       BL   @TXSTR
+       MOV  @ROWS,R0
+       DEC  R0
+       MPY  @D80,R0
+       MOV  R1,R0
+       LI   R2,SBHNTX-SBHINT-1
+       BL   @REVSPN
+SBV4   BL   @WAITK2            keys
+       CI   R0,11
+       JNE  SBV5
+       MOV  @ROWS,R1           back a line, if there is more to see
+       DEC  R1
+       S    @TXTTOP,R1         (rows shown)
+       A    @SBOFF,R1
+       C    R1,@SBCNT
+       JHE  SBV4
+       INC  @SBOFF
+       JMP  SBV1
+SBV5   CI   R0,12
+       JNE  SBV6
+       MOV  @SBOFF,R0          forward a line
+       JEQ  SBV4
+       DEC  @SBOFF
+       JMP  SBV1
+SBV6   CI   R0,13
+       JEQ  SBV7
+       CI   R0,15
+       JNE  SBV4
+SBV7   MOV  @CROW,R5           return: the latest lines above the prompt ...
+       DEC  R5
+       CLR  R4
+SBV8   C    R5,@TXTTOP
+       JLT  SBV9
+       BL   @SBROW
+       INC  R4
+       DEC  R5
+       JMP  SBV8
+SBV9   MOV  @CROW,R5           ... the rows from the prompt down blank ...
+SBV10  C    R5,@ROWS
+       JHE  SBV11
+       MOV  R5,R0
+       BL   @ECLR
+       INC  R5
+       JMP  SBV10
+SBV11  MOV  @CROW,R0           ... the prompt and what has been typed
+       MPY  @D80,R0
+       MOV  R1,R14
+       MOV  R14,R0
+       LI   R1,LBUF
+       MOV  @LLEN,R2
+       JEQ  SBV12
+       BL   @VMBW
+       MOV  R14,R0
+       AI   R0,ATRTAB
+       LI   R1,ABUF
+       MOV  @LLEN,R2
+       BL   @VMBW
+SBV12  MOV  @ILEN,R2
+       JEQ  SBV13
+       MOV  @ICOL,R0
+       LI   R1,IBUF
+       BL   @VMBW
+SBV13  BL   @CURSON
+       MOV  *R10+,R5
+       MOV  *R10+,R4
+       .leave
+       RT
+SBHINT BYTE SBHNTX-SBHINT-1
+       TEXT 'Earlier text: FCTN E back, FCTN X forward, ENTER to return'
+SBHNTX
+       EVEN

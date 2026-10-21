@@ -11,10 +11,10 @@ keep it current when the language changes.  The six manuals still to
 write are stubbed in the Claude Doc
 https://claude.ai/artifact/VqqmmXaB3E5RBxdTcfBtU2 (one tab each).
 
-**State (20 October 2026, checkpoint-m4b):** M0-M3 complete; M4 parts 1-3
-done (UNDO, SAVE/RESTORE with a portable save format, stories on disk and
-the game writer `tools/txa_game.py`), plus a title page.  Next: M4 part 4
-(pictures) and part 5 (sound and music).  The sample game is
+**State (21 October 2026, checkpoint-m4):** M0-M4 complete (engine 1.0
+beta: save, restore, undo, scrollback, pictures, sound and music, stories
+on disk and the game writer, title page, end screen).  Next: M5, the
+native compiler on the TI.  The sample game is
 `samples/lamplight.txa`; Rebecca tests it from `LAMPLIGHT-TESTING.md`.
 
 ## What it is
@@ -66,6 +66,8 @@ owns it; Claude builds it. The engine comes first; the story later.
 | `src/save.a99` | SAVE/RESTORE: the portable save file built in and read from VRAM; FNAME (DSK1. prefix) |
 | `tools/txa_game.py` | the game writer: E/A 5 engine files, 4K story (and picture) files, disk image, optional cartridge |
 | `src/picture.a99` | PICTURE: the picture area through window D into the bitmap layer; PICOFF, PICRDW (kernel window) |
+| `src/startup.a99` | START and everything run once before the story (loaders, CHKST, FATAL); assembled at VSTK with the font |
+| `tests/m4_scrollback_test.py` | the scrollback viewer and the screen restored after it |
 | `src/sound.a99` | MUSIC/SOUND and the frame-ticked player (kernel window; its own workspace >83E0) |
 | `tools/txsound.py` | the sound notation, its compiler, the sound area, the reference Player, WAV previews |
 | `samples/sounds/` | Lamplight's tunes and effects (.mml) |
@@ -98,7 +100,7 @@ owns it; Claude builds it. The engine comes first; the story later.
    `sample_test.py --quick`; the slow engine ones, `m1_vm_test.py`,
    `m2_engine_test.py`, `m3_engine_test.py`, `sample_test.py`,
    `m4_save_test.py`, `m4_disk_test.py`, `m4_picture_test.py`, `m4_quit_test.py`,
-   `m4_sound_test.py`, run 1-4 minutes each.  Start each
+   `m4_sound_test.py`, `m4_scrollback_test.py`, run 1-4 minutes each.  Start each
    in the background with output to a file and collect it in a later
    call: the tool stops any command after 300 s.  Run them one after
    another, never two at once, and never build anything while they run
@@ -119,8 +121,10 @@ owns it; Claude builds it. The engine comes first; the story later.
 - xas99 has NO operator precedence: expressions go left to right, so
   VOICES+4*VSIZE means (VOICES+4)*VSIZE.  Parenthesise every mixed
   expression.
-- The font lives at VSTK (>3000): read only at startup, then overwritten
-  by the value stack.  Don't read FONT after START.
+- The startup segment (startup.a99 and the font) lives at VSTK (>3000):
+  run or read only before the story, then overwritten by the value stack.
+  Nothing there may be called once VMRUN has run; START must end with an
+  explicit branch (falling through into whatever follows was a bug).
 - Before BLWP @>0000, clear the scratchpad from >8320: the console's
   power-up enables interrupts before clearing >83C4 (user hook) and
   >83CE (sound count); the fast block left there hung js99er.  The

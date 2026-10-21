@@ -35,6 +35,8 @@ def keys_for(line):
             out.append({FCTN, S.key_pos('E')})
         elif ch == '\x0c':                       # FCTN X: down arrow (history forward)
             out.append({FCTN, S.key_pos('X')})
+        elif ch == '\x0e':                       # FCTN 9: BACK (the scrollback)
+            out.append({FCTN, S.key_pos('9')})
         elif ch.isupper():
             out.append({SHIFT, S.key_pos(ch)})
         else:

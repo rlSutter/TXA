@@ -2,7 +2,7 @@
 * undo.a99 - UNDOSAVE and UNDO.
 *
 * Pages UNDLST.. (four, 16K) hold LAST: the dynamic area as it was at
-* the newest snapshot.  Pages UNDRNG.. (seven, 28K) hold the records,
+* the newest snapshot.  Pages UNDRNG.. (five, 20K) hold the records,
 * one per snapshot, back to back; URECS says where each starts.  A
 * record:
 *   word  R4 (the PC in window A)     word  R5 (its page)
@@ -21,7 +21,7 @@
 * before; the stacks and registers come from the record; that record is
 * dropped.  So UNDO after UNDO goes back a step further.
 *
-* When the records would not fit (28K) or 64 are kept, they start again
+* When the records would not fit (20K) or 64 are kept, they start again
 * with this one: UNDO then has one step until more are taken.
 *
 * Windows during the work: A shows a dynamic-area page, B the matching
