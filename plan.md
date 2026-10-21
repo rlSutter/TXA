@@ -676,6 +676,15 @@ M5 part 2 done (21 October 2026): the lexer on the TI.
   SHIFT (and gives capitals anyway); part 1's missing-file check had
   passed by luck.
 
+From Rebecca's first try of the workbench (21 October 2026): she had no
+disk to mount (only lamplight.txa, a PC file), and FCTN S did nothing at
+the prompt.  Now tools/txa_srcdisk.py writes a game's source and the
+library, wrapped to 80 columns, as DIS/VAR 80 files on a DSDD image
+(build/lamplight-src.dsk: LAMPLIGHT, STDLIB, LIBDEFS, PARSER, VERBS,
+VERBS2, TURN), each read back and checked; and the workbench reads keys
+itself (WKEY, as the engine's KEYGT2: modifiers set aside before the
+scan), so FCTN S rubs out and SHIFT works.  The load test checks both.
+
 ## Next
 
 1. M5 part 3: the parser on the TI (a compact tree in SAMS; its canonical

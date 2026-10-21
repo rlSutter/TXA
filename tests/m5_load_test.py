@@ -60,5 +60,11 @@ scr = R.screen(m).splitlines()
 check('the screen says so', scr[4].strip() == f'Read {len(lines)} lines, {len(want)} bytes.' and scr[0].startswith(' TXA Workbench'), scr[:5])
 m2 = run(['dsk1.nosuch'])            # (lower case: KEYGET stops at SHIFT; it gives capitals)
 check('a file that isn\'t there: "Cannot open that file."', m2.rw(sy['WBDONE']) == 0xFFFF and 'Cannot open that file.' in R.screen(m2), R.screen(m2).splitlines()[:5])
+m3 = run(['dsk1.lamplightx\b'])         # an extra letter, then FCTN S rubs it out
+check('FCTN S rubs out: "DSK1.LAMPLIGHTX" then FCTN S reads DSK1.LAMPLIGHT', m3.rw(sy['WBLNS']) == len(lines) and m3.rw(sy['WBDONE']) == 2,
+      (m3.rw(sy['WBDONE']), m3.rw(sy['WBLNS']), R.screen(m3).splitlines()[2]))
+m4 = run(['DSK1.LAMPLIGHT'])            # capitals typed with SHIFT
+check('a name typed with SHIFT (capitals) works', m4.rw(sy['WBLNS']) == len(lines) and m4.rw(sy['WBDONE']) == 2,
+      (m4.rw(sy['WBDONE']), R.screen(m4).splitlines()[2]))
 print('ALL PASS' if not fails else f'{fails} FAILED')
 sys.exit(1 if fails else 0)

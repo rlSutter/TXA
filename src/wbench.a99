@@ -50,6 +50,7 @@ WBERRL EQU  URECS+>64          its line
 WBERRC EQU  URECS+>66          the unexpected character (high byte)
 LXSV2  EQU  URECS+>68          R2 and R3 kept across MAPPG
 LXSV3  EQU  URECS+>6A
+WKLST  EQU  URECS+>6C          the key last reported (WKEY)
 LINBUF EQU  >3300              256 bytes: the line being lexed (the font's
 STRBUF EQU  >3400              1K: a token's text   / space, after startup)
 
@@ -291,16 +292,51 @@ WMAP   MOV  R11,R12
        MOV  @WBRET,R11
        RT
 
-* WKEY - R0 = the next key pressed, as a character code (ENTER 13).
-* KEYGET reports a key once per press (it returns 0 while the same key is
-* held) and ignores FCTN, so this skeleton prompt has no rub-out: typing
-* replaces the default name.  (M6 brings the full line editor.)
+* WKEY - R0 = the next key pressed, as a character code (ENTER 13, FCTN S
+* the rub-out, 8).  Its own reading, as the engine's KEYGT2 does it: the
+* modifiers (FCTN, SHIFT, CTRL in column 0) are set aside before the keys
+* are scanned, so a modifier never hides the key pressed with it (the
+* kernel's KEYGET stops at the first one).  Each press is reported once.
 WKEY   MOV  R11,@WBRET2
 WK1    BL   @KSCAN
-       BL   @KEYGET
-       MOV  R0,R0
+       MOVB @KEYMAP,R5         column 0: the modifiers
+       INV  R5
+       ANDI R5,>7000           FCTN >1000, SHIFT >2000, CTRL >4000
+       LI   R1,KEYMAP
+       LI   R2,KTAB
+       LI   R3,6
+WK2    MOVB *R1+,R4
+       INV  R4
+       ANDI R4,>FF00
+       CI   R3,6               column 0: = SPACE ENTER only
+       JNE  WK3
+       ANDI R4,>0700
+WK3    MOV  R4,R4
+       JNE  WK4
+       AI   R2,8
+       DEC  R3
+       JNE  WK2
+       CLR  @WKLST             nothing pressed: the next press is new
+       JMP  WK1
+WK4    SRL  R4,8               the first pressed row
+       CLR  R0
+WK5    SRL  R4,1
+       JOC  WK6
+       INC  R0
+       JMP  WK5
+WK6    A    R0,R2
+       MOVB *R2,R0
+       SRL  R0,8               the key's character (letters in capitals)
        JEQ  WK1
-       SRL  R0,8               (KEYGET gives the character in the high byte)
+       MOV  R5,R1
+       ANDI R1,>1000           FCTN S: the rub-out
+       JEQ  WK7
+       CI   R0,'S'
+       JNE  WK1                (other FCTN keys: nothing, for now)
+       LI   R0,8
+WK7    C    R0,@WKLST          still the same press?
+       JEQ  WK1
+       MOV  R0,@WKLST
        MOV  @WBRET2,R11
        RT
 

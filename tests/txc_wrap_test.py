@@ -35,5 +35,9 @@ for sub, name, lib in programs:
     a, _ = compile_file(os.path.join(ROOT, sub, name), [os.path.join(ROOT, lib)])
     b, _ = compile_file(os.path.join(d, name), [os.path.join(tmp, lib)])
     check(f'{sub}/{name}: wrapped (longest line {lng}), the same image ({len(a)} bytes)', a == b and lng <= 80)
+import txa_srcdisk
+out, names, size = txa_srcdisk.make_disk(os.path.join(ROOT, 'samples/lamplight.txa'), os.path.join(tmp, 'src.dsk'))
+check(f'the source disk: {len(names)} DIS/VAR 80 files, each read back from the image unchanged',
+      names[0] == 'LAMPLIGHT' and set(names[1:]) == {'LIBDEFS', 'PARSER', 'STDLIB', 'TURN', 'VERBS', 'VERBS2'}, names)
 print('ALL PASS' if not fails else f'{fails} FAILED')
 sys.exit(1 if fails else 0)

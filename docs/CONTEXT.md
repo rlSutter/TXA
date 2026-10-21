@@ -71,6 +71,7 @@ owns it; Claude builds it. The engine comes first; the story later.
 | `src/wlex.a99` | the workbench's lexer: SAMS source to SAMS tokens, identical to lexer.py |
 | `tests/m5_lex_test.py` | the TI lexer against the Python lexer on the corpus (args: lib, samples, tests, errors) |
 | `src/diskrec.a99` | DIS/VAR record files (DVOPEN, DVREAD, DVCLOS) for the workbench |
+| `tools/txa_srcdisk.py` | a game's source and the library as DIS/VAR 80 files on a TI disk image, for the workbench |
 | `tools/txa_wrap.py` | TXA source to 80 columns (D1 continuation), for DV80 files |
 | `tools/txc/dump.py` | canonical dumps of the compiler's stages (tokens so far), for M5's comparisons |
 | `tests/m5_load_test.py`, `tests/txc_wrap_test.py` | the workbench reading DV80 source; D1 wrapping compiles to identical images |
