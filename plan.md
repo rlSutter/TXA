@@ -554,6 +554,12 @@ old engine).  Also js99er's "-- $-" end-screen junk: same screenshot
 shows ",-  -(" in screen memory rows the picture covers; still
 unexplained, but not on the visible screen while the game runs.
 
+js99er bug report prepared (21 October 2026): outputs/txa/js99er-pr/
+(PULL_REQUEST.md, a one-line patch to assembly/f18a.ts against js99er
+master f6054a95 (2026-10-11): bitmapX1 = bmpX - bitmapX; a before/after
+image from the renderer's formula; the M0 probe as the test cartridge).
+For Rebecca to send to js99er's author.
+
 ## Next
 
 1. M4 part 5 (sound and music): MUSIC/SOUND declarations, MML notation
