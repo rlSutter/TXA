@@ -657,12 +657,31 @@ M5 part 1 done (21 October 2026):
 - tests/m5_load_test.py: Lamplight wrapped to 80 columns read into SAMS
   byte for byte (428 lines, 12090 bytes); a missing file reported.
 
+M5 part 2 done (21 October 2026): the lexer on the TI.
+- src/wlex.a99: lexer.py's rules in the same order (strings with D1,
+  dictionary words, ##actions, names and keywords, decimal to 32768, hex
+  where an operand may start, symbols); tokens in SAMS from page 64 as
+  kind, line, text length, text (and a number's value); errors stop with
+  a code and line (WBERR, WBERRL).  The workbench lexes after loading.
+- tests/m5_lex_test.py: the TI's tokens, read back and dumped
+  canonically, equal dump.tokens for the whole corpus (the 6 library
+  files, Lamplight, the M2 demo, the m2/m3 worlds: about 14,500 tokens);
+  7 error cases give the same error on the same line.
+- Speed: about 85 TI instructions a source byte: Lamplight with its
+  library about 25 s on a real TI.
+- Bug found: TPUT's page change called MAPPG, which uses R2 and R3,
+  TEMIT's text pointer and count: tokens ran past the end of SAMS until
+  the page numbers wrapped onto RAM and the kernel.  R2/R3 now kept.
+- The tests type file names in lower case: the kernel's KEYGET stops at
+  SHIFT (and gives capitals anyway); part 1's missing-file check had
+  passed by luck.
+
 ## Next
 
-1. M5 part 2: the lexer on the TI (tokens identical to dump.tokens for
-   the corpus; the first speed measurement).  The corpus on the TI side
-   is the wrapped source (txa_wrap), including the library files.
-2. M5 parts 3-6 as in the design doc.
+1. M5 part 3: the parser on the TI (a compact tree in SAMS; its canonical
+   text dump to add to dump.py; trees identical for the corpus; the
+   first parse error identical for malformed programs).
+2. M5 parts 4-6 as in the design doc.
 
 ## (was) M5 (waiting on D1-D4): the native compiler (the workbench cartridge: source loading,
    three passes, the precompiled library, error list; done when the TI
@@ -715,6 +734,7 @@ text output, word wrap and [MORE]; bold and underline glyph sets.
 
 ## History
 
+- 2026-10-21 M5 part 2: the lexer on the TI, identical to Python for the corpus.
 - 2026-10-21 M5 part 1: D1, txa_wrap, DV80 record reading, the workbench skeleton, the token dump.
 - 2026-10-21 M4 complete: scrollback; startup code moved to the startup segment.
 - 2026-10-21 M4 part 5: sound and music (notation, sound area, TI player identical to the reference, library, Lamplight's tunes and effects).

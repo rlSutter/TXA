@@ -68,6 +68,8 @@ owns it; Claude builds it. The engine comes first; the story later.
 | `tools/txa_game.py` | the game writer: E/A 5 engine files, 4K story (and picture) files, disk image, optional cartridge |
 | `src/picture.a99` | PICTURE: the picture area through window D into the bitmap layer; PICOFF, PICRDW (kernel window) |
 | `src/wbench.a99` | the TXA Workbench cartridge (M5): the native compiler's home; part 1 reads DV80 source into SAMS |
+| `src/wlex.a99` | the workbench's lexer: SAMS source to SAMS tokens, identical to lexer.py |
+| `tests/m5_lex_test.py` | the TI lexer against the Python lexer on the corpus (args: lib, samples, tests, errors) |
 | `src/diskrec.a99` | DIS/VAR record files (DVOPEN, DVREAD, DVCLOS) for the workbench |
 | `tools/txa_wrap.py` | TXA source to 80 columns (D1 continuation), for DV80 files |
 | `tools/txc/dump.py` | canonical dumps of the compiler's stages (tokens so far), for M5's comparisons |
@@ -128,6 +130,10 @@ owns it; Claude builds it. The engine comes first; the story later.
 - The kernel's KEYGET returns the character in the HIGH byte (ENTER is
   >0D00) and ignores FCTN; the engine's KEYGT2 (input.a99) is the one
   with FCTN keys and a low-byte code.
+- MAPPG uses R0-R3 and R12: any routine that may cross a SAMS page in
+  the middle of a caller's loop must keep R2/R3 itself (TPUT once didn't).
+- The simulator harness presses SHIFT for capitals; the kernel's KEYGET
+  stops at SHIFT, so type file names in lower case in workbench tests.
 - The TI number printer TXDEC takes the number in R0 (R1 width, R2 style).
 - xas99 has NO operator precedence: expressions go left to right, so
   VOICES+4*VSIZE means (VOICES+4)*VSIZE.  Parenthesise every mixed

@@ -53,12 +53,12 @@ def run(typed, max_steps=150_000_000):
 m = run([''])                                  # ENTER: the default, DSK1.LAMPLIGHT
 nl, ln = m.rw(sy['WBLNS']), m.rw(sy['WBLENL']) | (m.rw(sy['WBLENH']) << 16)
 got = bytes(m.ams[32 * 4096: 32 * 4096 + ln])
-check(f'the workbench read {len(lines)} lines, {len(want)} bytes', (m.rw(sy['WBDONE']), nl, ln) == (1, len(lines), len(want)), (m.rw(sy['WBDONE']), nl, ln))
+check(f'the workbench read {len(lines)} lines, {len(want)} bytes (and lexed them: done 2)', (m.rw(sy['WBDONE']), nl, ln) == (2, len(lines), len(want)), (m.rw(sy['WBDONE']), nl, ln))
 check('the text in SAMS (from page 32, a line feed after each record) is the file', got == want,
       next((f'at byte {i}: {want[max(0,i-30):i+30]!r} / {got[max(0,i-30):i+30]!r}' for i in range(min(len(got), len(want))) if got[i] != want[i]), 'length'))
 scr = R.screen(m).splitlines()
 check('the screen says so', scr[4].strip() == f'Read {len(lines)} lines, {len(want)} bytes.' and scr[0].startswith(' TXA Workbench'), scr[:5])
-m2 = run(['DSK1.NOSUCH'])
+m2 = run(['dsk1.nosuch'])            # (lower case: KEYGET stops at SHIFT; it gives capitals)
 check('a file that isn\'t there: "Cannot open that file."', m2.rw(sy['WBDONE']) == 0xFFFF and 'Cannot open that file.' in R.screen(m2), R.screen(m2).splitlines()[:5])
 print('ALL PASS' if not fails else f'{fails} FAILED')
 sys.exit(1 if fails else 0)

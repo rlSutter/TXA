@@ -24,6 +24,34 @@ WBNLEN EQU  URECS+>0C          the name being typed: its length
 WBRET  EQU  URECS+>0E          a saved return
 WBRET2 EQU  URECS+>10          another
 WBNAME EQU  URECS+>20          28 bytes: the name being typed
+* the lexer (wlex.a99)
+TOKPG  EQU  64                 SAMS page where the token stream starts
+SRTOT  EQU  WBLENL             the text's length (low, high)
+SRTOTH EQU  WBLENH
+SRPAGE EQU  URECS+>40          the source page in window E
+SROFF  EQU  URECS+>42          the next byte in it
+SRDONE EQU  URECS+>44          bytes of text read (low, high)
+SRDONH EQU  URECS+>46
+LINENO EQU  URECS+>48          the line being lexed
+TKPAGE EQU  URECS+>4A          the token page in window F
+TKOFF  EQU  URECS+>4C          the next byte in it
+LXTCNT  EQU  URECS+>4E          tokens written
+LXHOK  EQU  URECS+>50          hex allowed next (an operand may start)
+LXLTOK EQU  URECS+>52          tokens on this logical line
+LXNUM  EQU  URECS+>54          a number's value
+LXTMP  EQU  URECS+>56
+LXTMP2 EQU  URECS+>58
+LXRET  EQU  URECS+>5A
+LXRET2 EQU  URECS+>5C
+LXSTRL EQU  URECS+>5E          the line a string starts on
+LXPOS  EQU  URECS+>60
+WBERR  EQU  URECS+>62          an error's code (0: none)
+WBERRL EQU  URECS+>64          its line
+WBERRC EQU  URECS+>66          the unexpected character (high byte)
+LXSV2  EQU  URECS+>68          R2 and R3 kept across MAPPG
+LXSV3  EQU  URECS+>6A
+LINBUF EQU  >3300              256 bytes: the line being lexed (the font's
+STRBUF EQU  >3400              1K: a token's text   / space, after startup)
 
        AORG >A000
 WSTART LIMI 0
@@ -180,6 +208,40 @@ WL5A   LI   R0,>0A00
 WL6    BL   @DVCLOS
        LI   R0,1
        MOV  R0,@WBDONE
+       BL   @LEXALL            the tokens
+       MOV  R0,R0
+       JEQ  WL7
+       LI   R0,6               an error: its code and line
+       LI   R1,1
+       BL   @TXAT
+       LI   R1,SLXERR
+       CLR  R2
+       BL   @TXSTR
+       MOV  @WBERR,R0
+       CLR  R1
+       CLR  R2
+       BL   @TXDEC
+       LI   R1,SLINE
+       CLR  R2
+       BL   @TXSTR
+       MOV  @WBERRL,R0
+       CLR  R1
+       CLR  R2
+       BL   @TXDEC
+       JMP  WL6A
+WL7    LI   R0,6               "n tokens."
+       LI   R1,1
+       BL   @TXAT
+       MOV  @LXTCNT,R0
+       CLR  R1
+       CLR  R2
+       BL   @TXDEC
+       LI   R1,STOKS
+       CLR  R2
+       BL   @TXSTR
+       LI   R0,2
+       MOV  R0,@WBDONE         (2: read and lexed)
+WL6A
        LI   R0,4               "Read n lines, m bytes."
        LI   R1,1
        BL   @TXAT
@@ -284,7 +346,17 @@ SREA2X
 SREAD3 BYTE SREA3X-SREAD3-1
        TEXT ' bytes.'
 SREA3X
+STOKS  BYTE STOKSX-STOKS-1
+       TEXT ' tokens.'
+STOKSX
+SLXERR BYTE SLXERX-SLXERR-1
+       TEXT 'Lexer error '
+SLXERX
+SLINE  BYTE SLINEX-SLINE-1
+       TEXT ' at line '
+SLINEX
        EVEN
+       COPY "wlex.a99"
 WBEND
 
        AORG >2000

@@ -1,0 +1,807 @@
+*======================================================================
+* wlex.a99 - the workbench's lexer (M5 part 2): the loaded source text
+* (SAMS from page SRCPG, records ended by line feeds) to a token stream
+* (SAMS from page TOKPG), exactly as tools/txc/lexer.py tokenizes it.
+*
+* A token: byte kind, word line, word text length, the text, and for a
+* number its value word.  Kinds:
+TK.NUM EQU  1                  text: the digits as written (>1F for hex)
+TK.STR EQU  2                  text: the string's value (^ and ~ done)
+TK.ID  EQU  3                  text: as written
+TK.KW  EQU  4                  text: the keyword in upper case
+TK.ACT EQU  5                  text: the action's name (after ##)
+TK.DIC EQU  6                  text: the word in lower case
+TK.SYM EQU  7                  text: the symbol
+TK.NL  EQU  8                  no text
+TK.EOF EQU  9                  no text
+* The rules, in the order lexer.py tries them at each position: spaces
+* and tabs skipped; ! ends the line; "strings" (D1: one left open goes on
+* over the next lines, joined by single spaces, trailing and leading
+* spaces dropped, the token on its first line); 'dictionary words';
+* ##actions; names (keywords when they match in upper case); decimal
+* numbers (to 32768); hex (>1F) where an operand may start; symbols, two
+* characters first.  A line with tokens ends with NL; the end with EOF
+* on the line after the last.
+*
+* Errors stop the lexer with WBERR = the code and WBERRL = the line:
+LE.STR EQU  1                  string not closed
+LE.DIC EQU  2                  a dictionary word in single quotes is not closed
+LE.ACT EQU  3                  expected an action name after ##
+LE.BIG EQU  4                  number ... is larger than 32767
+LE.HEX EQU  5                  hex number ... does not fit in 16 bits
+LE.CHR EQU  6                  unexpected character
+*
+* Registers through the line's lexing: R4 = the position in LINBUF,
+* R5 = the line's length.  The helpers below keep R4 and R5.
+*======================================================================
+
+* ---- the source, a line at a time ---------------------------------------------
+* LXLINE - the next line into LINBUF (R5 = its length), LINENO + 1.
+* R0 = 0 if there was one, -1 at the end of the text.
+LXLINE .enter
+       C    @SRDONE,@SRTOT     all of it read?
+       JNE  LXL0
+       C    @SRDONH,@SRTOTH
+       JNE  LXL0
+       SETO R0
+       JMP  LXL9
+LXL0   INC  @LINENO
+       CLR  R5
+LXL1   C    @SRDONE,@SRTOT     (a last record without its line feed)
+       JNE  LXL2
+       C    @SRDONH,@SRTOTH
+       JEQ  LXL8
+LXL2   MOV  @SROFF,R1
+       MOVB @>E000(R1),R0
+       INC  @SRDONE
+       JNC  LXL3
+       INC  @SRDONH
+LXL3   INC  R1
+       CI   R1,4096
+       JL   LXL4
+       INC  @SRPAGE            the next source page
+       CLR  R1
+       MOV  R1,@SROFF
+       MOV  R0,@LXTMP
+       MOV  R2,@LXSV2          (MAPPG uses R2 and R3)
+       MOV  R3,@LXSV3
+       MOV  @SRPAGE,R0
+       LI   R1,>E
+       BL   @MAPPG
+       MOV  @LXSV2,R2
+       MOV  @LXSV3,R3
+       MOV  @LXTMP,R0
+       JMP  LXL5
+LXL4   MOV  R1,@SROFF
+LXL5   CB   R0,@BLF
+       JEQ  LXL8
+       CI   R5,255
+       JHE  LXL1               (lines past 255 characters are cut: DV80 has 80)
+       MOVB R0,@LINBUF(R5)
+       INC  R5
+       JMP  LXL1
+LXL8   CLR  R0
+LXL9   .leave
+       RT
+BLF    BYTE >0A
+BSP    BYTE ' '
+BTAB   BYTE >09
+BQUOT  BYTE '"'
+BAPOS  BYTE >27
+BHASH  BYTE '#'
+BBANG  BYTE '!'
+BGT    BYTE '>'
+BCARET BYTE '^'
+BTILDE BYTE '~'
+       EVEN
+
+* ---- the token stream -------------------------------------------------------
+* TPUT - R0's high byte onto the stream.  Uses R0, R1; keeps R2-R9.
+TPUT   MOV  @TKOFF,R1
+       MOVB R0,@>F000(R1)
+       INC  R1
+       CI   R1,4096
+       JL   TPU1
+       MOV  R11,@LXRET
+       MOV  R2,@LXSV2          (MAPPG uses R2 and R3: TEMIT's text pointer
+       MOV  R3,@LXSV3          and count must survive a page change)
+       INC  @TKPAGE            the next token page
+       CLR  @TKOFF
+       MOV  @TKPAGE,R0
+       LI   R1,>F
+       BL   @MAPPG
+       MOV  @LXSV2,R2
+       MOV  @LXSV3,R3
+       MOV  @LXRET,R11
+       RT
+TPU1   MOV  R1,@TKOFF
+       RT
+* TPUTW - R0 as a word, high byte first.
+TPUTW  MOV  R11,@LXRET2
+       MOV  R0,@LXTMP2
+       BL   @TPUT
+       MOV  @LXTMP2,R0
+       SWPB R0
+       BL   @TPUT
+       MOV  @LXRET2,R11
+       RT
+
+* TEMIT - a token: kind R6, line R7, text at R8 for R9 bytes; for a number
+* also its value (LXNUM).  Keeps R4, R5.  Records hex_ok for the next
+* token on this logical line in LXHOK.
+TEMIT  .enter
+       MOV  R6,R0
+       SWPB R0
+       BL   @TPUT
+       MOV  R7,R0
+       BL   @TPUTW
+       MOV  R9,R0
+       BL   @TPUTW
+       MOV  R9,R3
+       MOV  R8,R2
+TEM1   MOV  R3,R3
+       JEQ  TEM2
+       MOVB *R2+,R0
+       BL   @TPUT
+       DEC  R3
+       JMP  TEM1
+TEM2   CI   R6,TK.NUM
+       JNE  TEM3
+       MOV  @LXNUM,R0
+       BL   @TPUTW
+TEM3   INC  @LXTCNT
+       CI   R6,TK.NL
+       JHE  TEM9
+       INC  @LXLTOK            a token on this logical line
+       CLR  @LXHOK             hex may follow: a symbol but ), a keyword
+       CI   R6,TK.SYM          but TRUE FALSE NOTHING SELF
+       JNE  TEM4
+       CB   *R8,@BRPAR
+       JEQ  TEM9
+       SETO @LXHOK
+       JMP  TEM9
+TEM4   CI   R6,TK.KW
+       JNE  TEM9
+       LI   R2,NOHEX           the four keywords after which > is greater-than
+       BL   @KWIN
+       MOV  R0,R0
+       JNE  TEM9
+       SETO @LXHOK
+TEM9   .leave
+       RT
+BRPAR  BYTE ')'
+       EVEN
+
+* ---- names and keywords --------------------------------------------------------
+* KWIN - is the text at R8 (R9 bytes, upper case) in the keyword list at
+* R2 (length-prefixed entries, a 0 byte at the end)?  R0 = 1 if so.
+* Keeps R4-R9.  Uses R0-R3.
+KWIN   CLR  R0
+KWI1   MOVB *R2+,R0            the entry's length
+       JEQ  KWI9               the list's end: no
+       SRL  R0,8
+       C    R0,R9
+       JNE  KWI4
+       MOV  R8,R1              same length: compare
+       MOV  R0,R3
+KWI2   CB   *R1+,*R2+
+       JNE  KWI3
+       DEC  R3
+       JNE  KWI2
+       LI   R0,1
+       RT
+KWI3   DEC  R3                 skip the rest of this entry
+       A    R3,R2
+       CLR  R0
+       JMP  KWI1
+KWI4   A    R0,R2
+       CLR  R0
+       JMP  KWI1
+KWI9   CLR  R0
+       RT
+
+* ISALPH - is R0's high byte a letter or _?  ISALNM - or a digit?
+* Status EQ set when it is not.  Use R0 only (they keep it).
+ISALPH CB   R0,@BLA
+       JL   ISA1
+       CB   R0,@BLZ
+       JLE  ISYES
+ISA1   CB   R0,@BUA
+       JL   ISA2
+       CB   R0,@BUZ
+       JLE  ISYES
+ISA2   CB   R0,@BUND
+       JEQ  ISYES
+ISNO   CB   R0,R0              (EQ: no)
+       RT
+ISYES  CB   R0,@BNUL           (not EQ: yes, the character is never 0)
+       RT
+ISALNM CB   R0,@B0
+       JL   ISALPH
+       CB   R0,@B9
+       JLE  ISYES
+       JMP  ISALPH
+ISDIG  CB   R0,@B0
+       JL   ISNO
+       CB   R0,@B9
+       JLE  ISYES
+       JMP  ISNO
+ISHEX  CB   R0,@B0
+       JL   ISNO
+       CB   R0,@B9
+       JLE  ISYES
+       CB   R0,@BUA
+       JL   ISH1
+       CB   R0,@BUF
+       JLE  ISYES
+ISH1   CB   R0,@BLA
+       JL   ISNO
+       CB   R0,@BLF2
+       JLE  ISYES
+       JMP  ISNO
+BLA    BYTE 'a'
+BLZ    BYTE 'z'
+BUA    BYTE 'A'
+BUZ    BYTE 'Z'
+BUND   BYTE '_'
+BNUL   BYTE 0
+B0     BYTE '0'
+B9     BYTE '9'
+BUF    BYTE 'F'
+BLF2   BYTE 'f'
+       EVEN
+
+* ---- the lexer ------------------------------------------------------------------
+* LEXALL - the whole text: R0 = 0, or an error code (WBERR, WBERRL set).
+LEXALL .enter
+       CLR  @WBERR
+       CLR  @LXTCNT
+       CLR  @LINENO
+       CLR  @SRDONE
+       CLR  @SRDONH
+       LI   R0,SRCPG           the source from its first page
+       MOV  R0,@SRPAGE
+       CLR  @SROFF
+       LI   R1,>E
+       BL   @MAPPG
+       LI   R0,TOKPG           the tokens from theirs
+       MOV  R0,@TKPAGE
+       CLR  @TKOFF
+       LI   R1,>F
+       BL   @MAPPG
+LXA1   BL   @LXLINE            each line
+       MOV  R0,R0
+       JNE  LXA9
+       CLR  @LXLTOK
+       SETO @LXHOK             (no token yet on this line: hex allowed)
+       CLR  R4
+       BL   @LXLIN2
+       MOV  @WBERR,R0
+       JNE  LXA99
+       MOV  @LXLTOK,R0         a line with tokens ends with NL
+       JEQ  LXA1
+       LI   R6,TK.NL
+       MOV  @LINENO,R7
+       CLR  R9
+       BL   @TEMIT
+       JMP  LXA1
+LXA9   LI   R6,TK.EOF          the end, on the line after the last
+       MOV  @LINENO,R7
+       INC  R7
+       CLR  R9
+       BL   @TEMIT
+       CLR  R0
+LXA99  .leave
+       RT
+
+* LXERR - stop: error R0 on line R7.
+LXERR  MOV  R0,@WBERR
+       MOV  R7,@WBERRL
+       RT
+
+* LXLIN2 - the tokens of the line in LINBUF (R5 long) from R4.
+LXLIN2 .enter
+LX1    C    R4,R5
+       JL   LX2
+       B    @LX99
+LX2    MOVB @LINBUF(R4),R0
+       CB   R0,@BSP            spaces and tabs
+       JEQ  LX3
+       CB   R0,@BTAB
+       JNE  LX4
+LX3    INC  R4
+       JMP  LX1
+LX4    CB   R0,@BBANG          a comment: the rest of the line
+       JNE  LX5
+       B    @LX99
+LX5    CB   R0,@BQUOT
+       JNE  LX6
+       BL   @LXSTR
+       JMP  LX90
+LX6    CB   R0,@BAPOS
+       JNE  LX7
+       BL   @LXDICT
+       JMP  LX90
+LX7    CB   R0,@BHASH          ##Name
+       JNE  LX8
+       MOV  R4,R1
+       INC  R1
+       C    R1,R5
+       JHE  LX8
+       CB   @LINBUF(R1),@BHASH
+       JNE  LX8
+       BL   @LXACT
+       JMP  LX90
+LX8    BL   @ISALPH            a name
+       JEQ  LX10
+       BL   @LXNAME
+       JMP  LX90
+LX10   BL   @ISDIG             a decimal number
+       JEQ  LX11
+       BL   @LXDEC
+       JMP  LX90
+LX11   CB   R0,@BGT            hex, where an operand may start
+       JNE  LX12
+       MOV  @LXHOK,R1
+       JEQ  LX12
+       MOV  R4,R1
+       INC  R1
+       C    R1,R5
+       JHE  LX12
+       MOVB @LINBUF(R1),R0
+       BL   @ISHEX
+       JEQ  LX12
+       BL   @LXHEX
+       JMP  LX90
+LX12   BL   @LXSYM             a symbol, or an unexpected character
+LX90   MOV  @WBERR,R0
+       JNE  LX99
+       B    @LX1
+LX99   .leave
+       RT
+
+* LXSTR - a string at R4 (D1: it may go on over the next lines).
+LXSTR  .enter
+       MOV  @LINENO,@LXSTRL    the line it starts on
+       INC  R4
+       CLR  R9                 its value's length, in STRBUF
+       MOV  R4,R1              the closing quote on this line?
+LXS1   C    R1,R5
+       JHE  LXS3
+       CB   @LINBUF(R1),@BQUOT
+       JEQ  LXS2
+       INC  R1
+       JMP  LXS1
+LXS2   MOV  R1,R3              yes: R4..R3-1 is the value
+       BL   @LXSCPY
+       MOV  R3,R4
+       INC  R4
+       JMP  LXS8
+LXS3   MOV  R5,R3              no: the rest of the line, spaces stripped ...
+       BL   @LXRSTR
+       BL   @LXSCPY
+LXS4   BL   @LXLINE            ... and on to the next line
+       MOV  R0,R0
+       JEQ  LXS5
+       LI   R0,LE.STR          the text ended first
+       MOV  @LXSTRL,R7
+       BL   @LXERR
+       JMP  LXS9
+LXS5   CLR  R4                 its leading spaces dropped
+LXS6   C    R4,R5
+       JHE  LXS6A
+       CB   @LINBUF(R4),@BSP
+       JEQ  LXS6B
+       CB   @LINBUF(R4),@BTAB
+       JNE  LXS6A
+LXS6B  INC  R4
+       JMP  LXS6
+LXS6A  MOVB @BSP,@STRBUF(R9)   a space for the break
+       INC  R9
+       MOV  R4,R1              a closing quote here?
+LXS7   C    R1,R5
+       JHE  LXS7B
+       CB   @LINBUF(R1),@BQUOT
+       JEQ  LXS7A
+       INC  R1
+       JMP  LXS7
+LXS7A  MOV  R1,R3              yes: up to it, then lexing goes on after it
+       BL   @LXSCPY
+       MOV  R3,R4
+       INC  R4
+       JMP  LXS8
+LXS7B  MOV  R5,R3              no: this line (spaces stripped), and on
+       BL   @LXRSTR
+       BL   @LXSCPY
+       JMP  LXS4
+LXS8   LI   R6,TK.STR
+       MOV  @LXSTRL,R7
+       LI   R8,STRBUF
+       BL   @TEMIT
+LXS9   .leave
+       RT
+* LXRSTR - R3 back over trailing spaces and tabs (not before R4).
+LXRSTR C    R3,R4
+       JLE  LXR9
+       MOV  R3,R1
+       DEC  R1
+       CB   @LINBUF(R1),@BSP
+       JEQ  LXR1
+       CB   @LINBUF(R1),@BTAB
+       JNE  LXR9
+LXR1   DEC  R3
+       JMP  LXRSTR
+LXR9   RT
+* LXSCPY - LINBUF R4..R3-1 onto STRBUF at R9 (^ a line feed, ~ a quote).
+LXSCPY MOV  R4,R1
+LXC1   C    R1,R3
+       JHE  LXC9
+       CI   R9,1023
+       JHE  LXC9               (a string past 1023 characters is cut)
+       MOVB @LINBUF(R1),R0
+       CB   R0,@BCARET
+       JNE  LXC2
+       MOVB @BLF,R0
+       JMP  LXC3
+LXC2   CB   R0,@BTILDE
+       JNE  LXC3
+       MOVB @BQUOT,R0
+LXC3   MOVB R0,@STRBUF(R9)
+       INC  R9
+       INC  R1
+       JMP  LXC1
+LXC9   RT
+
+* LXDICT - 'word': its lower-case text.
+LXDICT .enter
+       MOV  R4,R1              the closing quote
+       INC  R1
+LXD1   C    R1,R5
+       JHE  LXD8
+       CB   @LINBUF(R1),@BAPOS
+       JEQ  LXD2
+       INC  R1
+       JMP  LXD1
+LXD2   MOV  R1,R9              the word's length (R1 - R4 - 1)
+       S    R4,R9
+       DEC  R9
+       JEQ  LXD8               '' is an error too
+       CLR  R2                 copied to STRBUF in lower case
+LXD3   MOV  R4,R3
+       INC  R3
+       A    R2,R3
+       MOVB @LINBUF(R3),R0
+       CB   R0,@BUA
+       JL   LXD4
+       CB   R0,@BUZ
+       JH   LXD4
+       AI   R0,>2000
+LXD4   MOVB R0,@STRBUF(R2)
+       INC  R2
+       C    R2,R9
+       JL   LXD3
+       MOV  R1,@LXTMP          (past the closing quote, after TEMIT)
+       LI   R6,TK.DIC
+       MOV  @LINENO,R7
+       LI   R8,STRBUF
+       BL   @TEMIT
+       MOV  @LXTMP,R4
+       INC  R4
+       JMP  LXD9
+LXD8   LI   R0,LE.DIC
+       MOV  @LINENO,R7
+       BL   @LXERR
+LXD9   .leave
+       RT
+
+* LXACT - ##Name.
+LXACT  .enter
+       INCT R4                 past ##
+       MOV  R4,R1
+       C    R1,R5
+       JHE  LXA8
+       MOVB @LINBUF(R1),R0
+       BL   @ISALPH
+       JEQ  LXA8
+LXA2   INC  R1                 the name's end
+       C    R1,R5
+       JHE  LXA3
+       MOVB @LINBUF(R1),R0
+       BL   @ISALNM
+       JNE  LXA2
+LXA3   LI   R6,TK.ACT
+       MOV  @LINENO,R7
+       MOV  R4,R8
+       AI   R8,LINBUF
+       MOV  R1,R9
+       S    R4,R9
+       MOV  R1,R4
+       BL   @TEMIT
+       JMP  LXA9A
+LXA8   LI   R0,LE.ACT
+       MOV  @LINENO,R7
+       BL   @LXERR
+LXA9A  .leave
+       RT
+
+* LXNAME - a name: a keyword when its upper case is one.
+LXNAME .enter
+       MOV  R4,R1
+LXN1   INC  R1
+       C    R1,R5
+       JHE  LXN2
+       MOVB @LINBUF(R1),R0
+       BL   @ISALNM
+       JNE  LXN1
+LXN2   MOV  R1,R9              its length, and its upper case in STRBUF
+       S    R4,R9
+       CLR  R2
+LXN3   MOV  R4,R3
+       A    R2,R3
+       MOVB @LINBUF(R3),R0
+       CB   R0,@BLA
+       JL   LXN4
+       CB   R0,@BLZ
+       JH   LXN4
+       AI   R0,->2000
+LXN4   MOVB R0,@STRBUF(R2)
+       INC  R2
+       C    R2,R9
+       JL   LXN3
+       MOV  R1,@LXTMP          (the name's end)
+       LI   R8,STRBUF
+       LI   R2,KWLIST
+       BL   @KWIN
+       MOV  @LINENO,R7
+       MOV  R0,R0
+       JEQ  LXN5
+       LI   R6,TK.KW           a keyword: its upper case
+       JMP  LXN6
+LXN5   LI   R6,TK.ID           a name: as written
+       MOV  R4,R8
+       AI   R8,LINBUF
+LXN6   BL   @TEMIT
+       MOV  @LXTMP,R4
+       .leave
+       RT
+
+* LXDEC - a decimal number (to 32768: the parser takes 32768 only after -).
+* R2 = the value so far, R3 = 1 once it passes 32768 (the digits are
+* still all taken, as lexer.py's regular expression takes them).
+LXDEC  .enter
+       MOV  R4,@LXPOS          the position, in memory (MPY uses R0, R1)
+       CLR  R2
+       CLR  R3
+LXDC1  MOV  @LXPOS,R1
+       C    R1,R5
+       JHE  LXDC4
+       MOVB @LINBUF(R1),R0
+       BL   @ISDIG
+       JEQ  LXDC4
+       SRL  R0,8
+       AI   R0,-'0'
+       MOV  R0,@LXTMP          the digit
+       INC  @LXPOS
+       MOV  R3,R3
+       JNE  LXDC1              past 32768 already
+       MOV  R2,R0              value * 10 + digit
+       LI   R1,10
+       MPY  R1,R0              R0:R1 = value * 10
+       MOV  R0,R0
+       JNE  LXDC3
+       A    @LXTMP,R1
+       JOC  LXDC3
+       C    R1,@D32768
+       JH   LXDC3
+       MOV  R1,R2
+       JMP  LXDC1
+LXDC3  LI   R3,1
+       JMP  LXDC1
+LXDC4  MOV  R3,R3
+       JNE  LXDC8
+       MOV  R2,@LXNUM
+       LI   R6,TK.NUM
+       MOV  @LINENO,R7
+       MOV  R4,R8
+       AI   R8,LINBUF
+       MOV  @LXPOS,R9
+       S    R4,R9
+       MOV  @LXPOS,R4
+       BL   @TEMIT
+       JMP  LXDC9
+LXDC8  LI   R0,LE.BIG
+       MOV  @LINENO,R7
+       BL   @LXERR
+LXDC9  .leave
+       RT
+D32768 DATA 32768
+
+* LXHEX - >1F: a hex number (in 16 bits).
+LXHEX  .enter
+       MOV  R4,R1
+       INC  R1                 past >
+       CLR  R2
+       CLR  R3
+LXH1   C    R1,R5
+       JHE  LXH5
+       MOVB @LINBUF(R1),R0
+       BL   @ISHEX
+       JEQ  LXH5
+       SRL  R0,8               its value
+       CI   R0,'a'
+       JL   LXH2
+       AI   R0,-'a'+10
+       JMP  LXH4
+LXH2   CI   R0,'A'
+       JL   LXH3
+       AI   R0,-'A'+10
+       JMP  LXH4
+LXH3   AI   R0,-'0'
+LXH4   CI   R2,>0FFF           another digit would pass >FFFF
+       JLE  LXH4A
+       LI   R3,1
+LXH4A  SLA  R2,4
+       SOC  R0,R2
+       INC  R1
+       JMP  LXH1
+LXH5   MOV  R3,R3
+       JNE  LXH8
+       MOV  R2,@LXNUM
+       LI   R6,TK.NUM
+       MOV  @LINENO,R7
+       MOV  R4,R8
+       AI   R8,LINBUF
+       MOV  R1,R9
+       S    R4,R9
+       MOV  R1,R4
+       BL   @TEMIT
+       JMP  LXH9
+LXH8   LI   R0,LE.HEX
+       MOV  @LINENO,R7
+       BL   @LXERR
+LXH9   .leave
+       RT
+
+* LXSYM - a symbol (two characters first), or an unexpected character.
+LXSYM  .enter
+       MOV  R4,R1
+       INC  R1
+       C    R1,R5
+       JHE  LXY2               no second character
+       LI   R2,SYMS2           ->  <>  <=  >=
+LXY1   MOVB *R2,R0
+       JEQ  LXY2
+       CB   *R2+,@LINBUF(R4)
+       JNE  LXY1A
+       CB   *R2,@LINBUF(R1)
+       JNE  LXY1A
+       LI   R9,2
+       JMP  LXY5
+LXY1A  INC  R2                 (the pair's second byte)
+       JMP  LXY1
+LXY2   LI   R2,SYMS1           : , ( ) . + - * / = < >
+LXY3   MOVB *R2,R0
+       JEQ  LXY8
+       CB   *R2+,@LINBUF(R4)
+       JNE  LXY3
+       LI   R9,1
+LXY5   LI   R6,TK.SYM
+       MOV  @LINENO,R7
+       MOV  R4,R8
+       AI   R8,LINBUF
+       A    R9,R4
+       BL   @TEMIT
+       JMP  LXY9
+LXY8   LI   R0,LE.CHR
+       MOV  @LINENO,R7
+       MOVB @LINBUF(R4),@WBERRC   (the character, for the message)
+       BL   @LXERR
+LXY9   .leave
+       RT
+SYMS2  TEXT '-><><=>='
+       BYTE 0
+SYMS1  TEXT ':,().+-*/=<>'
+       BYTE 0
+       EVEN
+
+* The keywords (lexer.py's KEYWORDS), and the four after which > is
+* greater-than rather than hex.
+KWLIST BYTE 7
+       TEXT 'INCLUDE'
+       BYTE 8
+       TEXT 'CONSTANT'
+       BYTE 6
+       TEXT 'GLOBAL'
+       BYTE 5
+       TEXT 'ARRAY'
+       BYTE 9
+       TEXT 'ATTRIBUTE'
+       BYTE 8
+       TEXT 'PROPERTY'
+       BYTE 5
+       TEXT 'CLASS'
+       BYTE 6
+       TEXT 'OBJECT'
+       BYTE 4
+       TEXT 'ROOM'
+       BYTE 4
+       TEXT 'VERB'
+       BYTE 7
+       TEXT 'ROUTINE'
+       BYTE 7
+       TEXT 'PICTURE'
+       BYTE 3
+       TEXT 'END'
+       BYTE 2
+       TEXT 'IN'
+       BYTE 3
+       TEXT 'HAS'
+       BYTE 3
+       TEXT 'NOT'
+       BYTE 4
+       TEXT 'NAME'
+       BYTE 2
+       TEXT 'IF'
+       BYTE 6
+       TEXT 'ELSEIF'
+       BYTE 4
+       TEXT 'ELSE'
+       BYTE 5
+       TEXT 'WHILE'
+       BYTE 3
+       TEXT 'FOR'
+       BYTE 4
+       TEXT 'EACH'
+       BYTE 5
+       TEXT 'LOCAL'
+       BYTE 5
+       TEXT 'PRINT'
+       BYTE 5
+       TEXT 'WRITE'
+       BYTE 4
+       TEXT 'MOVE'
+       BYTE 2
+       TEXT 'TO'
+       BYTE 6
+       TEXT 'REMOVE'
+       BYTE 4
+       TEXT 'GIVE'
+       BYTE 6
+       TEXT 'RETURN'
+       BYTE 4
+       TEXT 'TRUE'
+       BYTE 5
+       TEXT 'FALSE'
+       BYTE 7
+       TEXT 'NOTHING'
+       BYTE 4
+       TEXT 'SELF'
+       BYTE 3
+       TEXT 'AND'
+       BYTE 2
+       TEXT 'OR'
+       BYTE 3
+       TEXT 'MOD'
+       BYTE 5
+       TEXT 'HASNT'
+       BYTE 5
+       TEXT 'NOTIN'
+       BYTE 7
+       TEXT 'REVERSE'
+       BYTE 6
+       TEXT 'EXTEND'
+       BYTE 5
+       TEXT 'FIRST'
+       BYTE 7
+       TEXT 'REPLACE'
+       BYTE 0
+NOHEX  BYTE 4
+       TEXT 'TRUE'
+       BYTE 5
+       TEXT 'FALSE'
+       BYTE 7
+       TEXT 'NOTHING'
+       BYTE 4
+       TEXT 'SELF'
+       BYTE 0
+       EVEN
