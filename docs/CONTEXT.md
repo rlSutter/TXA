@@ -7,7 +7,9 @@ https://claude.ai/code/artifact/43a54522-f42d-42ed-b2c7-bf348e97a95d
 `5fb8447c-6c85`).  The Authoring Language Reference is the Claude Doc
 https://claude.ai/artifact/FdxcHQseUMuCM6etTi4BzW (doc id
 `7688fc9f-8239-4683-9bc0-3fa3dc6e24f7`, body node `c67c40d5-298f`):
-keep it current when the language changes.
+keep it current when the language changes.  The six manuals still to
+write are stubbed in the Claude Doc
+https://claude.ai/artifact/VqqmmXaB3E5RBxdTcfBtU2 (one tab each).
 
 **State (20 October 2026, checkpoint-m4b):** M0-M3 complete; M4 parts 1-3
 done (UNDO, SAVE/RESTORE with a portable save format, stories on disk and
