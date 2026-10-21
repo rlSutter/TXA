@@ -473,9 +473,39 @@ keep it current as the language changes).  Not yet covered there:
 scope=Routine supplying out-of-scope objects (not implemented: it only
 filters, like noun=Routine).
 
+Part 4 done (21 October 2026): pictures.
+- tools/txpics.py: a PNG becomes format 2 (256 x 96, 4 colours: when the
+  PNG has at most four) or format 4 (128 x 96 fat pixels, 16 colours,
+  scaled and reduced), each with its own 12-bit palette, run-length
+  packed.  The picture area (count, offsets, records) follows the story
+  in SAMS from the next page (build.story_blob; PICPG in storysrc); the
+  portable story image holds only picture numbers (rule 3).  The
+  cartridge and the disk files carry story and pictures together.
+- src/picture.a99 (in the kernel window: the resident engine was full):
+  PICTURE n loads the palette into F18A entries 32-47, decodes the pixels
+  through window D into the bitmap layer at >2800, puts the layer at
+  scanline 8 under the status line, 96 rows; the text window starts at
+  row 13 (rows 1-12 blanked).  PICTURE 0: layer off, text from row 1.
+  Every disk call redraws the picture after (PICRDW); RESTART hides it.
+- Library: ShowPicture(n) (remembered in picnum, so RESTORE and UNDO show
+  it again), room pictures by the PIC property (shown by DescribeRoom,
+  hidden in rooms without one and in the dark), PICTURES ON/OFF,
+  title_picture for TitlePage (the title page then starts under it).
+- Python VM: PICTURE prints nothing (records it); transcripts unchanged.
+- Lamplight: three pictures drawn in code (samples/pics/mkart.py):
+  TITLE and CAVE in 16 colours, LAMPROOM in 4.  On the title page, the
+  lit Sea Cave and the Lamp Room.
+- tests/m4_picture_test.py (11 checks: the exact pixels and palette in
+  VRAM, format, place, the text window, SAVE/RESTORE/UNDO).
+- Not done: the full-screen fallback for RP2040 PICO9918 boards (they
+  have no bitmap layer in 80 columns): needs board detection, untestable
+  here; and the TI Artist importer (a workbench feature).
+
 ## Next
 
-1. M4 part 4 (pictures) and part 5 (sound and music).
+1. M4 part 5 (sound and music): MUSIC/SOUND declarations, MML notation
+   for Rebecca's review, MIDI import, the TI player (frame-flag ticks in
+   key waits and calls), room MUSIC, Lamplight music.
 
 ## (was) Next
 1. M4: saving, restoring and UNDO (platform-independent save format;
@@ -519,6 +549,7 @@ text output, word wrap and [MORE]; bold and underline glyph sets.
 
 ## History
 
+- 2026-10-21 M4 part 4: pictures (converter, picture area, pane, library, Lamplight's three pictures).
 - 2026-10-20 M2 follow-ups: command history (FCTN E/X) and the two-row, 160-character input line.
 - 2026-10-19 M3 complete: part 4, the sample game Lamplight; light-change descriptions; final score; parser speed with the full verb set.
 - 2026-10-19 M3 part 3: the verb set (73 verbs), QUIT/RESTART confirmation, REPLACE and EXTEND.

@@ -258,3 +258,15 @@ SVR8   EQU  RAMVAR+>368        R8 kept across a disk call
 DSKRES EQU  RAMVAR+>36A        DSKCAL: the DSR call's result
 FRCNT  EQU  RAMVAR+>36E        RESTORE: frames still to read
 CENTRD EQU  RAMVAR+>242        1 while STYLE 8 (centred lines) is on
+* ---- pictures (picture.a99) ---------------------------------------------
+PICTOP EQU  13                 the text window's first row while a picture shows
+CURPIC EQU  RAMVAR+>048        the picture showing (0 none)
+PPAGE  EQU  RAMVAR+>04A        the picture reader: SAMS page (story-relative) in window D
+PPTR   EQU  RAMVAR+>04C        the picture reader: next byte's address in window D
+PREM   EQU  RAMVAR+>04E        the picture reader: bytes left in this page
+PFMT   EQU  RAMVAR+>050        the picture's format: 2 or 4
+PICN   EQU  RAMVAR+>052        the picture being shown
+PNCOL  EQU  RAMVAR+>054        its colour count
+PALBUF EQU  RAMVAR+>060        32 bytes: the picture's palette (16 words)
+PGRET  EQU  RAMVAR+>056        PGETB: its return across MAPWIN
+PGHI   EQU  RAMVAR+>058        PGETW: the high byte

@@ -67,7 +67,7 @@ ROUTINE DropFrom arr, n, o
 END
 
 ROUTINE IsMeta a
-  RETURN a = ##Score OR a = ##Verbose OR a = ##Brief OR a = ##Superbrief OR a = ##Quit OR a = ##Notify OR a = ##Save OR a = ##Restore OR a = ##Undo OR a = ##Restart OR a = ##Version
+  RETURN a = ##Score OR a = ##Verbose OR a = ##Brief OR a = ##Superbrief OR a = ##Quit OR a = ##Notify OR a = ##Save OR a = ##Restore OR a = ##Undo OR a = ##Restart OR a = ##Version OR a = ##Pictures
 END
 
 ROUTINE EndTurn
@@ -135,6 +135,10 @@ END
 ROUTINE TitlePage title, byline, blurb
   LOCAL k
   CLS()
+  IF title_picture
+    ShowPicture(title_picture)   ! the text window is then 17 rows, under it
+    k = 7
+  END
   WHILE k < 8
     PRINT
     k = k + 1
@@ -151,10 +155,37 @@ ROUTINE TitlePage title, byline, blurb
     PRINT (string) blurb
   END
   PRINT
-  PRINT
-  PRINT
+  IF title_picture = 0
+    PRINT
+    PRINT
+  END
   PRINT "Press any key to begin."
   STYLE(0)
   READKEY()
+  IF title_picture
+    ShowPicture(0)
+  END
   CLS()
+END
+
+! ShowPicture(n): show picture n (0: none), remembering it in picnum so a
+! restored or undone game can show it again; with PICTURES OFF only the
+! remembering happens.  An engine without pictures shows nothing.
+ROUTINE ShowPicture n
+  picnum = n
+  IF pictures_on
+    PICTURE n
+  ELSE
+    PICTURE 0
+  END
+END
+
+! RoomPicture: the room's own picture (its PIC), or none in a room without
+! one or in the dark.  DescribeRoom calls it.
+ROUTINE RoomPicture
+  IF IsLit() AND PROPLEN(location, PIC) > 0
+    ShowPicture(location.PIC)
+  ELSE
+    ShowPicture(0)
+  END
 END

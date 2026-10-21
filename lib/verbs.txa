@@ -170,6 +170,7 @@ END
 ! what is on each supporter and in each open container.
 ROUTINE DescribeRoom full
   LOCAL o, n, initials
+  RoomPicture()
   STYLE(1)
   IF NOT IsLit()
     PRINT "Darkness"

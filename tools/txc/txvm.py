@@ -33,6 +33,8 @@ class VM:
         self.self_ = 0
         self.steps = 0
         self.status = None
+        self.picture = 0
+        self.pictures_shown = []
         self.undo = []                # snapshots (no limit in the reference VM)
         self.save_dir = None          # where SAVE writes (None: an in-memory dict)
         self.saves = {}
@@ -486,7 +488,7 @@ class VM:
         elif name == 'QUIT': raise Quit()
         elif name == 'RESTART':
             self.img[:self.hw('dynamic_len')] = self.orig[:self.hw('dynamic_len')]
-            self.stack.clear(); self.frames.clear(); self.self_ = 0; self.undo.clear()
+            self.stack.clear(); self.frames.clear(); self.self_ = 0; self.undo.clear(); self.picture = 0
             pc = self.call(self.hw('entry'), [], None)
         elif name == 'UNDOSAVE':
             import copy
@@ -516,7 +518,10 @@ class VM:
             else:
                 pc = r
                 self.stack.append(2)
-        elif name in ('PICTURE', 'SOUND'): self.write(f'[{name.lower()} {pop()}]')
+        elif name == 'PICTURE':
+            self.picture = pop()                      # (the screen, not the text)
+            self.pictures_shown.append(self.picture)
+        elif name == 'SOUND': self.write(f'[sound {pop()}]')
         elif name == 'CLS':
             pass                                      # (the screen, not the text)
         elif name == 'STATUS':

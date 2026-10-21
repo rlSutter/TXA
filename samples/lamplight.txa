@@ -10,6 +10,10 @@
 
 INCLUDE "DSK1.STDLIB"
 
+PICTURE TitlePic "TITLE"     ! samples/pics/title.png: the lighthouse at dusk
+PICTURE CavePic "CAVE"       ! the sea cave, the float glowing
+PICTURE LampPic "LAMPROOM"   ! the great lens
+
 GLOBAL tide_in              ! 1 while the causeway is under water
 GLOBAL tide_turns = 6       ! turns until the tide turns
 GLOBAL lamp_fuelled         ! the great lamp has oil
@@ -52,6 +56,7 @@ ROOM Beach "Beach"
 END
 ROOM Cave "Sea Cave"
   DESC "A dripping cave, the sea's breathing loud in the dark. Daylight is east."
+  PIC CavePic
   E Beach
   OUTSIDE Beach
 END
@@ -108,6 +113,7 @@ ROOM WatchRoom "Watch Room"
 END
 ROOM LampRoom "Lamp Room"
   DESC "The great lens fills the room, its glass catching what light is left. A door leads out to the gallery."
+  PIC LampPic
   HAS light
   DOWN WatchRoom
   OUTSIDE Gallery
@@ -370,6 +376,7 @@ ROUTINE Initialise
   location = HarbourRoad
   max_score = 25
   StartDaemon(Tide)
+  title_picture = TitlePic
   TitlePage("LAMPLIGHT", "A TXA sample game", "A lighthouse gone dark, an old keeper who has lost his spectacles, a tide that will not wait, and a ship that is coming whether the lamp is lit or not.")
   PRINT "The wind has turned cold, and out across the bay the lighthouse stands dark against the last of the sunset. It should have been lit an hour ago."
 END

@@ -31,6 +31,7 @@ KENTRY B    @START             the entry: E/A 5 and the cartridge start here
        COPY "text80.a99"
        COPY "rle.a99"
        COPY "disk.a99"
+       COPY "picture.a99"
 * KERNND: first free byte of the kernel window
 KERNND
        COPY "gen/font.a99"

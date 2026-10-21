@@ -246,13 +246,14 @@ OSV12  BL   @SZFLSH
        BL   @DSKCAL
        MOV  R0,@UTMP
        BL   @SPRZER
+       BL   @PICRDW            (the disk call overwrote the picture)
        MOV  @UTMP,R0
        JNE  OSV99
        LI   R0,1
        MOV  R0,*R6+
        B    @NEXT
 OSV98  BL   @SPRZER
-OSV99  CLR  *R6+               failed: 0
+OSV99  BL   @PICRDW  CLR  *R6+               failed: 0
        B    @NEXT
 
 * SZFLSH / SLFLSH - a waiting skip, or waiting literals, into the file.
@@ -521,6 +522,8 @@ ORS11  BL   @VGET
 ORS12  MOV  @SVREG,R4          the PC back
        MOV  @SVREG+2,R5
        BL   @SPRZER
+       BL   @PICRDW            (the disk call overwrote the picture; the
+*                              library shows the restored game's own next)
        BL   @UNDONE            windows: B unknown first (it shows the pristine
 *                              copy now, and GLOAD reads through B), A on the PC
        BL   @GLOAD             the globals from the restored area
@@ -530,6 +533,7 @@ ORS12  MOV  @SVREG,R4          the PC back
        MOV  R0,*R6+
        B    @NEXT
 ORS98  BL   @SPRZER            failed: nothing changed
+       BL   @PICRDW
        BL   @UNDONE
        CLR  *R6+
        B    @NEXT

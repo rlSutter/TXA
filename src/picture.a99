@@ -1,0 +1,206 @@
+*======================================================================
+* picture.a99 - PICTURE n: the picture pane on the F18A bitmap layer.
+*
+* The TI build (tools/txpics.py) appends a picture area after the story
+* in SAMS, starting at story page PICPG (gen/storysrc.a99; 0: the story
+* has no pictures).  Its layout:
+*   word  count;  count x long  each picture's offset from the area's start
+*   each picture: byte format (2: 256 x 96 in 4 colours; 4: 128 x 96 fat
+*   pixels in 16), byte colour count, the palette words, the pixels
+*   run-length packed (tools/rlepack.py: >00->7F n+1 literal bytes,
+*   >80->FE the next byte n->7D times, >FF the end)
+*
+* Showing picture n: its palette into F18A entries 32-47, its pixels
+* decoded into the bitmap layer at BMLDAT (6144 bytes), the layer on at
+* scanline 8 (row 1, under the status line), 96 rows high.  The text
+* window then starts at row PICTOP (13): rows 1-12 are blanked, and text
+* already below stays.  PICTURE 0 switches the layer off and gives the
+* rows back.  Picture n again is nothing to do.
+*
+* The reader walks the area through window D (nothing prints a story
+* string meanwhile; PRSTR maps D again itself).  Disk calls overwrite
+* VRAM from >2000 (FBUF, the controller's buffers), so after one PICRDW
+* draws the current picture again.
+*======================================================================
+
+OPPIC  DECT R6
+       MOV  *R6,R0
+       C    R0,@CURPIC
+       JEQ  OPP9               showing already
+       MOV  R0,R0
+       JNE  OPP1
+       BL   @PICOFF            0: the pane off
+       B    @NEXT
+OPP1   BL   @PICSHW
+OPP9   B    @NEXT
+
+* PICOFF - the bitmap layer off, the text window back to row 1.
+PICOFF .enter
+       LI   R0,>9F00           VR31 = 0
+       BL   @VDPWR
+       LI   R0,1
+       MOV  R0,@TXTTOP
+       CLR  @CURPIC
+       .leave
+       RT
+
+* PICRDW - draw the current picture again (after a disk call).
+PICRDW .enter
+       MOV  @CURPIC,R0
+       JEQ  PRD9
+       CLR  @CURPIC
+       BL   @PICSHW
+PRD9   .leave
+       RT
+
+* PSEEK - the reader at byte offset R0:R1 (high, low) of the picture area.
+PSEEK  .enter
+       SLA  R0,4               page = PICPG + offset / 4096
+       MOV  R1,R2
+       SRL  R2,12
+       SOC  R0,R2
+       A    @PICPG,R2
+       MOV  R2,@PPAGE
+       ANDI R1,>0FFF
+       MOV  R1,R0
+       AI   R1,WIND
+       MOV  R1,@PPTR
+       LI   R1,4096
+       S    R0,R1
+       MOV  R1,@PREM
+       MOV  @PPAGE,R2          window D onto that page
+       LI   R3,MAPRGD
+       BL   @MAPWIN
+       .leave
+       RT
+
+* PGETB - R0 = the area's next byte (low byte).  Uses R0-R3, R12.
+PGETB  MOV  @PPTR,R1
+       CLR  R0
+       MOVB *R1+,R0
+       SRL  R0,8
+       MOV  R1,@PPTR
+       DEC  @PREM
+       JNE  PGB9
+       MOV  R11,R1             the page's end: the next page (MAPWIN uses
+       INC  @PPAGE             R2, R3 and R12; R0 and the return survive)
+       LI   R2,WIND
+       MOV  R2,@PPTR
+       LI   R2,4096
+       MOV  R2,@PREM
+       MOV  @PPAGE,R2
+       LI   R3,MAPRGD
+       MOV  R1,@PGRET
+       BL   @MAPWIN
+       MOV  @PGRET,R11
+PGB9   RT
+* PGETW - R0 = the next word.
+PGETW  .enter
+       BL   @PGETB
+       SWPB R0
+       MOV  R0,@PGHI
+       BL   @PGETB
+       SOC  @PGHI,R0
+       .leave
+       RT
+
+* PICSHW - show picture R0.
+PICSHW .enter
+       MOV  @PICPG,R1          no pictures in this build: nothing
+       JNE  PSH0
+       B    @PSH9
+PSH0   MOV  R0,@PICN
+       CLR  R0                 the count
+       CLR  R1
+       BL   @PSEEK
+       BL   @PGETW
+       C    @PICN,R0           a number past the count: nothing
+       JLE  PSH0A
+       B    @PSH9
+PSH0A
+       MOV  @PICN,R1           its offset: at 2 + (n-1) * 4
+       DEC  R1
+       SLA  R1,2
+       INCT R1
+       CLR  R0
+       BL   @PSEEK
+       BL   @PGETW
+       MOV  R0,@PNCOL          (the high word, briefly)
+       BL   @PGETW
+       MOV  R0,R1
+       MOV  @PNCOL,R0
+       BL   @PSEEK
+       BL   @PGETB             format, colours, palette
+       MOV  R0,@PFMT
+       BL   @PGETB
+       MOV  R0,@PNCOL
+       LI   R14,PALBUF
+       MOV  R0,R15
+PSH1   BL   @PGETW
+       MOV  R0,*R14+
+       DEC  R15
+       JNE  PSH1
+       LI   R0,>9F00           the layer off while it changes
+       BL   @VDPWR
+       LI   R0,32              the palette into entries 32-
+       LI   R1,PALBUF
+       MOV  @PNCOL,R2
+       BL   @F18PAL
+       LI   R0,BMLDAT          the pixels into the layer
+       BL   @VWAD
+PSH2   BL   @PGETB
+       CI   R0,>FF
+       JEQ  PSH5
+       CI   R0,>80
+       JHE  PSH4
+       INC  R0                 n+1 literal bytes
+       MOV  R0,R15
+PSH3   BL   @PGETB
+       SWPB R0
+       MOVB R0,@VDPWD
+       DEC  R15
+       JNE  PSH3
+       JMP  PSH2
+PSH4   AI   R0,->7D            the next byte, n->7D times
+       MOV  R0,R15
+       BL   @PGETB
+       SWPB R0
+PSH4A  MOVB R0,@VDPWD
+       DEC  R15
+       JNE  PSH4A
+       JMP  PSH2
+PSH5   C    @TXTTOP,@DPTOP     the text window under the pane
+       JEQ  PSH7
+       LI   R14,1              rows 1-12 blank
+PSH6   MOV  R14,R0
+       BL   @ECLR
+       INC  R14
+       CI   R14,PICTOP
+       JL   PSH6
+       LI   R0,PICTOP
+       MOV  R0,@TXTTOP
+       C    @CROW,R0           the next line no higher than the window
+       JHE  PSH7
+       MOV  R0,@CROW
+PSH7   LI   R0,>A000+(BMLDAT/64)   VR32: the picture's address
+       BL   @VDPWR
+       LI   R0,>A100           VR33: X 0
+       BL   @VDPWR
+       LI   R0,>A208           VR34: scanline 8, under the status line
+       BL   @VDPWR
+       LI   R0,>A300           VR35: 256 screen pixels wide
+       BL   @VDPWR
+       LI   R0,>A460           VR36: 96 rows
+       BL   @VDPWR
+       LI   R0,>C0+BMLPAL      VR31: on, above the text, palette 32-
+       C    @PFMT,@D4
+       JNE  PSH8
+       ORI  R0,>10             fat pixels: 16 colours
+PSH8   AI   R0,>9F00
+       BL   @VDPWR
+       MOV  @PICN,@CURPIC
+PSH9   SETO @CURBH             (window B was not touched; D was)
+       .leave
+       RT
+DPTOP  DATA PICTOP
+D4     DATA 4

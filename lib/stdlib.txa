@@ -28,6 +28,7 @@ ROUTINE Main
         PRINT "[Previous turn undone.]"
         BuildScope()
         ShowStatus()
+        ShowPicture(picnum)
       ELSE
         RunLine()
       END

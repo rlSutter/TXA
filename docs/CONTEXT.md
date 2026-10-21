@@ -62,7 +62,11 @@ owns it; Claude builds it. The engine comes first; the story later.
 | `src/undo.a99` | UNDOSAVE/UNDO: LAST in SAMS pages 16-19, XOR/RLE records in pages 20-26; PGCOPY; UPMAP (window B base in UBBASE) |
 | `src/disk.a99` | DSKCAL (PAB at >37A0, file buffer FBUF >2000) and Lantern's DSRLNK; SPRZER |
 | `src/save.a99` | SAVE/RESTORE: the portable save file built in and read from VRAM; FNAME (DSK1. prefix) |
-| `tools/txa_game.py` | the game writer: E/A 5 engine files, 4K story files, disk image, optional cartridge |
+| `tools/txa_game.py` | the game writer: E/A 5 engine files, 4K story (and picture) files, disk image, optional cartridge |
+| `src/picture.a99` | PICTURE: the picture area through window D into the bitmap layer; PICOFF, PICRDW (kernel window) |
+| `tools/txpics.py` | PNG to the TI picture formats; the picture area; read_area() the reference reader |
+| `samples/pics/` | Lamplight's pictures and mkart.py, which draws them |
+| `tests/m4_picture_test.py` | pictures on the engine: pixels, palette, format, place, SAVE/RESTORE/UNDO |
 | `samples/lamplight.txa` | the sample game, its walkthrough (.walk) and reviewed transcript (.expected) |
 | `tests/m4_save_test.py`, `tests/m4_disk_test.py` | SAVE/RESTORE cross-checks (identical save files from both VMs); the game writer and loading from disk |
 | `demos/m1demo.txa`, `demos/m2demo.txa` | the demonstration stories |
@@ -87,7 +91,7 @@ owns it; Claude builds it. The engine comes first; the story later.
    `txc_run_test.py`, `m2_parser_test.py`, `m3_world_test.py`,
    `sample_test.py --quick`; the slow engine ones, `m1_vm_test.py`,
    `m2_engine_test.py`, `m3_engine_test.py`, `sample_test.py`,
-   `m4_save_test.py`, `m4_disk_test.py`, run 1-4 minutes each.  Start each
+   `m4_save_test.py`, `m4_disk_test.py`, `m4_picture_test.py`, run 1-4 minutes each.  Start each
    in the background with output to a file and collect it in a later
    call: the tool stops any command after 300 s.  Run them one after
    another, never two at once, and never build anything while they run
@@ -105,6 +109,10 @@ owns it; Claude builds it. The engine comes first; the story later.
 
 ## Things learned the hard way
 
+- The resident engine (>A000-CFFF) is nearly full: new code goes in the
+  kernel window (>2000-2FFD) when it fits (picture.a99 did).
+- Background chains of several engine suites die partway: run the slow
+  suites one per call (each under 300 s).
 - RAM variables: build.py refuses to build if two in defs.a99 overlap;
   a variable's size is the "N bytes" (or "N words") in its comment, so
   every buffer must say its size.  It has caught four real overlaps.

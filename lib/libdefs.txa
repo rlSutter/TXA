@@ -17,6 +17,7 @@ PROPERTY DOOR_TO WITH_KEY CAPACITY BEFORE AFTER LIFE ORDERS
 PROPERTY DIR            ! on a compass object: its number, 1-12 (see GoSub)
 PROPERTY CANT_GO        ! a room: said instead of "You can't go that way."
 PROPERTY FOUND_IN       ! the rooms a floating object (a door, a river) is in
+PROPERTY PIC            ! a room: the picture shown while the player is there (and can see)
 PROPERTY EACH_TURN      ! a room: run (or printed) at the end of every turn there
 PROPERTY DAEMON         ! a routine run every turn while StartDaemon is in force
 PROPERTY TIME_LEFT      ! a timer's turns to go (give the object TIME_LEFT 0)
@@ -43,6 +44,9 @@ GLOBAL lookmode = 1           ! 1 brief, 2 verbose, 3 superbrief
 GLOBAL beforehook             ! a routine the game sets to see every action first
 GLOBAL afterhook              ! one that sees every action that has happened
 GLOBAL endturnhook            ! one run at the end of every turn
+GLOBAL picnum                 ! the picture showing (kept in saves, so RESTORE and UNDO can show it again)
+GLOBAL pictures_on = 1        ! PICTURES OFF sets 0
+GLOBAL title_picture          ! a picture for the title page (0: none)
 
 OBJECT Yourself "yourself"
   NAME "me" "myself" "self" "yourself"

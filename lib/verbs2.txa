@@ -155,6 +155,11 @@ END
 VERB "version"
   -> Version
 END
+VERB "pictures" "graphics"
+  -> Pictures
+  "on" -> Pictures
+  "off" -> Pictures
+END
 
 ! ---- a yes or no from the player -------------------------------------------
 ROUTINE YesOrNo
@@ -466,6 +471,7 @@ ROUTINE SaveSub
     PRINT "Restored."
     BuildScope()
     ShowStatus()
+    ShowPicture(picnum)
   END
 END
 
@@ -485,4 +491,20 @@ END
 
 ROUTINE VersionSub
   PRINT "Written with TXA for the TI-99/4A."
+END
+
+ROUTINE PicturesSub
+  IF WordAt(verbwn + 1) = 'off'
+    pictures_on = 0
+  ELSEIF WordAt(verbwn + 1) = 'on'
+    pictures_on = 1
+  ELSE
+    pictures_on = 1 - pictures_on
+  END
+  ShowPicture(picnum)
+  IF pictures_on
+    PRINT "Pictures on."
+  ELSE
+    PRINT "Pictures off."
+  END
 END
