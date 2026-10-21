@@ -66,5 +66,10 @@ check('FCTN S rubs out: "DSK1.LAMPLIGHTX" then FCTN S reads DSK1.LAMPLIGHT', m3.
 m4 = run(['DSK1.LAMPLIGHT'])            # capitals typed with SHIFT
 check('a name typed with SHIFT (capitals) works', m4.rw(sy['WBLNS']) == len(lines) and m4.rw(sy['WBDONE']) == 2,
       (m4.rw(sy['WBDONE']), R.screen(m4).splitlines()[2]))
+check('after the results it says what a key does', 'Press a key to choose another file.' in R.screen(m4), R.screen(m4).splitlines()[:9])
+m5 = run(['', '', ''])                  # ENTER loads; ENTER (any key) clears; ENTER loads again
+scr5 = R.screen(m5).splitlines()
+check('a key clears the results and asks again; the next file loads', m5.rw(sy['WBDONE']) == 2 and m5.rw(sy['WBLNS']) == len(lines)
+      and scr5[2].strip() == 'Source file: DSK1.LAMPLIGHT', scr5[:9])
 print('ALL PASS' if not fails else f'{fails} FAILED')
 sys.exit(1 if fails else 0)

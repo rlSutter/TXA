@@ -684,6 +684,11 @@ library, wrapped to 80 columns, as DIS/VAR 80 files on a DSDD image
 VERBS2, TURN), each read back and checked; and the workbench reads keys
 itself (WKEY, as the engine's KEYGT2: modifiers set aside before the
 scan), so FCTN S rubs out and SHIFT works.  The load test checks both.
+Rebecca then loaded it in js99er: "Read 428 lines, 12090 bytes. 1333
+tokens." as in the simulator.  It seemed stalled afterwards: it waited
+for a key without saying so, and went back to a prompt that looked
+unchanged.  Now it says "Press a key to choose another file." and clears
+the results when it asks again (tested).
 
 ## Next
 

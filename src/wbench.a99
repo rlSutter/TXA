@@ -263,7 +263,19 @@ WL6A
        LI   R1,SREAD3
        CLR  R2
        BL   @TXSTR
-WL9    BL   @WKEY              then the prompt again
+WL9    LI   R0,8               then: say what a key does, wait for one,
+       LI   R1,1               and clear the results for the next file
+       BL   @TXAT
+       LI   R1,SAGAIN
+       CLR  R2
+       BL   @TXSTR
+       BL   @WKEY
+       LI   R14,4
+WL10   MOV  R14,R0
+       BL   @WCLR
+       INC  R14
+       CI   R14,30
+       JL   WL10
        B    @WPROMP
 
 * WPUT - the byte in R0's high byte into the source text.  Uses R0-R3, R12.
@@ -388,6 +400,9 @@ STOKSX
 SLXERR BYTE SLXERX-SLXERR-1
        TEXT 'Lexer error '
 SLXERX
+SAGAIN BYTE SAGAIX-SAGAIN-1
+       TEXT 'Press a key to choose another file.'
+SAGAIX
 SLINE  BYTE SLINEX-SLINE-1
        TEXT ' at line '
 SLINEX
