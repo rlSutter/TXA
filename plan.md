@@ -624,9 +624,29 @@ cartridge skeleton, DV80 loading, dump formats), 2 lexer, 3 parser,
 4 meaning, 5 code, 6 linking and output; each stage matched to Python
 on the whole corpus by dumps from SAMS.
 
+Rebecca approved D1-D4 as recommended (21 October 2026).
+
+M5 part 1 under way:
+- D1 done in the Python compiler: a string left open at the end of a
+  line continues on the next (the break one space; trailing spaces and
+  the next line's leading spaces dropped); the string token keeps its
+  first line; an open string at the end of the file is an error at its
+  first line.  txc_parse_test: 5 checks.
+- tools/txa_wrap.py: TXA source to 80 columns (breaks at a single space
+  inside any string; long comments move above).  Six long code lines in
+  the library rewritten (helpers SeesInto, AllCandidate, ShowsInside;
+  IsMeta in groups; locals in the OOPS splice): behaviour unchanged.
+- tests/txc_wrap_test.py: the library, Lamplight and every m2/m3 world,
+  wrapped, compile to identical images.
+
 ## Next
 
-1. M5 (waiting on D1-D4): the native compiler (the workbench cartridge: source loading,
+1. M5 part 1 (rest): DV80 reading on the TI (record I/O: OPEN, READ,
+   CLOSE; the simulator's disk needs it too), the workbench cartridge
+   skeleton on the engine's kernel, the token dump format.
+2. M5 parts 2-6 as in the design doc.
+
+## (was) M5 (waiting on D1-D4): the native compiler (the workbench cartridge: source loading,
    three passes, the precompiled library, error list; done when the TI
    produces images byte-identical to the Python compiler for the whole
    corpus).  Start with its design.

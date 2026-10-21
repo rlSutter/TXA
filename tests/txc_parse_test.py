@@ -135,5 +135,22 @@ for name, src, line, part in [
     ok, detail = err(src, line, part)
     check('error: ' + name, ok, detail)
 
+
+# ---- D1: a string left open at the end of a line continues on the next ----
+from txc.lexer import tokenize as _tok
+_t = [t for t in _tok('PRINT "A long room, its walls\n      hung with old maps,   \n   and a door north.", x\nPRINT "z"\n') if t.kind != 'NL']
+check('D1: a string continues over three lines, joined by single spaces',
+      _t[1].kind == 'STR' and _t[1].value == 'A long room, its walls hung with old maps, and a door north.', _t[1])
+check('D1: the statement goes on after the closing quote', [t.value for t in _t[2:4]] == [',', 'x'], _t[2:4])
+check('D1: the string has its first line; later tokens their own', _t[1].line == 1 and _t[3].line == 3 and _t[5].line == 4,
+      [(t.value, t.line) for t in _t])
+try:
+    _tok('PRINT "never\nclosed\n'); _ok = False
+except Exception as e:
+    _ok = 'line 1' in str(e) and 'string not closed' in str(e)
+check('D1: a string still open at the end of the file is an error at the line it starts', _ok)
+_t2 = [t for t in _tok('PRINT "two^lines ~quoted\n  ~ here"\n') if t.kind == 'STR']
+check('D1: ^ and ~ work across the break', _t2[0].value == 'two\nlines "quoted " here', _t2[0].value)
+
 print('ALL PASS' if not fails else f'{fails} FAILED')
 sys.exit(1 if fails else 0)

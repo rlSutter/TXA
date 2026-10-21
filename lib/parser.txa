@@ -119,12 +119,20 @@ ROUTINE AddScope obj
   END
 END
 
+! can things inside (or on, or carried by) c be seen?
+ROUTINE SeesInto c
+  IF c HAS supporter OR c HAS transparent OR c HAS animate
+    RETURN TRUE
+  END
+  RETURN c HAS container AND c HAS open
+END
+
 ROUTINE ScopeTree obj
   LOCAL c
   FOR EACH c IN obj
     IF c <> player
       AddScope(c)
-      IF c HAS supporter OR c HAS transparent OR (c HAS container AND c HAS open) OR c HAS animate
+      IF SeesInto(c)
         ScopeTree(c)
       END
     END
@@ -643,12 +651,24 @@ END
 
 ! ALL: everything in scope that suits the verb and no other character
 ! holds, then EXCEPT ...
+! may ALL take in o?  Not the player, scenery, concealed or fixed things,
+! characters, or what a character carries
+ROUTINE AllCandidate o
+  IF o = player OR o HAS scenery OR o HAS concealed
+    RETURN FALSE
+  END
+  IF o HAS static OR o HAS animate
+    RETURN FALSE
+  END
+  RETURN PARENT(o) HASNT animate OR PARENT(o) = player
+END
+
 ROUTINE AllObjects typ
   LOCAL k, o, w
   nmulti = 0
   WHILE k < nscope
     o = scopes(k)
-    IF o <> player AND o HASNT scenery AND o HASNT concealed AND o HASNT static AND o HASNT animate AND (PARENT(o) HASNT animate OR PARENT(o) = player)
+    IF AllCandidate(o)
       IF typ = 4
         IF o IN player
           AddMulti(o)
@@ -953,7 +973,10 @@ ROUTINE AskMissing li, start
   ! the command's own words, a space, then the reply
   CopyText(text2, lasttext)
   text2(0) = 0
-  AppendTo(text, parse(2 + 3 * cmdstart0), parse(2 + 3 * (cmdend - 1)) + parse(3 + 3 * (cmdend - 1)) - parse(2 + 3 * cmdstart0))
+  LOCAL cfirst, cupto
+  cfirst = parse(2 + 3 * cmdstart0)
+  cupto = parse(2 + 3 * (cmdend - 1)) + parse(3 + 3 * (cmdend - 1))
+  AppendTo(text, cfirst, cupto - cfirst)
   AppendTo(spacearr, 1, 1)
   AppendTo(lasttext, 1, lasttext(0))
   CopyText(text2, text)

@@ -56,11 +56,20 @@ DEC = re.compile(r'[0-9]+')
 HEX = re.compile(r'>[0-9A-Fa-f]+')
 
 def tokenize(text, file='<source>'):
+    """Tokens for the text.  A string left open at the end of a line
+    continues on the next (decision D1, for 80-column TI source): the line
+    break becomes one space, trailing spaces before it and the next line's
+    leading spaces are dropped, and the statement goes on after the closing
+    quote.  Tokens carry the line they are on (a string: the line it starts)."""
     toks = []
-    for ln, raw in enumerate(text.splitlines(), 1):
+    lines = text.splitlines()
+    k = 0
+    while k < len(lines):
+        ln = k + 1
+        raw = lines[k]; k += 1
         i, n, line = 0, len(raw), []
-        def emit(kind, value, txt):
-            line.append(Tok(kind, value, txt, file, ln))
+        def emit(kind, value, txt, at=None):
+            line.append(Tok(kind, value, txt, file, at or ln))
         while i < n:
             c = raw[i]
             if c in ' \t':
@@ -69,8 +78,26 @@ def tokenize(text, file='<source>'):
                 break
             if c == '"':
                 j = raw.find('"', i + 1)
-                if j < 0:
-                    raise TxaError(file, ln, 'string not closed on this line')
+                if j < 0:                           # D1: the string goes on
+                    start = ln
+                    parts = [raw[i + 1:].rstrip(' \t')]
+                    while True:
+                        if k >= len(lines):
+                            raise TxaError(file, start, 'string not closed')
+                        ln = k + 1
+                        raw = lines[k]; k += 1
+                        body = raw.lstrip(' \t')
+                        j = body.find('"')
+                        if j < 0:
+                            parts.append(body.rstrip(' \t'))
+                            continue
+                        parts.append(body[:j])
+                        off = len(raw) - len(body)
+                        i, n = off + j + 1, len(raw)
+                        break
+                    s = ' '.join(parts)
+                    s = s.replace('^', '\n').replace('~', '"')
+                    emit('STR', s, '"' + s + '"', at=start); continue
                 s = raw[i + 1:j].replace('^', '\n').replace('~', '"')
                 emit('STR', s, raw[i:j + 1]); i = j + 1; continue
             if c == "'":                           # 'lamp': a dictionary word
@@ -113,5 +140,5 @@ def tokenize(text, file='<source>'):
         if line:
             toks.extend(line)
             toks.append(Tok('NL', None, '', file, ln))
-    toks.append(Tok('EOF', None, '', file, len(text.splitlines()) + 1))
+    toks.append(Tok('EOF', None, '', file, len(lines) + 1))
     return toks

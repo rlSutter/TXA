@@ -224,10 +224,19 @@ ROUTINE ShowsInitial o
   RETURN PROPLEN(o, INITIAL) > 0 AND o HASNT moved
 END
 
+! is what's on or in o shown (a supporter, or an open or see-through
+! container)?
+ROUTINE ShowsInside o
+  IF o HAS supporter
+    RETURN TRUE
+  END
+  RETURN o HAS container AND (o HAS open OR o HAS transparent)
+END
+
 ! "On the oak table is a brass lamp." / "In the box are some coins."
 ROUTINE DescribeContents o
   LOCAL n, c
-  IF o HASNT supporter AND (o HASNT container OR (o HASNT open AND o HASNT transparent))
+  IF NOT ShowsInside(o)
     RETURN
   END
   FOR EACH c IN o
@@ -367,7 +376,7 @@ ROUTINE InvList obj, depth
       WRITE " (providing light)"
     END
     PRINT
-    IF c HAS supporter OR (c HAS container AND (c HAS open OR c HAS transparent))
+    IF ShowsInside(c)
       InvList(c, depth + 1)
     END
   END
