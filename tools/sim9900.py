@@ -658,6 +658,11 @@ class CPU:
                     # cartridge's first program (expansion RAM and the cards keep
                     # their state, as they do on a real console)
                     self.m.at_reset = (list(self.m.vregs), dict(self.m.palette), self.m.ams_mapping)   # for the tests
+                    # the scratchpad as the program left it: a real console does
+                    # not clear it before its interrupt routine runs (a non-zero
+                    # user hook at >83C4, or a sound count at >83CE, hangs the
+                    # power-up), so a program must clear it before BLWP @>0000
+                    self.m.scratch_at_reset = bytes(self.m.scratch)
                     for i in range(0x100): self.m.scratch[i] = 0
                     self.m.bank = 0
                     self.m.console_resets = getattr(self.m, 'console_resets', 0) + 1

@@ -540,6 +540,20 @@ yes or no." had no line break.  tests: world5 (death, a wrong answer,
 UNDO, RESTORE, RESTART, a custom endmessage, QUIT; 6 named checks, the
 engine identical); the picture test checks the ending picture.
 
+QUIT left the console hung (21 October 2026, Rebecca's js99er
+screenshot: after the end screen's QUIT, the game's text in 40 columns,
+no title screen).  Cause: the fast block (copied to >8320-83DD in the
+speed work, after M0's probe proved QUIT) covers the console's user
+interrupt hook at >83C4 and sound count at >83CE; the console's
+power-up enables interrupts before clearing them, so a stale hook jumps
+into engine code.  Fixed: QUIT clears >8320->83FF before BLWP @>0000.
+The simulator modelled the reset as clearing the scratchpad, which hid
+it; it now records the scratchpad as the program left it
+(scratch_at_reset).  tests/m4_quit_test.py checks it (and fails on the
+old engine).  Also js99er's "-- $-" end-screen junk: same screenshot
+shows ",-  -(" in screen memory rows the picture covers; still
+unexplained, but not on the visible screen while the game runs.
+
 ## Next
 
 1. M4 part 5 (sound and music): MUSIC/SOUND declarations, MML notation

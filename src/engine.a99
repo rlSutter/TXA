@@ -456,6 +456,13 @@ QUIT   MOV  @F18FLG,R0
        JEQ  QT1
        BL   @F18RST
 QT1    BL   @AMSOFF
+       LI   R0,>8320           the scratchpad above this workspace cleared:
+QT2    CLR  *R0+               the fast block lives there, over the console's
+       CI   R0,>8400           user interrupt hook (>83C4) and sound count
+       JL   QT2                (>83CE); the console's power-up enables
+*                              interrupts before it clears them, and a stale
+*                              hook hangs it (the screen stays on the game's
+*                              text, in 40 columns: Rebecca, js99er)
        BLWP @>0000
 
 D128   DATA 128

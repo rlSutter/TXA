@@ -93,7 +93,7 @@ owns it; Claude builds it. The engine comes first; the story later.
    `txc_run_test.py`, `m2_parser_test.py`, `m3_world_test.py`,
    `sample_test.py --quick`; the slow engine ones, `m1_vm_test.py`,
    `m2_engine_test.py`, `m3_engine_test.py`, `sample_test.py`,
-   `m4_save_test.py`, `m4_disk_test.py`, `m4_picture_test.py`, run 1-4 minutes each.  Start each
+   `m4_save_test.py`, `m4_disk_test.py`, `m4_picture_test.py`, `m4_quit_test.py`, run 1-4 minutes each.  Start each
    in the background with output to a file and collect it in a later
    call: the tool stops any command after 300 s.  Run them one after
    another, never two at once, and never build anything while they run
@@ -111,6 +111,10 @@ owns it; Claude builds it. The engine comes first; the story later.
 
 ## Things learned the hard way
 
+- Before BLWP @>0000, clear the scratchpad from >8320: the console's
+  power-up enables interrupts before clearing >83C4 (user hook) and
+  >83CE (sound count); the fast block left there hung js99er.  The
+  simulator's reset model clears it itself, so test scratch_at_reset.
 - The resident engine (>A000-CFFF) is nearly full: new code goes in the
   kernel window (>2000-2FFD) when it fits (picture.a99 did).
 - Background chains of several engine suites die partway: run the slow
