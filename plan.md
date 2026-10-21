@@ -501,6 +501,24 @@ Part 4 done (21 October 2026): pictures.
   have no bitmap layer in 80 columns): needs board detection, untestable
   here; and the TI Artist importer (a workbench feature).
 
+From Rebecca's play-test of the pictured build (21 October 2026):
+- "the pictures seem to be duplicated horizontally": a js99er bug, found
+  in its source (assembly/f18a.ts): in 80-column mode it halves the
+  screen x for the bitmap layer's bounds test (bmpX = x >> 1) but not
+  for the pixel address (bitmapX1 = x - bitmapX), so each 480-pixel line
+  reads two picture rows: the picture at half width, then again (one row
+  lower) on the right.  The F18A reference keeps the layer on its
+  256-pixel grid in 80 columns, so real hardware should show one
+  full-width picture; not yet confirmed on a console.  (The M0 probe
+  will have shown the same doubling.)
+- The end screen's status line showed the score before the winning
+  move (15, not 25): the move that ends the game skipped EndTurn.  Fixed:
+  the library counts it as a turn and redraws the status line;
+  sample_test checks "Score: 25  Moves: 47" on the engine.
+- "--   $-" after the moves on the end screen: not reproduced in the
+  simulator; waiting on a screenshot and whether it was js99er or the
+  console, and whether SAVE/RESTORE were used.
+
 ## Next
 
 1. M4 part 5 (sound and music): MUSIC/SOUND declarations, MML notation

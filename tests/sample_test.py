@@ -48,6 +48,8 @@ if '--quick' not in sys.argv:
     if per:
         secs = sorted(n * 9e-6 for n in per)
         print(f'      engine time per command (estimate): median {secs[len(secs)//2]:.1f}s, worst {secs[-1]:.1f}s')
+    row0 = g['R'].screen(m).splitlines()[0]
+    check('at the end the status line shows the final score and moves', row0.rstrip().endswith('Score: 25  Moves: 47'), repr(row0))
     if '--png' in sys.argv:
         g['R'].render(m, os.path.join(ROOT, 'build/shots/lamplight-end.png'))
     # the command history with a long status line ("Score: 5  Moves: 7"):
