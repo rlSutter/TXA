@@ -18,6 +18,7 @@ PROPERTY DIR            ! on a compass object: its number, 1-12 (see GoSub)
 PROPERTY CANT_GO        ! a room: said instead of "You can't go that way."
 PROPERTY FOUND_IN       ! the rooms a floating object (a door, a river) is in
 PROPERTY PIC            ! a room: the picture shown while the player is there (and can see)
+PROPERTY TUNE           ! a room: the tune that plays while the player is there
 PROPERTY EACH_TURN      ! a room: run (or printed) at the end of every turn there
 PROPERTY DAEMON         ! a routine run every turn while StartDaemon is in force
 PROPERTY TIME_LEFT      ! a timer's turns to go (give the object TIME_LEFT 0)
@@ -48,6 +49,11 @@ GLOBAL picnum                 ! the picture showing (kept in saves, so RESTORE a
 GLOBAL pictures_on = 1        ! PICTURES OFF sets 0
 GLOBAL title_picture          ! a picture for the title page (0: none)
 GLOBAL end_picture            ! a picture for the end screen (0: none)
+GLOBAL tunenum                ! the tune playing (kept in saves, like picnum)
+GLOBAL music_on = 1           ! MUSIC OFF sets 0
+GLOBAL sounds_on = 1          ! SOUNDS OFF sets 0
+GLOBAL title_music            ! a tune for the title page (0: none)
+GLOBAL end_music              ! a tune for the end screen (0: none)
 GLOBAL endmessage             ! a string to use instead of "You have won" / "You have died" (0: those)
 
 OBJECT Yourself "yourself"

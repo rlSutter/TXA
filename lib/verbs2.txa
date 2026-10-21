@@ -160,6 +160,16 @@ VERB "pictures" "graphics"
   "on" -> Pictures
   "off" -> Pictures
 END
+VERB "music"
+  -> Music
+  "on" -> Music
+  "off" -> Music
+END
+VERB "sounds" "effects"
+  -> Sounds
+  "on" -> Sounds
+  "off" -> Sounds
+END
 
 ! ---- a yes or no from the player -------------------------------------------
 ROUTINE YesOrNo
@@ -472,6 +482,7 @@ ROUTINE SaveSub
     BuildScope()
     ShowStatus()
     ShowPicture(picnum)
+    PlayMusic(tunenum)
   END
 END
 
@@ -506,5 +517,36 @@ ROUTINE PicturesSub
     PRINT "Pictures on."
   ELSE
     PRINT "Pictures off."
+  END
+END
+
+ROUTINE MusicSub
+  IF WordAt(verbwn + 1) = 'off'
+    music_on = 0
+  ELSEIF WordAt(verbwn + 1) = 'on'
+    music_on = 1
+  ELSE
+    music_on = 1 - music_on
+  END
+  PlayMusic(tunenum)
+  IF music_on
+    PRINT "Music on."
+  ELSE
+    PRINT "Music off."
+  END
+END
+
+ROUTINE SoundsSub
+  IF WordAt(verbwn + 1) = 'off'
+    sounds_on = 0
+  ELSEIF WordAt(verbwn + 1) = 'on'
+    sounds_on = 1
+  ELSE
+    sounds_on = 1 - sounds_on
+  END
+  IF sounds_on
+    PRINT "Sound effects on."
+  ELSE
+    PRINT "Sound effects off."
   END
 END

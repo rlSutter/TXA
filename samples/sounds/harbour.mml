@@ -1,0 +1,6 @@
+! harbour.mml - the outdoor rooms: a jaunty shanty in D major, 4/4
+TEMPO 112
+LOOP
+A: o4 l8 v10 @3  d f+ a a b a f+ d | e g b b a g f+ e | d f+ a >d c+ <b a f+ | g e c+ e d4 r4
+A:               f+ a >d d c+ <b a f+ | g b >e d c+ <b a g | f+ d e c+ d f+ e c+ | d4 <a4 >d4 r4
+C: o3 l4 v8 @6   d a d a | e b e b | d a d a | a e d r | d a d a | e b a e | d a e a | d a d r

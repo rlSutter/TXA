@@ -67,7 +67,7 @@ ROUTINE DropFrom arr, n, o
 END
 
 ROUTINE IsMeta a
-  RETURN a = ##Score OR a = ##Verbose OR a = ##Brief OR a = ##Superbrief OR a = ##Quit OR a = ##Notify OR a = ##Save OR a = ##Restore OR a = ##Undo OR a = ##Restart OR a = ##Version OR a = ##Pictures
+  RETURN a = ##Score OR a = ##Verbose OR a = ##Brief OR a = ##Superbrief OR a = ##Quit OR a = ##Notify OR a = ##Save OR a = ##Restore OR a = ##Undo OR a = ##Restart OR a = ##Version OR a = ##Pictures OR a = ##Music OR a = ##Sounds
 END
 
 ROUTINE EndTurn
@@ -135,6 +135,9 @@ END
 ROUTINE TitlePage title, byline, blurb
   LOCAL k
   CLS()
+  IF title_music
+    PlayMusic(title_music)
+  END
   IF title_picture
     ShowPicture(title_picture)   ! the text window is then 17 rows, under it
     k = 7
@@ -165,7 +168,38 @@ ROUTINE TitlePage title, byline, blurb
   IF title_picture
     ShowPicture(0)
   END
+  IF title_music
+    PlayMusic(0)
+  END
   CLS()
+END
+
+! PlayMusic(n): tune n (0: none), remembered in tunenum so a restored or
+! undone game plays it again; with MUSIC OFF only the remembering.  The
+! tune already playing goes on.  An engine without sound stays silent.
+ROUTINE PlayMusic n
+  tunenum = n
+  IF music_on
+    MUSIC(n)
+  ELSE
+    MUSIC(0)
+  END
+END
+
+! PlaySound(n): effect n, once, over the music (not with SOUNDS OFF).
+ROUTINE PlaySound n
+  IF sounds_on
+    SOUND(n)
+  END
+END
+
+! RoomMusic: the room's own tune (its TUNE), or none.  DescribeRoom calls it.
+ROUTINE RoomMusic
+  IF PROPLEN(location, TUNE) > 0
+    PlayMusic(location.TUNE)
+  ELSE
+    PlayMusic(0)
+  END
 END
 
 ! ShowPicture(n): show picture n (0: none), remembering it in picnum so a
@@ -200,6 +234,9 @@ ROUTINE EndScreen
   LOCAL w
   IF end_picture
     ShowPicture(end_picture)
+  END
+  IF end_music
+    PlayMusic(end_music)
   END
   PRINT
   STYLE(9)

@@ -29,6 +29,7 @@ ROUTINE Main
         BuildScope()
         ShowStatus()
         ShowPicture(picnum)
+        PlayMusic(tunenum)
       ELSE
         RunLine()
       END

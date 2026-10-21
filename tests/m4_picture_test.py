@@ -33,7 +33,7 @@ area = txpics.picture_area(info, [os.path.join(ROOT, 'samples'), os.path.join(RO
 pics = txpics.read_area(area)
 check('the converter: 4 pictures, formats 4, 4, 2, 4, each 6144 bytes of pixels',
       [p[0] for p in pics] == [4, 4, 2, 4] and all(len(p[2]) == 6144 for p in pics), [(p[0], len(p[2])) for p in pics])
-blob, picpg = build.story_blob(img, area)
+blob, picpg, _ = build.story_blob(img, area)
 check('the picture area starts on the page after the story', picpg == (len(img) + 4095) // 4096 and blob[picpg * 4096:] == area)
 cart, _ = build.engine_cart(img, 'LAMPLIGHT', pictures=area)
 sy = build.symbols(os.path.join(build.B, 'engine.equ'))

@@ -25,6 +25,7 @@ Array     = node('Array', 'name', 'size', 'values')          # size or values (N
 Attribute = node('Attribute', 'names')
 Property  = node('Property', 'names')
 Picture   = node('Picture', 'name', 'path')
+SoundDecl = node('SoundDecl', 'kind', 'name', 'path')           # MUSIC / SOUND name "file"
 ObjDecl   = node('ObjDecl', 'kind', 'name', 'short', 'parent', 'body')   # kind: CLASS, OBJECT, ROOM
 Verb      = node('Verb', 'words', 'lines')
 Extend    = node('Extend', 'word', 'first', 'lines')            # EXTEND "verb" [FIRST]

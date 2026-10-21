@@ -90,6 +90,12 @@ class Parser:
 
     def decl(self):
         t = self.tok; p = self.pos()
+        if t.kind == 'ID' and t.value.upper() in ('MUSIC', 'SOUND') and self.peek().kind == 'ID':
+            k = self.take().value.upper()          # MUSIC Name "FILE" / SOUND Name "FILE": a tune or an
+            n = self.ident()                       # effect (MUSIC(n) and SOUND(n) are the built-ins)
+            d = A.SoundDecl(k, n, self.expect('STR', what='a sound file name').value, **p)
+            self.expect_nl()
+            return d
         if t.kind != 'KW':
             self.err(f'expected a declaration (OBJECT, ROOM, ROUTINE ...), found {self.describe()}')
         k = self.take().value

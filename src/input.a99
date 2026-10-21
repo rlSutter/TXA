@@ -383,7 +383,11 @@ WAITK2 .enter
        MOV  R4,*R10
        DECT R10
        MOV  R5,*R10
-WK21   BL   @KEYGT2
+WK21   MOVB @VDPSTA,@SNDST    a new frame: the sound player runs
+       JGT  WK22
+       JEQ  WK22
+       BLWP @SNDVEC
+WK22   BL   @KEYGT2
        MOV  R0,R0
        JEQ  WK21
        MOV  *R10+,R5

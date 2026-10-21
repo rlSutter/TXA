@@ -15,12 +15,20 @@ PICTURE CavePic "CAVE"       ! the sea cave, the float glowing
 PICTURE LampPic "LAMPROOM"   ! the great lens
 PICTURE EndPic "ENDING"      ! the lighthouse lit: the end screen
 
+MUSIC TitleTune "TITLE"      ! samples/sounds/title.mml: a slow sea song
+MUSIC HarbourTune "HARBOUR"  ! the outdoor rooms: a shanty
+MUSIC EndTune "ENDING"       ! the end screen: a fanfare
+SOUND HornSound "HORN"       ! the ship answering
+SOUND MatchSound "MATCH"     ! a match struck
+SOUND TideSound "TIDE"       ! the tide turning
+
 GLOBAL tide_in              ! 1 while the causeway is under water
 GLOBAL tide_turns = 6       ! turns until the tide turns
 GLOBAL lamp_fuelled         ! the great lamp has oil
 
 ! ---- the village ----------------------------------------------------------
 ROOM HarbourRoad "Harbour Road"
+  TUNE HarbourTune
   DESC "A cobbled road above the harbour. The keeper's cottage is north, its door ajar; a boat shed stands to the west. The quay is east, and steps lead down to the beach to the south."
   HAS light
   N Kitchen
@@ -48,6 +56,7 @@ ROOM BoatShed "Boat Shed"
   OUTSIDE ShedDoor
 END
 ROOM Beach "Beach"
+  TUNE HarbourTune
   DESC "Shingle runs down to the water. The road is up the steps to the north, and a dark cave opens in the cliff to the west."
   HAS light
   N HarbourRoad
@@ -64,6 +73,7 @@ END
 
 ! ---- the crossing ----------------------------------------------------------
 ROOM Quay "Quay"
+  TUNE HarbourTune
   DESC "Stone steps and mooring rings. A causeway of flat stones runs east across the bay to the lighthouse rock; the road is west."
   HAS light
   W HarbourRoad
@@ -72,12 +82,14 @@ ROOM Quay "Quay"
   END
 END
 ROOM Causeway "Causeway"
+  TUNE HarbourTune
   DESC "Flat stones, slick with weed, with the sea on both sides. The quay is west and the lighthouse rock east."
   HAS light
   W Quay
   E Rocks
 END
 ROOM Rocks "Lighthouse Rock"
+  TUNE HarbourTune
   DESC "Black rock round the foot of the lighthouse, whose door is north. The causeway leads back west."
   HAS light
   N Base
@@ -120,6 +132,7 @@ ROOM LampRoom "Lamp Room"
   OUTSIDE Gallery
 END
 ROOM Gallery "Gallery"
+  TUNE HarbourTune
   DESC "A railed gallery around the top of the tower, the wind tugging at your coat. Far out, a ship's lights move against the dark."
   HAS light
   INSIDE LampRoom
@@ -287,6 +300,7 @@ OBJECT Lens "great lens" IN LampRoom
   BEFORE
     Burn:
       IF NOT lamp_fuelled
+        PlaySound(MatchSound)
         PRINT "The wick is dry; it won't take a flame."
         RETURN TRUE
       END
@@ -296,6 +310,8 @@ OBJECT Lens "great lens" IN LampRoom
       END
       score = score + 10
       end_picture = EndPic
+      end_music = EndTune
+      PlaySound(HornSound)
       PRINT "You strike a match and touch it to the wick. The flame catches, steadies, and the great lens takes it, throwing a slow beam out across the water. Far out, a ship's horn answers."
       deadflag = 2
       RETURN TRUE
@@ -309,6 +325,7 @@ OBJECT Tide "tide"
       tide_turns = 6
       tide_in = 1 - tide_in
       IF location = Quay OR location = Causeway OR location = Rocks
+        PlaySound(TideSound)
         IF tide_in
           PRINT "The tide is coming in over the causeway."
         ELSE
@@ -379,6 +396,7 @@ ROUTINE Initialise
   max_score = 25
   StartDaemon(Tide)
   title_picture = TitlePic
+  title_music = TitleTune
   TitlePage("LAMPLIGHT", "A TXA sample game", "A lighthouse gone dark, an old keeper who has lost his spectacles, a tide that will not wait, and a ship that is coming whether the lamp is lit or not.")
   PRINT "The wind has turned cold, and out across the bay the lighthouse stands dark against the last of the sunset. It should have been lit an hour ago."
 END

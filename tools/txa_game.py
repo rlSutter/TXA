@@ -20,7 +20,7 @@ for the disk version, a disk drive (or TIPI / CF7 as DSK1)."""
 import argparse, os, shutil, subprocess, sys
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.join(ROOT, 'tools'))
-import build, txpics
+import build, txpics, txsound
 from txc.codegen import compile_file
 
 def write_game(source, prefix, title=None, lib=None, out=None, cart=False, device='DSK1', quiet=False):
@@ -36,13 +36,14 @@ def write_game(source, prefix, title=None, lib=None, out=None, cart=False, devic
     image, info = compile_file(source, [lib], title=title)
     srcdir = os.path.dirname(os.path.abspath(source))
     pictures = txpics.picture_area(info, [srcdir, os.path.join(srcdir, 'pics')])
-    blob, picpg = build.story_blob(image, pictures)
+    sounds = txsound.sound_area(info, [srcdir, os.path.join(srcdir, 'sounds')])
+    blob, picpg, sndpg = build.story_blob(image, pictures, sounds)
     os.makedirs(os.path.join(ROOT, 'src/gen'), exist_ok=True)
     if not os.path.exists(os.path.join(ROOT, 'src/gen/font.a99')):
         subprocess.run([sys.executable, 'tools/mkfont.py'], cwd=ROOT, check=True)
     build.check_ramvars()
     # the engine, reading the story from disk files
-    build.write_storysrc(blob, disk_prefix=f'{device}.{prefix}S', picpg=picpg)
+    build.write_storysrc(blob, disk_prefix=f'{device}.{prefix}S', picpg=picpg, sndpg=sndpg)
     segs = build.assemble_engine(prefix + '1')
     ea5 = []
     name = prefix + '1'
@@ -64,7 +65,7 @@ def write_game(source, prefix, title=None, lib=None, out=None, cart=False, devic
     files = {'engine': ea5, 'story': story, 'disk': dsk, 'image_bytes': len(image), 'picture_bytes': len(pictures),
              'pictures': len(info['program'].pictures), 'warnings': info['program'].warnings}
     if cart:
-        c, _ = build.engine_cart(image, title[:20], pictures=pictures)
+        c, _ = build.engine_cart(image, title[:20], pictures=pictures, sounds=sounds)
         cp = os.path.join(out, title.lower() + '8.bin')
         open(cp, 'wb').write(c); files['cart'] = cp
     if not quiet:

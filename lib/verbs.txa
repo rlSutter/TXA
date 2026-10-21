@@ -171,6 +171,7 @@ END
 ROUTINE DescribeRoom full
   LOCAL o, n, initials
   RoomPicture()
+  RoomMusic()
   STYLE(1)
   IF NOT IsLit()
     PRINT "Darkness"

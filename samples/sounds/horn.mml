@@ -1,0 +1,4 @@
+! horn.mml - the ship's horn answering: two low notes, fading
+TEMPO 120
+B: o3 v10 @16 a1&a2
+C: o3 v13 @16 d1&d2

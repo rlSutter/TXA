@@ -178,6 +178,8 @@ Mostly a polite default response in this game: `push` / `press` / `shove` / `mov
 | `restart` / `quit` / `q` | Starts again or stops. Both ask first. |
 | `version` | Says the game was written with TXA. |
 | `pictures on` / `pictures off` | Shows or hides the pictures. |
+| `music on` / `music off` | Plays or silences the music. |
+| `sounds on` / `sounds off` | Plays or silences the sound effects. |
 
 ### Editing keys
 
@@ -286,7 +288,20 @@ A disk must be mounted as DSK1. With the cartridge, any blank disk image; with t
 - [ ] `quit`, then `yes`: the game ends; "[End of story: press a key]"; a key returns to the TI title screen with normal colours.
 - [ ] `restart`, then `yes`: the title page again; a key, then the introduction and Harbour Road, Score 0, Moves 0.
 
-### 5.10 Pictures
+### 5.10 Sound and music
+
+- [ ] The title page plays a slow sea song (three voices: a melody, a bass, soft surf); it stops when you press a key.
+- [ ] Harbour Road, the quay, the causeway, the rock, the beach and the gallery play a lively shanty; the cottage, the shed, the cave and the lighthouse are quiet. Walking between two outdoor rooms, the tune carries on without restarting.
+- [ ] At the quay, when the tide turns, a swell of surf plays over the music.
+- [ ] `light lens with matches` before the oil: a match scratch.
+- [ ] Lighting the lamp: the ship's horn, two low notes fading, then a short fanfare with the end screen.
+- [ ] `music off`: Music off. Silence, and it stays off in other rooms. `music on`: the room's tune comes back.
+- [ ] `sounds off`: Sound effects off. The tide and the horn are silent; the music still plays.
+- [ ] Save outdoors, restore indoors (or the reverse): the music matches where you end up. The same after `undo`.
+- [ ] `quit` and `restart`: the sound stops cleanly, no stuck note.
+- [ ] The music keeps going while the game prints and thinks (it may pause briefly while a picture draws).
+
+### 5.11 Pictures
 
 - [ ] Light the lantern in the Sea Cave: a picture of the cave (daylight at the mouth, the green float glowing) appears at the top, and the text continues below it.
 - [ ] Walk out (`e`): the picture disappears and the text uses the whole screen again.
@@ -298,7 +313,7 @@ A disk must be mounted as DSK1. With the cartridge, any blank disk image; with t
 - [ ] `restart`: no picture until the title page shows its own.
 - [ ] Note how long a picture takes to appear (expected: about a second).
 
-### 5.11 Speed and the screen
+### 5.12 Speed and the screen
 
 - [ ] Note the time for `take all` in the kitchen, for `look` in a room with many things, and for crossing the causeway.
 - [ ] Walk around until the screen fills and scrolls: the text scrolls smoothly, with bold room names and the reverse status line intact.

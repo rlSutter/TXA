@@ -264,7 +264,11 @@ WAITKY .enter
        DECT R10
        MOV  R5,*R10
        CLR  @KEYLST
-WKY1   BL   @KSCAN
+WKY1   MOVB @VDPSTA,@SNDST    a new frame: the sound player runs
+       JGT  WKY2
+       JEQ  WKY2
+       BLWP @SNDVEC
+WKY2   BL   @KSCAN
        BL   @KEYGET
        MOV  R0,R0
        JEQ  WKY1

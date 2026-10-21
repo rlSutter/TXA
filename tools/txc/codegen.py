@@ -263,7 +263,7 @@ class Gen:
             s = self.p.sym(e.id)
             if s.kind == 'global':
                 c.op('LOAD', 16 + s.number)
-            elif s.kind in ('object', 'picture', 'array'):
+            elif s.kind in ('object', 'picture', 'array', 'music', 'sound'):
                 self.push_num(s.number)
             elif s.kind == 'routine':
                 c.op('PUSHW', 0); c.fixups.append((len(c.b) - 2, ('routine', s.name)))

@@ -41,12 +41,12 @@ OPTAB  DATA OPNOP,OPPSHB,OPPSHW,OPPSH0,OPPSH1,OPPOP,OPDUP,OPSELF  >00
        DATA OPPRS,OPPRV,OPPRN,OPPRO,OPPRC,OPNL,OPSTYL,OPPRA
        DATA OPREAD,OPRKEY,OPTOKN,OPFRSH,BADOP,BADOP,BADOP,BADOP
        DATA OPRAND,OPQUIT,OPRST,OPSAVE,OPREST,OPUSAV,OPUNDO,OPPIC
-       DATA OPSTAT,OPSND,OPCLS,BADOP,BADOP,BADOP,BADOP,BADOP
+       DATA OPSTAT,OPSND,OPCLS,OPMUS,BADOP,BADOP,BADOP,BADOP
 * >68->FF: no opcodes.  A full table lets NEXT skip the range check.
        BSS  0
 OPTPAD EQU  >100-(>68)
        COPY "gen/badops.a99"
-OPLAST EQU  >62
+OPLAST EQU  >63
 
 * ---- constants, stack, variables -----------------------------------------
 OPNOP  B    @NEXT
@@ -294,7 +294,11 @@ OPCLLV BL   @FB
 * GOCALL - call routine R15 (packed) with the top R14 values as its
 * arguments.  If NEWSLF is not -1, SELF becomes NEWSLF for the call.
 * Calling 0 just takes the arguments and pushes 0.
-GOCALL MOV  R14,R0
+GOCALL MOVB @VDPSTA,@SNDST    a new frame (the VDP's flag): the sound
+       JGT  GOC0               player runs once
+       JEQ  GOC0
+       BLWP @SNDVEC
+GOC0   MOV  R14,R0
        SLA  R0,1
        S    R0,R6              the arguments come off the stack ...
        MOV  R6,@VT1            ... from here
@@ -983,22 +987,14 @@ OPQUIT B    @VMEND
 * RESTART: the dynamic area back from the pristine copy (SAMS pages
 * PRPAGE on), the stacks emptied, Main called again.
 OPRST  BL   @PICOFF            no picture across a restart
+       BLWP @SOFFV             and no sound
        BL   @PRISTN
        BL   @GLOAD             the globals again, from the restored area
        BL   @UINIT             no undo across a restart
        B    @VMRUN
 * SAVE and RESTORE are in save.a99.
 * UNDOSAVE and UNDO are in undo.a99.
-* PICTURE is in picture.a99.  SOUND prints a placeholder for now, as txvm.py
-* does, so transcripts stay comparable (sound arrives in M4 part 5).
-OPSND  LI   R1,SSND
-OPPS1  BL   @CHSTR
-       DECT R6
-       MOV  *R6,R1
-       BL   @PRNUM
-       LI   R0,']'
-       BL   @CHOUT
-       B    @NEXT
+* PICTURE is in picture.a99; MUSIC and SOUND in sound.a99.
 * STATUS r s m: the status line, drawn straight into row 0 (it is not
 * part of the transcript): the room's name from column 1, "Score: s
 * Moves: m" (or "Moves: m" when s is -1) ending at column 78.  The row's
@@ -1033,6 +1029,4 @@ SAN    BYTE 3
        TEXT 'an '
 SANC   BYTE 3
        TEXT 'An '
-SSND   BYTE 7
-       TEXT '[sound '
        EVEN

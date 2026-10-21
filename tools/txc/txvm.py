@@ -35,6 +35,9 @@ class VM:
         self.status = None
         self.picture = 0
         self.pictures_shown = []
+        self.music = 0
+        self.music_played = []
+        self.sounds_played = []
         self.undo = []                # snapshots (no limit in the reference VM)
         self.save_dir = None          # where SAVE writes (None: an in-memory dict)
         self.saves = {}
@@ -521,7 +524,10 @@ class VM:
         elif name == 'PICTURE':
             self.picture = pop()                      # (the screen, not the text)
             self.pictures_shown.append(self.picture)
-        elif name == 'SOUND': self.write(f'[sound {pop()}]')
+        elif name == 'SOUND':
+            self.sounds_played.append(pop())          # (the sound chip, not the text)
+        elif name == 'MUSIC':
+            self.music = pop(); self.music_played.append(self.music)
         elif name == 'CLS':
             pass                                      # (the screen, not the text)
         elif name == 'STATUS':

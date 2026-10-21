@@ -51,7 +51,7 @@ BUILTINS = {
     'READ': ('READ', 2, True), 'TOKENIZE': ('TOKENIZE', 2, True),
     'HASATTR': ('HASATTRV', 2, True), 'FRESHLINE': ('FRESH', 0, False),
     'AGET': ('ALOADV', 2, True), 'APUT': ('ASTOREV', 3, False),
-    'ISNAME': ('ISNAME', 2, True), 'CLS': ('CLS', 0, False), 'FILTERN': ('FILTERN', 4, True), 'ACOPY': ('ACOPY', 3, False),
+    'ISNAME': ('ISNAME', 2, True), 'CLS': ('CLS', 0, False), 'MUSIC': ('MUSIC', 1, False), 'FILTERN': ('FILTERN', 4, True), 'ACOPY': ('ACOPY', 3, False),
     # the second argument of these two is a property name, not a value
     'PROPLEN': ('PROPLEN', 2, True), 'PROPWORD': ('GETPROPN', 3, True),
 }
@@ -74,7 +74,7 @@ SLOT_CODE = {'noun': 1, 'held': 2, 'multi': 3, 'multiheld': 4, 'multiexcept': 5,
 
 class Sym:
     """One declared name.  kind: constant, global, array, attribute,
-    property, class, object, routine, picture."""
+    property, class, object, routine, picture, music, sound."""
     def __init__(self, kind, name, decl, number=None):
         self.kind, self.name, self.decl, self.number = kind, name, decl, number
     def __repr__(self):
@@ -105,6 +105,8 @@ class Program:
         self.globals = []             # Sym, by number
         self.arrays = []              # Sym
         self.pictures = []            # Sym
+        self.musics = []              # Sym (MUSIC declarations, numbered from 1)
+        self.sounds = []              # Sym (SOUND declarations, numbered from 1)
         self.verbs = []               # Verb nodes
         self.dictionary = set()       # words, lower case, at most 12 characters
         self.constants = {}           # upper name -> value
@@ -188,6 +190,9 @@ class Sema:
                     self.declare('property', n, d, len(p.props)); p.props.append(n)
             elif isinstance(d, A.Picture):
                 p.pictures.append(self.declare('picture', d.name, d, len(p.pictures) + 1))
+            elif isinstance(d, A.SoundDecl):
+                lst = p.musics if d.kind == 'MUSIC' else p.sounds
+                lst.append(self.declare(d.kind.lower(), d.name, d, len(lst) + 1))
             elif isinstance(d, A.ObjDecl):
                 if d.kind == 'CLASS':
                     self.declare('class', d.name, d)
@@ -342,7 +347,7 @@ class Sema:
                 return ('obj', s.number)
             if s.kind == 'routine':
                 return ('routine', s.name)
-            if s.kind == 'picture':
+            if s.kind in ('picture', 'music', 'sound'):
                 return ('num', s.number)
         if isinstance(e, A.Const) and e.which == 'SELF':
             self.err(e, 'SELF has no value outside a routine')

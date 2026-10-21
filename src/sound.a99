@@ -1,0 +1,466 @@
+*======================================================================
+* sound.a99 - MUSIC and SOUND: the player for the TMS9919.
+*
+* The TI build (tools/txsound.py, which documents the notation, the
+* events and the player exactly) appends a sound area after the pictures,
+* at story page SNDPG (gen/storysrc.a99; 0: none).  Its header: word M
+* (tunes), word S (effects), then (M+S) longs, each item's offset (tunes
+* first).  An item: byte voices, byte flags (1 loops), then per voice
+* byte channel, word stream offset from the item; then the streams.
+* Offsets fit in a word: the area stays under 64K.
+*
+* Six voices (VOICES, 20 bytes each): 0-3 music, 4-5 the effect.  Fields:
+V.P    EQU  0                  the next event (offset in the area)
+V.ST   EQU  2                  the stream's start (for looping)
+V.W    EQU  4                  frames still to wait
+V.PER  EQU  6                  the period (or the noise type)
+V.VOL  EQU  8                  the volume for new notes
+V.CUR  EQU  10                 the volume now (decay lowers it)
+V.ENV  EQU  12                 decay: frames a step (0 none)
+V.ENC  EQU  14                 decay: frames to the next step
+V.CH   EQU  16                 the channel, 0-3 (3 noise)
+V.FL   EQU  18                 flags: 1 active, 2 loops, 4 effect, 8 sounding
+VSIZE  EQU  20
+*
+* A frame is a sixtieth of a second: the VDP's frame flag (status bit 7).
+* SNDPOL sites (the key waits, every routine call) read the status and,
+* on a new frame, BLWP to SNDTKE, which runs every active voice once
+* (tools/txsound.py's Player.tick, write for write).  The player reads
+* the area through window D and puts D back on DPAGE afterwards.
+*======================================================================
+
+SNDVEC DATA SNDWS,SNDTKE
+
+* ---- reading the sound area -------------------------------------------------
+* SGETB - R0 = the area's byte at offset R1 (low byte).  Maps window D to
+* the right page when needed.  Uses R0, R2, R3, R12.  Any workspace.
+SGETB  MOV  R1,R2
+       SRL  R2,12              the page: SNDPG + offset / 4096
+       A    @SNDPG,R2
+       AI   R2,STPAGE
+       C    R2,@SMAPD
+       JEQ  SGB1
+       MOV  R2,@SMAPD
+       MOV  R2,R3              (page << 8) | page: the card latches a byte
+       SLA  R3,8
+       SOC  R3,R2
+       LI   R12,AMSCRU
+       SBO  0
+       MOV  R2,@MAPRGD
+       SBZ  0
+SGB1   MOV  R1,R2
+       ANDI R2,>0FFF
+       CLR  R0
+       MOVB @WIND(R2),R0
+       SRL  R0,8
+       RT
+
+* SDREST - window D back on DPAGE, if the reader moved it.  Uses R2, R12.
+SDREST MOV  @SMAPD,R2
+       JLT  SDR9
+       SETO @SMAPD
+       MOV  @DPAGE,R2
+       MOV  R2,R12             (page << 8) | page
+       SLA  R12,8
+       SOC  R12,R2
+       LI   R12,AMSCRU
+       SBO  0
+       MOV  R2,@MAPRGD
+       SBZ  0
+SDR9   RT
+
+* ---- the chip -----------------------------------------------------------------
+* SATT - the attenuation for voice R9's channel at volume R0.  STONE - its
+* period (nothing for noise).  SSIL - silence on channel R0.  Use R0, R1.
+SATT   LI   R1,15
+       S    R0,R1
+       MOV  @V.CH(R9),R0
+       SLA  R0,5
+       SOC  R1,R0
+       ORI  R0,>90
+       SWPB R0
+       MOVB R0,@SNDCHP
+       RT
+SSIL   SLA  R0,5
+       ORI  R0,>9F
+       SWPB R0
+       MOVB R0,@SNDCHP
+       RT
+STONE  MOV  @V.CH(R9),R0
+       CI   R0,3
+       JEQ  STN9
+       SLA  R0,5
+       MOV  @V.PER(R9),R1
+       ANDI R1,>000F
+       SOC  R1,R0
+       ORI  R0,>80
+       SWPB R0
+       MOVB R0,@SNDCHP
+       MOV  @V.PER(R9),R0
+       SRL  R0,4
+       ANDI R0,>003F
+       SWPB R0
+       MOVB R0,@SNDCHP
+STN9   RT
+
+* SBUSY - R7 = 1 when an active effect voice uses channel R0, else 0.
+* Uses R1, R2, R7.  Leaf.
+SBUSY  CLR  R7
+       LI   R1,VOICES+(4*VSIZE)
+SBS1   MOV  @V.FL(R1),R2
+       ANDI R2,1
+       JEQ  SBS2
+       C    @V.CH(R1),R0
+       JNE  SBS2
+       LI   R7,1
+SBS2   AI   R1,VSIZE
+       CI   R1,VOICES+(6*VSIZE)
+       JL   SBS1
+       RT
+
+* ---- the frame ----------------------------------------------------------------
+SNDTKE INC  @STICKS
+       LI   R9,VOICES
+       LI   R8,6
+STK1   MOV  @V.FL(R9),R0
+       ANDI R0,1
+       JEQ  STK2
+       BL   @RUNV
+STK2   AI   R9,VSIZE
+       DEC  R8
+       JNE  STK1
+       BL   @SDREST
+       RTWP
+
+* RUNV - voice R9 for one frame.  R7 = quiet (a music voice under an
+* effect).  Uses R0-R7, R12.
+RUNV   MOV  R11,R6
+       CLR  R7
+       MOV  @V.FL(R9),R0
+       ANDI R0,4
+       JNE  RNV1
+       MOV  @V.CH(R9),R0       a music voice: an effect on its channel?
+       BL   @SBUSY
+RNV1   MOV  @V.W(R9),R0        waiting: one frame less, and decay
+       JEQ  RNV3
+       DEC  @V.W(R9)
+       MOV  @V.FL(R9),R0
+       ANDI R0,8
+       JEQ  RNV3
+       MOV  @V.ENV(R9),R0
+       JEQ  RNV3
+       MOV  @V.CUR(R9),R0
+       JEQ  RNV3
+       DEC  @V.ENC(R9)
+       JNE  RNV3
+       MOV  @V.ENV(R9),@V.ENC(R9)
+       DEC  @V.CUR(R9)
+       MOV  R7,R7
+       JEQ  RNQ1
+       B    @RNV3
+RNQ1
+       MOV  @V.CUR(R9),R0
+       BL   @SATT
+RNV3   MOV  @V.W(R9),R0        events while the wait has run out
+       JNE  RNV9
+       MOV  @V.FL(R9),R0
+       ANDI R0,1
+       JEQ  RNV9
+       MOV  @V.P(R9),R1
+       BL   @SGETB
+       MOV  R0,R0
+       JNE  RNV10
+       MOV  @V.FL(R9),R0       the end: loop, end an effect, or stop
+       ANDI R0,2
+       JEQ  RNV4
+       MOV  @V.ST(R9),@V.P(R9)
+       B    @RNV3
+RNV4   MOV  @V.FL(R9),R0
+       ANDI R0,4
+       JEQ  RNV5
+       BL   @ENDFX
+       JMP  RNV9
+RNV5   MOV  @V.FL(R9),R0
+       ANDI R0,>FFFE
+       MOV  R0,@V.FL(R9)
+       MOV  R7,R7
+       JNE  RNV9
+       MOV  @V.CH(R9),R0
+       BL   @SSIL
+RNV9   B    *R6
+RNV10  CI   R0,1
+       JNE  RNV20
+       INC  R1                 a tone: period, frames
+       BL   @SGETB
+       SWPB R0
+       MOV  R0,R4
+       INC  R1
+       BL   @SGETB
+       SOC  R4,R0
+       MOV  R0,@V.PER(R9)
+       INC  R1
+       BL   @SGETB
+       MOV  R0,@V.W(R9)
+       INC  R1
+       MOV  R1,@V.P(R9)
+       BL   @SSTART            volume, decay, sounding
+       MOV  R7,R7
+       JEQ  RNQ2
+       B    @RNV3
+RNQ2
+       BL   @STONE
+       MOV  @V.CUR(R9),R0
+       BL   @SATT
+       B    @RNV3
+RNV20  CI   R0,2
+       JNE  RNV30
+       INC  R1                 a rest
+       BL   @SGETB
+       MOV  R0,@V.W(R9)
+       INC  R1
+       MOV  R1,@V.P(R9)
+       MOV  @V.FL(R9),R0
+       ANDI R0,>FFF7
+       MOV  R0,@V.FL(R9)
+       MOV  R7,R7
+       JEQ  RNQ3
+       B    @RNV3
+RNQ3
+       MOV  @V.CH(R9),R0
+       BL   @SSIL
+       B    @RNV3
+RNV30  CI   R0,3
+       JNE  RNV40
+       INC  R1                 volume
+       BL   @SGETB
+       MOV  R0,@V.VOL(R9)
+       INCT @V.P(R9)
+       B    @RNV3
+RNV40  CI   R0,4
+       JNE  RNV50
+       INC  R1                 decay
+       BL   @SGETB
+       MOV  R0,@V.ENV(R9)
+       INCT @V.P(R9)
+       B    @RNV3
+RNV50  CI   R0,5
+       JNE  RNV60
+       INC  R1                 noise: type, frames
+       BL   @SGETB
+       MOV  R0,@V.PER(R9)
+       INC  R1
+       BL   @SGETB
+       MOV  R0,@V.W(R9)
+       INC  R1
+       MOV  R1,@V.P(R9)
+       BL   @SSTART
+       MOV  R7,R7
+       JEQ  RNQ4
+       B    @RNV3
+RNQ4
+       MOV  @V.PER(R9),R0
+       ORI  R0,>E0
+       SWPB R0
+       MOVB R0,@SNDCHP
+       MOV  @V.CUR(R9),R0
+       BL   @SATT
+       B    @RNV3
+RNV60  INC  R1                 hold (6)
+       BL   @SGETB
+       MOV  R0,@V.W(R9)
+       INCT @V.P(R9)
+       B    @RNV3
+
+* SSTART - a note starts: CUR = VOL, ENC = ENV, sounding.
+SSTART MOV  @V.VOL(R9),@V.CUR(R9)
+       MOV  @V.ENV(R9),@V.ENC(R9)
+       MOV  @V.FL(R9),R0
+       ORI  R0,8
+       MOV  R0,@V.FL(R9)
+       RT
+
+* ENDFX - effect voice R9 ends: the music voice on its channel gets its
+* last sound back, or the channel falls silent.  Uses R0-R3, R11 saved
+* in R3.
+ENDFX  MOV  R11,R3
+       MOV  @V.FL(R9),R0
+       ANDI R0,>FFFE
+       MOV  R0,@V.FL(R9)
+       MOV  R9,R2              (the effect voice, kept)
+       LI   R9,VOICES          a music voice, active, on this channel?
+EFX1   MOV  @V.FL(R9),R0
+       ANDI R0,1
+       JEQ  EFX2
+       C    @V.CH(R9),@V.CH(R2)
+       JEQ  EFX4
+EFX2   AI   R9,VSIZE
+       CI   R9,VOICES+(4*VSIZE)
+       JL   EFX1
+EFX3   MOV  R2,R9              none, or not sounding: silence
+       MOV  @V.CH(R9),R0
+       BL   @SSIL
+       B    *R3
+EFX4   MOV  @V.FL(R9),R0
+       ANDI R0,8
+       JEQ  EFX3
+       C    @V.CH(R9),@D3S     its period (or noise type) and volume back
+       JNE  EFX5
+       MOV  @V.PER(R9),R0
+       ORI  R0,>E0
+       SWPB R0
+       MOVB R0,@SNDCHP
+       JMP  EFX6
+EFX5   BL   @STONE
+EFX6   MOV  @V.CUR(R9),R0
+       BL   @SATT
+       MOV  R2,R9
+       B    *R3
+D3S    DATA 3
+
+* ---- MUSIC n and SOUND n -------------------------------------------------------
+* The opcodes pass n in SNDARG and BLWP to the player's workspace (SNDWS),
+* so the VM's registers are untouched.  There R13-R15 hold the way back;
+* R0-R12 are free.
+
+* SLDIT - item R0 (from 0) into the voices from R9, at most R8 of them,
+* flags R7 (4: an effect).  Uses R0-R10, R12.
+SLDIT  MOV  R11,R6
+       SLA  R0,2               its offset: the low word of long 4 + 4k
+       AI   R0,6
+       MOV  R0,R1
+       BL   @SGETW
+       MOV  R0,@SITEM          the item
+       MOV  R0,R1
+       BL   @SGETB
+       MOV  R0,R10             its voices
+       INC  R1
+       BL   @SGETB
+       ANDI R0,1
+       JEQ  SLD0
+       ORI  R7,2               it loops
+SLD0   MOV  @SITEM,R0          the first voice entry: item + 2
+       INCT R0
+       MOV  R0,@SENT
+SLD1   MOV  R10,R10
+       JEQ  SLD9
+       MOV  R8,R8
+       JEQ  SLD9
+       MOV  @SENT,R1           channel, then the stream's offset
+       BL   @SGETB
+       MOV  R0,@V.CH(R9)
+       INC  R1
+       BL   @SGETW
+       A    @SITEM,R0
+       MOV  R0,@V.P(R9)
+       MOV  R0,@V.ST(R9)
+       CLR  @V.W(R9)
+       CLR  @V.PER(R9)
+       LI   R0,15
+       MOV  R0,@V.VOL(R9)
+       CLR  @V.CUR(R9)
+       CLR  @V.ENV(R9)
+       CLR  @V.ENC(R9)
+       MOV  R7,R0
+       ORI  R0,1
+       MOV  R0,@V.FL(R9)
+       MOV  @SENT,R0           the next entry, 3 bytes on
+       AI   R0,3
+       MOV  R0,@SENT
+       AI   R9,VSIZE
+       DEC  R10
+       DEC  R8
+       JMP  SLD1
+SLD9   B    *R6
+* SGETW - R0 = the area's word at offset R1.  Uses R0, R2-R5, R12.
+SGETW  MOV  R11,R5
+       BL   @SGETB
+       SWPB R0
+       MOV  R0,R4
+       INC  R1
+       BL   @SGETB
+       SOC  R4,R0
+       DEC  R1
+       B    *R5
+
+OPMUS  DECT R6
+       MOV  *R6,@SNDARG
+       BLWP @SMUSV
+       B    @NEXT
+OPSND  DECT R6
+       MOV  *R6,@SNDARG
+       BLWP @SSNDV
+       B    @NEXT
+SMUSV  DATA SNDWS,SMUSE
+SSNDV  DATA SNDWS,SSNDE
+SOFFV  DATA SNDWS,SOFFE
+
+* SMUSE - tune SNDARG (0: none).  The one playing already goes on.
+SMUSE  MOV  @SNDARG,R0
+       C    R0,@CURMUS
+       JEQ  SMU9
+       MOV  @SNDPG,R1
+       JEQ  SMU9               no sound in this build
+       MOV  R0,@CURMUS
+       LI   R9,VOICES          the music voices: silent unless under the
+SMU1   MOV  @V.FL(R9),R0       effect, and cleared
+       ANDI R0,1
+       JEQ  SMU2
+       MOV  @V.CH(R9),R0
+       BL   @SBUSY
+       MOV  R7,R7
+       JNE  SMU2
+       MOV  @V.CH(R9),R0
+       BL   @SSIL
+SMU2   CLR  @V.FL(R9)
+       AI   R9,VSIZE
+       CI   R9,VOICES+(4*VSIZE)
+       JL   SMU1
+       MOV  @CURMUS,R0
+       JEQ  SMU8
+       DEC  R0                 item n-1
+       LI   R9,VOICES
+       LI   R8,4
+       CLR  R7
+       BL   @SLDIT
+SMU8   BL   @SDREST
+SMU9   RTWP
+
+* SSNDE - effect SNDARG, over the music.
+SSNDE  MOV  @SNDPG,R1
+       JEQ  SSN9
+       LI   R9,VOICES+(4*VSIZE)  the effect voices still playing end first
+       BL   @SSN1
+       LI   R9,VOICES+(5*VSIZE)
+       BL   @SSN1
+       CLR  R1                 tunes before effects: item SNDM + n - 1
+       BL   @SGETW
+       A    @SNDARG,R0
+       DEC  R0
+       LI   R9,VOICES+(4*VSIZE)
+       LI   R8,2
+       LI   R7,4
+       BL   @SLDIT
+       BL   @SDREST
+SSN9   RTWP
+SSN1   MOV  @V.FL(R9),R0
+       ANDI R0,1
+       JEQ  SSN2
+       B    @ENDFX             (returns through R11, to SSNDE)
+SSN2   RT
+
+* SOFFE - silence: no voices, all four channels quiet (RESTART, QUIT).
+SOFFE  LI   R0,VOICES
+       LI   R1,(VSIZE*6)/2
+SOF1   CLR  *R0+
+       DEC  R1
+       JNE  SOF1
+       CLR  @CURMUS
+       LI   R0,>9F00
+       MOVB R0,@SNDCHP
+       LI   R0,>BF00
+       MOVB R0,@SNDCHP
+       LI   R0,>DF00
+       MOVB R0,@SNDCHP
+       LI   R0,>FF00
+       MOVB R0,@SNDCHP
+       RTWP

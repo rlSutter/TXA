@@ -1,0 +1,7 @@
+! title.mml - Lamplight's title music: a slow sea song in A minor, 3/4
+TEMPO 96
+LOOP
+A: o4 l4 v11 @8  a2 >e4 | <a >c <b | a2. | r2. | g2 >d4 | <g b a | g2. | r2.
+A:               f2 >c4 | <f a g | e2 d4 | c2. | e2 b4 | g+ b >d | c2 <b4 | a2.
+C: o3 l2. v9      a | a | a | e | g | g | g | d | f | f | c | c | e | e | e | a
+N: l2. v3 @10     s | r | s | r | s | r | s | r | s | r | s | r | s | r | s | r

@@ -560,9 +560,44 @@ master f6054a95 (2026-10-11): bitmapX1 = bmpX - bitmapX; a before/after
 image from the renderer's formula; the M0 probe as the test cartridge).
 For Rebecca to send to js99er's author.
 
+Part 5 done (21 October 2026): sound and music.
+- tools/txsound.py: the notation (an MML dialect: TEMPO, LOOP, voices A B
+  C N; notes, lengths and dots, octaves, volume, @ decay, & ties, [ ]
+  repeats, drum letters k s h x n0-7), compiled to per-voice event
+  streams (tone, rest, volume, decay, noise, hold, end), the sound area
+  (tunes then effects), the reference Player, and WAV previews.  A
+  looping tune's voices must be the same length; an effect has at most
+  two voices.
+- Language: MUSIC Name "FILE" and SOUND Name "FILE" declarations
+  (numbered from 1); the MUSIC(n) built-in (opcode >63); SOUND(n) was
+  already there.  The room property is TUNE (MUSIC is the built-in's
+  name; the spec's sketch used MUSIC).
+- src/sound.a99 (kernel window): six voices (four music, two effect),
+  played once a frame (the VDP frame flag, polled in both key waits and
+  at every routine call: three instructions, no registers), in its own
+  workspace (>83E0, the GPL workspace) by BLWP; MUSIC and SOUND BLWP
+  there too.  Reads the area through window D and puts D back (MAPWIN
+  now remembers D's page in DPAGE).  RESTART and QUIT silence the chip.
+- Space: the font moved out of the kernel window to VSTK (it is read
+  only at startup; the value stack overwrites it), so the E/A 5 chain
+  has four files; rle.a99 left the engine (unused); URECS halved (64
+  undo records) to make room for the voices.
+- Library: PlayMusic (remembered in tunenum, back after RESTORE and
+  UNDO), PlaySound, RoomMusic (TUNE), MUSIC ON/OFF, SOUNDS ON/OFF,
+  title_music, end_music.
+- Lamplight: title (a sea song), harbour (a shanty, the outdoor rooms),
+  ending (a fanfare); the tide, a match, the ship's horn.
+- tests/m4_sound_test.py: the TI player's chip bytes equal the reference
+  player's for the whole walkthrough (4111 frames, 27 calls, 974 bytes).
+- Bug found: xas99 has no operator precedence (left to right):
+  VOICES+4*VSIZE assembled as (VOICES+4)*VSIZE; parenthesise.
+
 ## Next
 
-1. M4 part 5 (sound and music): MUSIC/SOUND declarations, MML notation
+1. M4: scrollback (in M4's definition, not yet built).  Then the M4
+   checkpoint, and M5.
+
+## (was) M4 part 5 (sound and music): MUSIC/SOUND declarations, MML notation
    for Rebecca's review, MIDI import, the TI player (frame-flag ticks in
    key waits and calls), room MUSIC, Lamplight music.
 
@@ -608,6 +643,7 @@ text output, word wrap and [MORE]; bold and underline glyph sets.
 
 ## History
 
+- 2026-10-21 M4 part 5: sound and music (notation, sound area, TI player identical to the reference, library, Lamplight's tunes and effects).
 - 2026-10-21 M4 part 4: pictures (converter, picture area, pane, library, Lamplight's three pictures).
 - 2026-10-20 M2 follow-ups: command history (FCTN E/X) and the two-row, 160-character input line.
 - 2026-10-19 M3 complete: part 4, the sample game Lamplight; light-change descriptions; final score; parser speed with the full verb set.

@@ -26,7 +26,10 @@
 * The card takes the page in either byte, so the page goes in both:
 * MOVB @WS+5 copies R2's low byte into its high byte.
 MAPWIN AI   R2,STPAGE
-       MOVB @WS+5,R2
+       CI   R3,MAPRGD          (window D: remember its page for the sound
+       JNE  MAPW1              player, which borrows D and puts it back)
+       MOV  R2,@DPAGE
+MAPW1  MOVB @WS+5,R2
        LI   R12,AMSCRU
        SBO  0
        MOV  R2,*R3

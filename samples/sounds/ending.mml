@@ -1,0 +1,4 @@
+! ending.mml - the end screen: a short fanfare in C, played once
+TEMPO 100
+A: o4 l8 v12     c e g >c4. <g8 >e2 d4 c2.
+C: o3 l4 v9      c g c e g2 c2.

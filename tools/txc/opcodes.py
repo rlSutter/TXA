@@ -114,7 +114,8 @@ OPS = [
     (0x5E, 'UNDO',     '',  '-> f',       'Go back to the newest snapshot, removing it (so a second UNDO goes further back): execution continues after its UNDOSAVE, which pushes 2.  If there is none, push 0 and carry on.  An engine keeps at least one snapshot; the TI keeps 28K of differences (over a hundred typical turns), starting again when they fill.'),
     (0x5F, 'PICTURE',  '',  'n ->',       'Show picture n (0 hides the pane).'),
     (0x60, 'STATUS',   '',  'r s m ->',   'Draw the status line: room r\'s short name (0: "Darkness") on the left; on the right "Score: s  Moves: m", or "Moves: m" when s is -1. An engine without a status line ignores it.'),
-    (0x61, 'SOUND',    '',  'n ->',       'Play sound effect n.'),
+    (0x61, 'SOUND',    '',  'n ->',       'Play sound effect n once, over any music (an engine without sound stays silent).'),
+    (0x63, 'MUSIC',    '',  'n ->',       'Play tune n (looping if it loops); 0 stops the music; the tune already playing goes on.  An engine without sound stays silent.'),
     (0x62, 'CLS',      '',  '',           'Clear the text window (a partly written line is written first); the next line starts at its top.  An engine without a screen may just start a new line.'),
 ]
 

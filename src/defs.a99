@@ -230,7 +230,7 @@ UTMP   EQU  RAMVAR+>380        scratch
 UTMP2  EQU  RAMVAR+>382        scratch
 UTMP3  EQU  RAMVAR+>36C        scratch (save.a99)
 ULIT   EQU  RAMVAR+>390        112 bytes: literal bytes waiting (written in runs of up to 112)
-URECS  EQU  RAMVAR+>5E0        256 bytes: where each snapshot's record starts (128 words)
+URECS  EQU  RAMVAR+>5E0        128 bytes: where each snapshot's record starts (64 words)
 * ---- disk (disk.a99) and the save file (save.a99) ---------------------
 FBUF   EQU  >2000              VRAM: a file's bytes (over the sprite patterns,
 *                              zeroed again after each disk call)
@@ -270,3 +270,17 @@ PNCOL  EQU  RAMVAR+>054        its colour count
 PALBUF EQU  RAMVAR+>060        32 bytes: the picture's palette (16 words)
 PGRET  EQU  RAMVAR+>056        PGETB: its return across MAPWIN
 PGHI   EQU  RAMVAR+>058        PGETW: the high byte
+* ---- sound (sound.a99) -----------------------------------------------------
+SNDCHP EQU  >8400              the TMS9919
+SNDWS  EQU  >83E0              the player's workspace (the GPL workspace: idle
+*                              except during a disk call, when no frame is polled)
+CURMUS EQU  RAMVAR+>0F0        the tune playing (0 none)
+DPAGE  EQU  RAMVAR+>0F2        the physical page window D shows (MAPWIN keeps it)
+SMAPD  EQU  RAMVAR+>0F4        the page the sound reader mapped into D (-1 none)
+SNDST  EQU  RAMVAR+>0F6        the VDP status byte just read (frame poll)
+SNDM   EQU  RAMVAR+>0F8        tunes in the sound area (effects follow them)
+STICKS EQU  RAMVAR+>0FA        frames played (for the tests)
+VOICES EQU  RAMVAR+>660        120 bytes: six voices of 20 (0-3 music, 4-5 effects)
+SNDARG EQU  RAMVAR+>0FC        MUSIC / SOUND: n
+SITEM  EQU  RAMVAR+>0FE        SLOAD: the item's offset
+SENT   EQU  RAMVAR+>032        SLOAD: the voice entry being read

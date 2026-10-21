@@ -29,10 +29,15 @@ KENTRY B    @START             the entry: E/A 5 and the cartridge start here
        COPY "pager.a99"
        COPY "keys.a99"
        COPY "text80.a99"
-       COPY "rle.a99"
        COPY "disk.a99"
        COPY "picture.a99"
+       COPY "sound.a99"
 * KERNND: first free byte of the kernel window
 KERNND
+
+* The font is read only at startup (FONTLD, FONTUL, the no-F18A screen),
+* so it loads where the value stack will be: once the story runs, the
+* stack overwrites it.  (It used to fill 768 bytes of the kernel window.)
+       AORG VSTK
        COPY "gen/font.a99"
        END  START

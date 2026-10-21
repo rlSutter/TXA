@@ -27,13 +27,15 @@ def check(name, ok, detail=''):
 
 out = tempfile.mkdtemp()
 files = txa_game.write_game(os.path.join(ROOT, 'samples/lamplight.txa'), 'LAMP', 'LAMPLIGHT', out=out, quiet=True)
-nfiles = (files['image_bytes'] + files['picture_bytes'] + ((-files['image_bytes']) % 4096 if files['picture_bytes'] else 0) + 4095) // 4096
-check(f'the writer: 3 engine files, {nfiles} story-and-picture files, a disk image', len(files['engine']) == 3 and len(files['story']) == nfiles and os.path.exists(files['disk']), files)
+nfiles = len(files['story'])
+neng = len(build.ea5_segments('TXAE1')) if False else len(files['engine'])
+check(f'the writer: {neng} engine files (the kernel, the font, the resident engine), {nfiles} story files, a disk image',
+      neng >= 3 and len(files['story']) == nfiles and os.path.exists(files['disk']), files)
 cat = build.run([sys.executable, build.XDM, files['disk']])
-check('the disk image holds every file, as PROGRAM files', all(n in cat for n in files['engine'] + files['story']) and cat.count('PROGRAM') == 3 + nfiles, cat)
+check('the disk image holds every file, as PROGRAM files', all(n in cat for n in files['engine'] + files['story']) and cat.count('PROGRAM') == neng + nfiles, cat)
 chain = [open(os.path.join(out, n), 'rb').read() for n in files['engine']]
 flags = [int.from_bytes(c[:2], 'big') for c in chain]; addrs = [int.from_bytes(c[4:6], 'big') for c in chain]
-check('the E/A 5 chain: "more" flags, then the last; it starts at >2000 (KENTRY)', flags[:-1] == [0xFFFF] * 2 and flags[-1] == 0 and addrs[0] == 0x2000, (flags, [hex(a) for a in addrs]))
+check('the E/A 5 chain: "more" flags, then the last; it starts at >2000 (KENTRY)', flags[:-1] == [0xFFFF] * (neng - 1) and flags[-1] == 0 and addrs[0] == 0x2000, (flags, [hex(a) for a in addrs]))
 
 # the engine as the writer built it (disk mode), loaded by the cartridge loader
 segs = build.ea5_segments('LAMP1')

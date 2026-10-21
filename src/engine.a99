@@ -78,6 +78,10 @@ STR4B
        BL   @GLOAD             the globals into RAM
        BL   @UINIT             undo: LAST = the starting state, no records
        CLR  @CURPIC            no picture yet
+       SETO @SMAPD             sound: window D untouched, D on its own page,
+       LI   R0,13              no voices, the chip quiet
+       MOV  R0,@DPAGE
+       BLWP @SOFFV
        CLR  R0                 the status line: the title, in reverse
        LI   R1,1
        BL   @TXAT
@@ -455,7 +459,8 @@ NOFREG DATA >8000,>81E0,>8200,>8300+(GM1COL/>40),>8400+(PATTAB/>800),>8500+(SPRA
 QUIT   MOV  @F18FLG,R0
        JEQ  QT1
        BL   @F18RST
-QT1    BL   @AMSOFF
+QT1    BLWP @SOFFV            the chip quiet
+       BL   @AMSOFF
        LI   R0,>8320           the scratchpad above this workspace cleared:
 QT2    CLR  *R0+               the fast block lives there, over the console's
        CI   R0,>8400           user interrupt hook (>83C4) and sound count
