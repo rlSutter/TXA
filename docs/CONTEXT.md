@@ -14,7 +14,8 @@ https://claude.ai/artifact/VqqmmXaB3E5RBxdTcfBtU2 (one tab each).
 **State (21 October 2026, checkpoint-m4):** M0-M4 complete (engine 1.0
 beta: save, restore, undo, scrollback, pictures, sound and music, stories
 on disk and the game writer, title page, end screen).  Next: M5, the
-native compiler on the TI.  The sample game is
+native compiler on the TI; its design (decisions D1-D4 for Rebecca) is
+the Claude Doc https://claude.ai/artifact/UZ6z6yM1ZeuFV9V4cja64D.  The sample game is
 `samples/lamplight.txa`; Rebecca tests it from `LAMPLIGHT-TESTING.md`.
 
 ## What it is

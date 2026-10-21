@@ -612,9 +612,21 @@ next command normal).
 scrollback, pictures, sound and music, stories on disk and the game
 writer, the title page and the end screen.
 
+M5 design drafted for Rebecca's review (21 October 2026), a Claude Doc:
+https://claude.ai/artifact/UZ6z6yM1ZeuFV9V4cja64D (doc id
+df223b89-078d-43ef-9658-cc9a72bf1bd6).  Four decisions await her: D1
+long strings in DV80 source (recommended: an open string continues on
+the next line, the break a space, leading spaces skipped; a language
+change in both compilers), D2 the library compiled from source first,
+D3 stop at the first error like Python, D4 a separate "TXA Workbench"
+cartridge with a minimal front end.  The plan: 1 groundwork (D1, the
+cartridge skeleton, DV80 loading, dump formats), 2 lexer, 3 parser,
+4 meaning, 5 code, 6 linking and output; each stage matched to Python
+on the whole corpus by dumps from SAMS.
+
 ## Next
 
-1. M5: the native compiler (the workbench cartridge: source loading,
+1. M5 (waiting on D1-D4): the native compiler (the workbench cartridge: source loading,
    three passes, the precompiled library, error list; done when the TI
    produces images byte-identical to the Python compiler for the whole
    corpus).  Start with its design.
