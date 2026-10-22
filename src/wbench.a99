@@ -23,6 +23,7 @@
 *   4  the meaning stage, second half (wsema2.a99)
 *   5  the code generator (wcode.a99)
 *   6  the linker, first half (wlink.a99): substitutions, the first tables
+*   7  the linker, second half (wlink2.a99): the rest, the story files
 * SAMS windows: >D000, >E000, >F000 are the stages' data windows.
 * SAMS pages (512K, the least the workbench needs):
 *   16-31   the overlays (two pages each)
@@ -257,6 +258,12 @@ WL2D   LI   R0,5               the code (overlay 5)
        JEQ  WL2E
        B    @WLERR
 WL2E   LI   R0,6               the linker, first half (overlay 6)
+       BL   @OVSEL
+       BL   @OVENT
+       MOV  R0,R0
+       JEQ  WL2F
+       B    @WLERR
+WL2F   LI   R0,7               the linker, second half, the files (overlay 7)
        BL   @OVSEL
        BL   @OVENT
        MOV  R0,R0

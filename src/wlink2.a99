@@ -1,0 +1,857 @@
+*======================================================================
+* wlink2.a99 - the linker, second half (M5 part 6), overlay 7: the rest
+* of tools/txc/codegen.py's link() after the dynamic area (overlay 6):
+* the dictionary (14-byte entries: 12 letters, flags: 1 noun, 2 verb, 4
+* preposition; the VERB's number), the grammar's empty table, the
+* actions, the substitution table, the routines and the strings (each
+* on a 4-byte boundary, the strings encoded), every fixup, the header and
+* its checksum.  Then the image written to disk as PROGRAM files of 4K,
+* named as the game writer names a story's (prefix, S, 01 ...).
+*
+* Where things went (WHRPG, packed addresses): routines by their place in
+* RDIRPG (+0), strings by number (+1024), routines by symbol (+2048).  A
+* routine's place in the image replaces its code place in RDIRPG (+4, +6).
+*======================================================================
+* variables (SV0+66 on)
+JR     EQU  SV0+66             the routine, the string, the fixup being done
+JN     EQU  SV0+68
+J1     EQU  SV0+70             temporaries
+J2     EQU  SV0+72
+J3     EQU  SV0+74
+JTAB   EQU  SV0+76             the substitution table's place
+JTOKL  EQU  SV0+78             the token: its length
+JREM   EQU  SV0+80             the string's bytes still to read
+JPEND  EQU  SV0+82             a byte read ahead (-1: none)
+JLENH  EQU  SV0+84             the image's length
+JLENL  EQU  SV0+86
+JSUM   EQU  SV0+88             the checksum
+JFILES EQU  SV0+90             story files written
+JTOK   EQU  KEYB               128 bytes: the token being encoded
+
+* LINK7 - the second half of the linker.  R0 = 0, or an error.
+LINK7  MOV  R10,R9
+       LI   R10,MSTKT
+       .enter
+       LI   R0,SV0+66
+LJ1    CLR  *R0+
+       CI   R0,SV0+120
+       JL   LJ1
+       MOV  R9,@OLDR10
+       MOV  R10,@SSTK
+       CLR  @EFPG
+       CLR  @DFPG
+       CLR  @XFPG
+       BL   @JFLAGS
+       BL   @JDICT
+       LI   R0,H.GRAMMAR       the grammar: an empty table
+       MOV  @IPL,R2
+       BL   @JHDRW
+       CLR  R0
+       BL   @IWORD
+       BL   @JACTS
+       BL   @JABBS
+       MOV  @IPH,R0            the tables must stay under 64K
+       JEQ  LJ2
+       CLR  R1
+       LI   R2,255
+       LI   R0,SE.TAB
+       B    @SERR
+LJ2    BL   @JROUTS
+       BL   @JSTRS
+       LI   R2,3
+       BL   @IALIGN
+       MOV  @IPH,@JLENH
+       MOV  @IPL,@JLENL
+       MOV  @IPH,R0            at most MAX_IMAGE
+       CI   R0,IMGMAXH
+       JL   LJ3
+       JH   LJ2A
+       MOV  @IPL,R0
+       JEQ  LJ3
+LJ2A   CLR  R1
+       LI   R2,255
+       LI   R0,SE.IMG
+       B    @SERR
+LJ3    BL   @JFIXES
+       BL   @JHEAD
+       BL   @JWRITE
+       CLR  R0
+       .leave
+       MOV  @OLDR10,R10
+       RT
+
+* JHDRW - header field R0 := R2.  Uses R0-R3.
+JHDRW  MOV  R11,@J3
+       MOV  R0,R3
+       MOV  R2,R0
+       CLR  R2
+       BL   @IPUTW
+       MOV  @J3,R11
+       RT
+
+* ---- the dictionary -----------------------------------------------------------------
+* JFLAGS - each word's flags (DVBPG + FLGOFF, a byte by word number): 1 if
+* an object has it among its NAME words, 2 if a VERB has it, 4 if a
+* grammar line has it as a word.
+JFLAGS .enter
+       LI   R0,DVBPG           clear them
+       BL   @DMAP
+       LI   R1,>D000+FLGOFF
+JF1    CLR  *R1+
+       CI   R1,>E000
+       JL   JF1
+       CLR  R8                 nouns: every object's NAME words
+JF2    INC  R8
+       C    R8,@ON
+       JH   JF4
+       MOV  R8,R0
+       BL   @OBJAT
+       MOV  @14(R1),R7
+JF3    MOV  R7,R7
+       JEQ  JF2
+       MOV  R7,R0
+       BL   @HCELL
+       MOV  *R1,R7
+       MOV  @2(R1),R0
+       LI   R2,>0100
+       BL   @JSETF
+       JMP  JF3
+JF4    CLR  R8                 verbs: their words; prepositions: their
+JF5    INC  R8                 lines' words
+       C    R8,@VN
+       JH   JF9
+       MOV  R8,R0
+       BL   @VRBAT
+       MOV  *R1,R3
+       MOV  @2(R1),@JN         (its first line: in memory, JWORD uses R0-R7)
+       BL   @DXSEEK
+       BL   @XB                its words
+       BL   @XW
+       MOV  R0,R9
+JF6    MOV  R9,R9
+       JEQ  JF7
+       DEC  R9
+       BL   @JWORD             (the word at the reader: its number)
+       LI   R2,>0200
+       BL   @JSETF
+       JMP  JF6
+JF7    MOV  @JN,R0             each line: its word tokens
+       JEQ  JF5
+       BL   @HCELL
+       MOV  *R1,@JN
+       MOV  @4(R1),R2
+       MOV  @2(R1),R0
+       MOV  R2,R1
+       BL   @XSET
+       BL   @XB
+       BL   @XB
+       BL   @XW
+       BL   @XB                its tokens
+       BL   @XW
+       MOV  R0,R9
+JF8    MOV  R9,R9
+       JEQ  JF7
+       DEC  R9
+       BL   @XB                a GTok: kind, value, filter
+       BL   @XB
+       BL   @XW
+       BL   @OPRD
+       LI   R1,QWORD7
+       BL   @OPIS
+       MOV  R0,R0
+       JEQ  JF8A
+       BL   @JWORD
+       LI   R2,>0400
+       BL   @JSETF
+       BL   @XSKIP
+       JMP  JF8
+JF8A   BL   @XSKIP             (a slot: not a word)
+       BL   @XSKIP
+       JMP  JF8
+JF9    .leave
+       RT
+QWORD7 BYTE 4
+       TEXT 'word'
+       EVEN
+* JSETF - word R0's flags OR R2's high byte.  Uses R0, R1.
+JSETF  MOV  R11,@J3
+       MOV  R0,R1
+       LI   R0,DVBPG
+       BL   @DMAP
+       SOCB R2,@>D000+FLGOFF(R1)
+       MOV  @J3,R11
+       RT
+* JWORD - R0 = the number of the word at the reader (a string: lower
+* case, 12 letters at most; it is in the dictionary).  Uses R0-R7.
+JWORD  MOV  R11,@J2
+       BL   @XB
+       BL   @XW
+       MOV  R0,R3
+       CLR  R4
+JW1    MOV  R3,R3
+       JEQ  JW3
+       BL   @XB
+       CI   R4,12
+       JHE  JW2
+       SWPB R0
+       CB   R0,@BUPA
+       JL   JW1A
+       CB   R0,@BUPZ
+       JH   JW1A
+       AI   R0,>2000
+JW1A   MOVB R0,@DWB(R4)
+       INC  R4
+JW2    DEC  R3
+       JMP  JW1
+JW3    MOV  R4,R0
+       BL   @DADD
+       MOV  @J2,R11
+       RT
+
+* JDICT - the dictionary: its count, then each word in sorted order: 12
+* bytes (zero padded), its flags, its VERB's number.
+JDICT  .enter
+       LI   R0,H.DICTIONARY
+       MOV  @IPL,R2
+       BL   @JHDRW
+       MOV  @DN,R0
+       BL   @IWORD
+       CLR  R8                 by place
+JD1    INC  R8
+       C    R8,@DN
+       JH   JD9
+       LI   R0,DSPG
+       BL   @EMAP
+       MOV  R8,R1
+       SLA  R1,1
+       MOV  @>E000(R1),R7      the word at this place
+       CLR  R6                 its 12 bytes
+JD2    MOV  R7,R0
+       BL   @DICAT
+       MOVB @2(R1),R2
+       SRL  R2,8
+       CLR  R0
+       C    R6,R2
+       JHE  JD3
+       A    R6,R1
+       MOVB @3(R1),R0
+       SWPB R0
+JD3    BL   @IBYTE
+       INC  R6
+       CI   R6,12
+       JL   JD2
+       LI   R0,DVBPG           its flags, its VERB
+       BL   @DMAP
+       MOV  R7,R1
+       MOVB @>D000+FLGOFF(R1),R0
+       SWPB R0
+       BL   @IBYTE
+       LI   R0,DVBPG
+       BL   @DMAP
+       MOV  R7,R1
+       SLA  R1,1
+       MOV  @>D000(R1),R0
+       BL   @IBYTE
+       JMP  JD1
+JD9    .leave
+       RT
+
+* JACTS - the actions: their count, then each one's routine (fixed up).
+JACTS  .enter
+       LI   R0,H.ACTIONS
+       MOV  @IPL,R2
+       BL   @JHDRW
+       MOV  @ACN,R0
+       BL   @IWORD
+       CLR  R8
+JA1    C    R8,@ACN
+       JHE  JA9
+       MOV  R8,R0              (overlay 4's ACTAT: 56 a page, 72 bytes)
+       MOV  R0,R1
+       CLR  R0
+       DIV  @D56J,R0
+       MPY  @D72J,R1
+       MOV  R2,R1
+       AI   R1,>D000
+       AI   R0,ACTPG
+       BL   @DMAP
+       MOV  @66(R1),R5
+       LI   R4,1
+       BL   @LFIX
+       INC  R8
+       JMP  JA1
+JA9    .leave
+       RT
+D56J   DATA 56
+D72J   DATA 72
+
+* JABBS - the substitution table: 128 words (each text's place from the
+* table's start, 0 if unused), then the texts, each ending in 0.
+JABBS  .enter
+       LI   R0,H.ABBREVS
+       MOV  @IPL,R2
+       MOV  R2,@JTAB
+       BL   @JHDRW
+       LI   R2,256
+       BL   @IZERO
+       CLR  R8
+JB1    C    R8,@NABB
+       JHE  JB9
+       MOV  @IPL,R0            its place
+       S    @JTAB,R0
+       CLR  R2
+       MOV  R8,R3
+       SLA  R3,1
+       A    @JTAB,R3
+       BL   @IPUTW
+       LI   R0,ABBPG           its text
+       BL   @DMAP
+       MOV  R8,R1
+       SLA  R1,3
+       AI   R1,>D000
+       MOV  *R1,R6
+       MOV  @2(R1),R7
+JB2    MOV  R6,R6
+       JEQ  JB3
+       LI   R0,ABBPG
+       BL   @DMAP
+       CLR  R0
+       MOVB @>D000(R7),R0
+       SWPB R0
+       BL   @IBYTE
+       INC  R7
+       DEC  R6
+       JMP  JB2
+JB3    CLR  R0
+       BL   @IBYTE
+       INC  R8
+       JMP  JB1
+JB9    .leave
+       RT
+
+* ---- routines and strings -----------------------------------------------------------
+* JROUTS - each routine on a 4-byte boundary, its code copied; where it
+* went (packed) by its place, and by its symbol for a ROUTINE.
+JROUTS .enter
+       CLR  @JR
+JR1    C    @JR,@RN
+       JL   JR1A
+       .leave
+       RT
+JR1A   LI   R2,3
+       BL   @IALIGN
+       BL   @JPACK             R0 = the packed address here
+       MOV  R0,R5
+       MOV  @JR,R1
+       SLA  R1,1
+       LI   R0,WHRPG
+       BL   @DMAP
+       MOV  R5,@>D000(R1)
+       MOV  @JR,R1             its directory entry
+       SLA  R1,3
+       AI   R1,>D000
+       LI   R0,RDIRPG
+       BL   @DMAP
+       MOV  @4(R1),R7          its code: start, length
+       MOV  @6(R1),R6
+       MOV  @IPH,@4(R1)        (now: its place in the image)
+       MOV  @IPL,@6(R1)
+       MOVB *R1,R0
+       SRL  R0,8
+       CI   R0,1
+       JNE  JR2
+       MOV  @2(R1),R1          a ROUTINE: by its symbol too
+       SLA  R1,1
+       LI   R0,WHRPG
+       BL   @DMAP
+       MOV  R5,@>D800(R1)
+JR2    MOV  R6,R6              its bytes
+       JEQ  JR3
+       MOV  R7,R1              (overlay 5's CODAT: pages 0, 1, 4, 5)
+       MOV  R1,R0
+       SRL  R0,12
+       CI   R0,2
+       JL   JR2A
+       INCT R0
+JR2A   BL   @DMAP
+       ANDI R1,>0FFF
+       CLR  R0
+       MOVB @>D000(R1),R0
+       SWPB R0
+       BL   @IBYTE
+       INC  R7
+       DEC  R6
+       JMP  JR2
+JR3    INC  @JR
+       JMP  JR1
+* JPACK - R0 = IPH:IPL / 4, the packed address of the next byte.
+* Uses R0, R1.
+JPACK  MOV  @IPL,R0
+       SRL  R0,2
+       MOV  @IPH,R1
+       SLA  R1,14
+       SOC  R1,R0
+       RT
+
+* JSTRS - each string on a 4-byte boundary, encoded: its tokens, each one
+* in the substitution table as >80 + its place, any other byte as itself
+* (a line feed 10; outside 32-126 a question mark), then 0.
+JSTRS  .enter
+       CLR  @JN
+JS1    C    @JN,@STRN
+       JL   JS1A
+       .leave
+       RT
+JS1A   LI   R2,3
+       BL   @IALIGN
+       BL   @JPACK
+       MOV  R0,R5
+       MOV  @JN,R1
+       SLA  R1,1
+       LI   R0,WHRPG
+       BL   @DMAP
+       MOV  R5,@>D400(R1)
+       MOV  @JN,R1             its place in the tree
+       SLA  R1,3
+       AI   R1,>D200
+       LI   R0,STRPG
+       BL   @DMAP
+       MOV  @4(R1),R2
+       MOV  @2(R1),R0
+       MOV  R2,R1
+       BL   @XSET
+       BL   @XB
+       BL   @XW
+       MOV  R0,@JREM
+       SETO @JPEND
+JS2    BL   @JNEXT
+       MOV  R0,R0
+       JEQ  JS8
+       MOV  @JTOKL,R0          a substitution?
+       CI   R0,1
+       JEQ  JS4
+       BL   @JFIND
+       MOV  R0,R0
+       JLT  JS4
+       AI   R0,>80
+       BL   @IBYTE
+       JMP  JS2
+JS4    CLR  R6                 no: its bytes
+JS5    C    R6,@JTOKL
+       JHE  JS2
+       CLR  R0
+       MOVB @JTOK(R6),R0
+       SWPB R0
+       CI   R0,10
+       JEQ  JS6
+       CI   R0,32
+       JL   JS5A
+       CI   R0,127
+       JL   JS6
+JS5A   LI   R0,'?'
+JS6    BL   @IBYTE
+       INC  R6
+       JMP  JS5
+JS8    CLR  R0                 the end
+       BL   @IBYTE
+       INC  @JN
+       JMP  JS1
+* JNEXT - the next token of the string (JREM bytes left, JPEND read
+* ahead), as overlay 6's TNEXT: into JTOK, JTOKL.  R0 = 0 when done.
+* Uses R0-R3.
+JNEXT  MOV  R11,@J1
+       MOV  @JPEND,R0
+       JLT  JN1
+       SETO @JPEND
+       JMP  JN2
+JN1    MOV  @JREM,R0
+       JEQ  JN9
+       DEC  @JREM
+       BL   @XB
+JN2    SWPB R0
+       MOVB R0,@JTOK
+       LI   R2,1
+       BL   @JLETR
+       MOV  R1,R1
+       JEQ  JN8
+JN3    MOV  @JREM,R0
+       JEQ  JN8
+       DEC  @JREM
+       BL   @XB
+       SWPB R0
+       BL   @JLETR
+       MOV  R1,R1
+       JEQ  JN4
+       MOVB R0,@JTOK(R2)
+       INC  R2
+       JMP  JN3
+JN4    CB   R0,@BSPC
+       JNE  JN5
+       MOVB R0,@JTOK(R2)
+       INC  R2
+       JMP  JN8
+JN5    SWPB R0
+       MOV  R0,@JPEND
+JN8    MOV  R2,@JTOKL
+       LI   R0,1
+       MOV  @J1,R11
+       RT
+JN9    CLR  R0
+       MOV  @J1,R11
+       RT
+* JLETR - R1 = 1 if R0's high byte is a letter (A-Z, a-z).
+JLETR  CLR  R1
+       CB   R0,@BUPA
+       JL   JL9
+       CB   R0,@BUPZ
+       JLE  JL8
+       CB   R0,@BLWA
+       JL   JL9
+       CB   R0,@BLWZ
+       JH   JL9
+JL8    INC  R1
+JL9    RT
+* JFIND - R0 = JTOK's place in the substitution table, or -1.  Its hash
+* as overlay 6 made them; the chain on ABBPG.  Uses R0-R7.
+JFIND  MOV  R11,@J2
+       CLR  R0
+       MOV  @JTOKL,R2
+       LI   R1,JTOK
+JFN1   MOV  R2,R2
+       JEQ  JFN2
+       SRC  R0,13
+       MOVB *R1+,R3
+       SRL  R3,8
+       XOR  R3,R0
+       DEC  R2
+       JMP  JFN1
+JFN2   MOV  R0,R4              (the whole hash)
+       ANDI R0,63
+       SLA  R0,1
+       MOV  R0,R1
+       LI   R0,ABBPG
+       BL   @DMAP
+       MOV  @>D400(R1),R5
+JFN3   MOV  R5,R5
+       JEQ  JFN8
+       DEC  R5
+       MOV  R5,R1
+       SLA  R1,3
+       AI   R1,>D000
+       C    @6(R1),R4
+       JNE  JFN5
+       C    *R1,@JTOKL
+       JNE  JFN5
+       MOV  @2(R1),R2          the same text?
+       AI   R2,>D000
+       CLR  R3
+JFN4   C    R3,@JTOKL
+       JHE  JFN9
+       CB   *R2+,@JTOK(R3)
+       JNE  JFN5
+       INC  R3
+       JMP  JFN4
+JFN5   MOV  @4(R1),R5
+       JMP  JFN3
+JFN8   SETO R5
+JFN9   MOV  R5,R0
+       MOV  @J2,R11
+       RT
+
+* ---- fixups, header -------------------------------------------------------------------
+* JFIXES - every fixup: the code's (its routine's place + its place in it)
+* and the tables'; the packed address of its routine or string there.
+JFIXES .enter
+       CLR  R8                 the code's
+JX1    C    R8,@FXN
+       JHE  JX5
+       MOV  R8,R0
+       MOV  R0,R1
+       ANDI R1,511
+       SLA  R1,3
+       AI   R1,>D000
+       SRL  R0,9
+       AI   R0,FIXPG
+       BL   @DMAP
+       MOV  *R1,R2             its routine, place, kind, key
+       MOV  @2(R1),R3
+       MOV  @4(R1),R4
+       MOV  @6(R1),R5
+       MOV  R2,R1              the routine's place in the image
+       SLA  R1,3
+       AI   R1,>D000
+       LI   R0,RDIRPG
+       BL   @DMAP
+       MOV  @4(R1),R2
+       A    @6(R1),R3
+       JNC  JX2
+       INC  R2
+JX2    BL   @JWHERE            R0 = the address
+       BL   @IPUTW
+       INC  R8
+       JMP  JX1
+JX5    CLR  R8                 the tables'
+JX6    C    R8,@LFN
+       JHE  JX9
+       MOV  R8,R1
+       SLA  R1,3
+       AI   R1,>D000
+       LI   R0,LFXPG
+       BL   @DMAP
+       MOV  *R1,R2
+       MOV  @2(R1),R3
+       MOV  @4(R1),R4
+       MOV  @6(R1),R5
+       BL   @JWHERE
+       BL   @IPUTW
+       INC  R8
+       JMP  JX6
+JX9    .leave
+       RT
+* JWHERE - R0 = the packed address of kind R4 (1 a routine by symbol, 2 a
+* string, 3 a routine by its place in RDIRPG), key R5.  Keeps R2-R5.
+JWHERE MOV  R11,@J3
+       MOV  R5,R1
+       SLA  R1,1
+       CI   R4,1
+       JNE  JWH1
+       AI   R1,2048
+       JMP  JWH3
+JWH1   CI   R4,2
+       JNE  JWH3
+       AI   R1,1024
+JWH3   LI   R0,WHRPG
+       BL   @DMAP
+       MOV  @>D000(R1),R0
+       MOV  @J3,R11
+       RT
+
+* JHEAD - the header: magic, version, release, length, entry (Main), the
+* build date, the title, the proper and plural attributes; then the
+* checksum of every byte after it.
+JHEAD  .enter
+       LI   R0,H.MAGIC
+       LI   R2,MAGIC1
+       BL   @JHDRW
+       LI   R0,H.MAGIC+2
+       LI   R2,MAGIC2
+       BL   @JHDRW
+       LI   R0,H.VERSION
+       LI   R2,FMTVER
+       BL   @JHDRW
+       LI   R0,H.RELEASE
+       LI   R2,1
+       BL   @JHDRW
+       LI   R0,H.IMAGE_LEN_HI
+       MOV  @JLENH,R2
+       BL   @JHDRW
+       LI   R0,H.IMAGE_LEN_LO
+       MOV  @JLENL,R2
+       BL   @JHDRW
+       LI   R1,QMAIN7          the entry: Main's address
+       BL   @KEYSET
+       BL   @SLOOK
+       MOV  R0,R5
+       LI   R4,1
+       BL   @JWHERE
+       MOV  R0,R2
+       LI   R0,H.ENTRY
+       BL   @JHDRW
+       CLR  R8                 the date: 6 bytes
+JH1    MOVB @WDATE(R8),R0
+       SRL  R0,8
+       BL   @JPUTB
+       INC  R8
+       CI   R8,6
+       JL   JH1
+       CLR  R8                 the title: the main file's name, 16 wide
+       MOVB @FTAB,R7
+       SRL  R7,8
+JH2    LI   R0,' '
+       C    R8,R7
+       JHE  JH3
+       MOVB @FTAB+1(R8),R0
+       SRL  R0,8
+JH3    MOV  R8,R3
+       AI   R3,H.TITLE-H.BUILD_DATE
+       .push R8
+       MOV  R3,R8
+       BL   @JPUTB
+       .pop R8
+       INC  R8
+       CI   R8,16
+       JL   JH2
+       LI   R1,QPROP           the proper and plural attributes (255: none)
+       LI   R6,H.ATTR_PROPER
+       BL   @JATTR
+       LI   R1,QPLUR
+       LI   R6,H.ATTR_PLURAL
+       BL   @JATTR
+       CLR  @JSUM              the checksum: every byte after the header
+       CLR  R2
+       LI   R3,H.SIZE
+JH4    C    R2,@JLENH
+       JL   JH5
+       JH   JH6
+       C    R3,@JLENL
+       JHE  JH6
+JH5    .push R2
+       .push R3
+       BL   @IGETB
+       .pop R3
+       .pop R2
+       A    R0,@JSUM
+       INC  R3
+       JNC  JH4
+       INC  R2
+       JMP  JH4
+JH6    LI   R0,H.CHECKSUM
+       MOV  @JSUM,R2
+       BL   @JHDRW
+       .leave
+       RT
+* JPUTB - byte R0 at header place H.BUILD_DATE + R8.  Uses R0-R3.
+JPUTB  MOV  R11,@J2
+       MOV  @IPH,@ISVH
+       MOV  @IPL,@ISVL
+       CLR  @IPH
+       MOV  R8,R1
+       AI   R1,H.BUILD_DATE
+       MOV  R1,@IPL
+       BL   @IBYTE
+       MOV  @ISVH,@IPH
+       MOV  @ISVL,@IPL
+       MOV  @J2,R11
+       RT
+* JATTR - header byte R6 := the number of the attribute named at R1, or
+* 255 if there is none.  Uses R0-R7.
+JATTR  MOV  R11,@J1
+       MOV  R6,@J2             (its place: SLOOKK uses R0-R7)
+       BL   @KEYSET
+       BL   @SLOOKK
+       LI   R5,255
+       CI   R1,K.ATT
+       JNE  JAT1
+       BL   @SYMAT
+       MOV  @4(R1),R5
+JAT1   MOV  @IPH,@ISVH
+       MOV  @IPL,@ISVL
+       CLR  @IPH
+       MOV  @J2,@IPL
+       MOV  R5,R0
+       BL   @IBYTE
+       MOV  @ISVH,@IPH
+       MOV  @ISVL,@IPL
+       MOV  @J1,R11
+       RT
+QMAIN7 BYTE 4
+       TEXT 'MAIN'
+QPROP  BYTE 6
+       TEXT 'PROPER'
+QPLUR  BYTE 6
+       TEXT 'PLURAL'
+       EVEN
+
+* ---- the story files -------------------------------------------------------------------
+* JWRITE - the image as PROGRAM files of 4K (the last one shorter), on the
+* main file's device: prefix (the main file's name, 6 letters at most),
+* S, 01, 02 ... (as tools/txa_game.py names a story's files).
+JWRITE .enter
+       CLR  @JFILES
+JWR1   MOV  @JFILES,R0         this file's 4K: page IMGPG + n
+       MOV  R0,R1
+       SLA  R1,12              (its start, low word)
+       MOV  R0,R2
+       SRL  R2,4               (high word)
+       C    R2,@JLENH
+       JL   JWR2
+       JH   JWR9
+       C    R1,@JLENL
+       JHE  JWR9
+JWR2   MOV  @JLENL,R3          its length: what is left, at most 4096
+       S    R1,R3
+       MOV  @JLENH,R4
+       S    R2,R4
+       C    R1,@JLENL
+       JLE  JWR2A
+       DEC  R4
+JWR2A  MOV  R4,R4
+       JNE  JWR2B
+       CI   R3,4096
+       JLE  JWR3
+JWR2B  LI   R3,4096
+JWR3   MOV  R3,@J1
+       BL   @JNAME             FNBUF: the device, prefix, S, 2 digits
+       MOV  @JFILES,R0         its bytes to VRAM: FBUF
+       A    @IMGPG,R0
+       BL   @DMAP
+       LI   R0,FBUF
+       LI   R1,>D000
+       MOV  @J1,R2
+       BL   @VMBW
+       LI   R0,6               SAVE
+       MOV  @J1,R1
+       BL   @DSKCAL
+       MOV  R0,R0
+       JEQ  JWR4
+       MOV  R0,R1              a disk error: its code as the line
+       LI   R2,255
+       LI   R0,SE.DSK
+       B    @SERR
+JWR4   CLR  @DFPG              (the DSR moved nothing of ours, but be sure)
+       INC  @JFILES
+       JMP  JWR1
+JWR9   .leave
+       RT
+* JNAME - FNBUF = the main file's device (the typed name up to its last
+* '.'), its first 6 letters, S, file JFILES + 1 in two digits.  Uses R0-R4.
+JNAME  MOV  R11,@J2
+       LI   R4,FNBUF+1
+       MOV  @WBNLEN,R0         the device: up to the last '.'
+       CLR  R1                 (R1: the length up to it)
+       CLR  R2
+JNM1   C    R2,R0
+       JHE  JNM2
+       CB   @WBNAME(R2),@JDOT
+       JNE  JNM1A
+       MOV  R2,R1
+       INC  R1
+JNM1A  INC  R2
+       JMP  JNM1
+JNM2   CLR  R2
+JNM3   C    R2,R1
+       JHE  JNM4
+       MOVB @WBNAME(R2),*R4+
+       INC  R2
+       JMP  JNM3
+JNM4   MOVB @FTAB,R0           the prefix: the main file's first 6 letters
+       SRL  R0,8
+       CI   R0,6
+       JLE  JNM5
+       LI   R0,6
+JNM5   CLR  R2
+JNM6   C    R2,R0
+       JHE  JNM7
+       MOVB @FTAB+1(R2),*R4+
+       INC  R2
+       JMP  JNM6
+JNM7   MOVB @JLETS,*R4+        S, then the number
+       MOV  @JFILES,R1
+       INC  R1
+       CLR  R0
+       DIV  @D10J,R0           R0 tens, R1 ones
+       AI   R0,'0'
+       SWPB R0
+       MOVB R0,*R4+
+       AI   R1,'0'
+       SWPB R1
+       MOVB R1,*R4+
+       MOV  R4,R0              the length byte
+       AI   R0,-FNBUF-1
+       SWPB R0
+       MOVB R0,@FNBUF
+       MOV  @J2,R11
+       RT
+JDOT   BYTE '.'
+JLETS  BYTE 'S'
+D10J   DATA 10
