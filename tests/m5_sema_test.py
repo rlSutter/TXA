@@ -18,7 +18,8 @@ wrapped files:
            word's VERB, VERBTAB, GRAMTAB, ACTSUB, DICTVERB (dump.tables),
            and the warnings (dump.warnings)
   errors   malformed programs give the same first error, on the same
-           line of the same file
+           line of the same file, one for each of sema.py's errors (but
+           'more than 1000 objects'); and the warnings
 
   python3 tests/m5_sema_test.py [decls|meaning|errors|all] [quick]
 
@@ -206,7 +207,7 @@ quick = 'quick' in args
 if which in ('decls', 'all'):
     for rel, libdir in corpus(quick):
         path = os.path.join(ROOT, rel)
-        name = os.path.splitext(os.path.basename(path))[0]
+        name = os.path.splitext(os.path.basename(path))[0].replace('_', '')   # (the harness cannot type _)
         d, ppath = stage(open(path).read(), name, libdir)
         want = py_decls(ppath, libdir)
         m, steps = run_ti(d, name)
@@ -220,7 +221,7 @@ if which in ('decls', 'all'):
 if which in ('meaning', 'all'):
     for rel, libdir in corpus(quick):
         path = os.path.join(ROOT, rel)
-        name = os.path.splitext(os.path.basename(path))[0]
+        name = os.path.splitext(os.path.basename(path))[0].replace('_', '')   # (the harness cannot type _)
         d, ppath = stage(open(path).read(), name, libdir)
         p = py_meaning(ppath)
         m, steps = run_ti(d, name)
@@ -236,20 +237,99 @@ if which in ('meaning', 'all'):
         want, got = dump.warnings(p), (ti_warnings(m) if done >= 4 else '')
         check(f'{rel}: warnings identical ({len(p.warnings)})', got == want, first_diff(want, got) if done >= 4 else why)
 
+CODES = [('is a built-in function', 41), ('is already declared', 42), ('more than 240 globals', 43),
+         ('more than 48 attributes', 44), ('more than 63 properties', 45), ('more than 1000 objects', 46), ('is defined in terms of itself', 47), ('must be worked out when compiling', 48),
+         ('division by zero', 49), ('is not a class', 50), ('includes itself', 51), ('nothing can be IN it', 52),
+         ('is given two parents', 53), ('unknown attribute', 54), ('a class cannot say what its objects are IN', 55),
+         ('(declare it with PROPERTY)', 56), ('unknown name', 57), ('SELF has no value outside a routine', 58),
+         ('a property value must be', 59), ('a dictionary word cannot be empty', 60), ('is inside itself', 61),
+         ('but this file has no ROUTINE', 62), ('no VERB has that word', 63), ('has no routine', 64),
+         ('is already a word of another VERB', 65), ('is not a grammar token', 66), ('is not a routine', 67),
+         ('a grammar line takes at most two objects', 68), ('is declared twice in this routine', 69),
+         ('parameters and locals in one routine', 70), ('must be a LOCAL', 71), ('on its own does nothing', 72),
+         ('it cannot be assigned to', 73), ('only an array element can be assigned to', 74),
+         ('an array element takes one index', 75), ('and has no value here', 76), ('needs an attribute name after it', 77),
+         ('unknown property', 78), ('the second argument of', 80), (' argument', 79),
+         ('cannot be called', 82), ('cannot find the file', 40)]
+def code_of(msg):
+    for k, c in CODES:
+        if k in msg:
+            return c
+    return -1
+def names(n, stem, kw):
+    """n names declared with kw, ten to a line (DV80 lines are short)."""
+    sep = ', ' if kw.strip() == 'LOCAL' else ' '
+    return ''.join(f'{kw}' + sep.join(f'{stem}{i}' for i in range(k, min(n, k + 10))) + '\n' for k in range(0, n, 10))
+ERRS = [
+    ('a built-in name declared', 'GLOBAL random\n'),
+    ('declared twice', 'GLOBAL a\nGLOBAL A\n'),
+    ('241 globals', ''.join(f'GLOBAL g{i}\n' for i in range(241))),
+    ('49 attributes', names(49, 'a', 'ATTRIBUTE ')),
+    ('63 properties', names(63, 'P', 'PROPERTY ')),
+    ('a constant defined by itself', 'CONSTANT A = B\nCONSTANT B = A + 1\n'),
+    ('a constant not worked out', 'GLOBAL g\nCONSTANT A = g\n'),
+    ('division by zero', 'CONSTANT A = 1 / (2 - 2)\n'),
+    ('not a class', 'GLOBAL g\nOBJECT O "o"\n  CLASS g\nEND\n'),
+    ('a class including itself', 'CLASS A\n  CLASS B\nEND\nCLASS B\n  CLASS A\nEND\nOBJECT O "o"\n  CLASS A\nEND\n'),
+    ('IN a global', 'GLOBAL g\nOBJECT O "o" IN g\nEND\n'),
+    ('two parents', 'OBJECT P "p"\nEND\nOBJECT Q "q"\nEND\nOBJECT O "o" IN P\n  IN Q\nEND\n'),
+    ('unknown attribute (HAS)', 'OBJECT O "o"\n  HAS shiny\nEND\n'),
+    ('a class with IN', 'OBJECT P "p"\nEND\nCLASS C\n  IN P\nEND\nOBJECT O "o"\n  CLASS C\nEND\n'),
+    ('unknown property in a body', 'OBJECT O "o"\n  COLOUR 3\nEND\n'),
+    ('unknown name as a value', 'PROPERTY P\nOBJECT O "o"\n  P nowhere\nEND\n'),
+    ('SELF as a value', 'PROPERTY P\nOBJECT O "o"\n  P SELF\nEND\n'),
+    ('a global as a value', 'PROPERTY P\nGLOBAL g\nOBJECT O "o"\n  P g\nEND\n'),
+    ('a NAME with a space', 'OBJECT O "o"\n  NAME "two words"\nEND\n'),
+    ('inside itself', 'OBJECT A "a" IN B\nEND\nOBJECT B "b" IN A\nEND\n'),
+    ('REPLACE without the routine', 'REPLACE Foo\n'),
+    ('EXTEND an unknown verb', 'EXTEND "zap"\n  noun -> Zap\nEND\n'),
+    ('an action without its routine', 'VERB "zap"\n  noun -> Zap\nEND\n'),
+    ('a word of two verbs', 'ROUTINE ZapSub\nEND\nVERB "zap"\n  noun -> Zap\nEND\nVERB "Zap"\n  noun -> Zap\nEND\n'),
+    ('not a grammar token', 'ROUTINE ZapSub\nEND\nVERB "zap"\n  thing -> Zap\nEND\n'),
+    ('a filter that is not a routine', 'ROUTINE ZapSub\nEND\nGLOBAL g\nVERB "zap"\n  noun=g -> Zap\nEND\n'),
+    ('three objects in a line', 'ROUTINE ZapSub\nEND\nVERB "zap"\n  noun noun noun -> Zap\nEND\n'),
+    ('a local twice', 'ROUTINE F\n  LOCAL a\n  IF a\n    LOCAL a\n  END\nEND\n'),
+    ('17 locals', 'ROUTINE F\n' + names(17, 'v', '  LOCAL ') + 'END\n'),
+    ('a loop variable not local', 'ROUTINE F\n  FOR EACH x IN 1\n  END\nEND\n'),
+    ('a global on its own', 'GLOBAL g\nROUTINE F\n  g\nEND\n'),
+    ('a built-in on its own, arguments missing', 'ROUTINE F\n  STATUS\nEND\n'),
+    ('assigning to a constant', 'CONSTANT C = 1\nROUTINE F\n  C = 2\nEND\n'),
+    ('assigning to a call', 'ROUTINE G\nEND\nROUTINE F\n  G(1) = 2\nEND\n'),
+    ('an element with two indexes', 'ARRAY a 3\nROUTINE F\n  a(1, 2) = 2\nEND\n'),
+    ('an attribute as a value', 'ATTRIBUTE shiny\nROUTINE F\n  RETURN shiny\nEND\n'),
+    ('HAS without an attribute name', 'GLOBAL g\nROUTINE F\n  RETURN g HAS 3\nEND\n'),
+    ('HAS an unknown attribute', 'GLOBAL g\nROUTINE F\n  RETURN g HAS shiny\nEND\n'),
+    ('an unknown property after a dot', 'GLOBAL g\nROUTINE F\n  RETURN g.COLOUR\nEND\n'),
+    ('a built-in with too few arguments', 'ROUTINE F\n  RETURN RANDOM()\nEND\n'),
+    ('a routine with too many arguments', 'ROUTINE G a\nEND\nROUTINE F\n  G(1, 2)\nEND\n'),
+    ('PROPLEN without a property', 'ROUTINE F\n  RETURN PROPLEN(1, 2)\nEND\n'),
+    ('calling a global', 'GLOBAL g\nROUTINE F\n  g(1)\nEND\n'),
+    ('an unknown name in a routine', 'ROUTINE F\n  RETURN nowhere\nEND\n'),
+    ('a GIVE of an unknown attribute', 'OBJECT O "o"\nEND\nROUTINE F\n  GIVE O shiny\nEND\n'),
+    ('an error in an included file', 'GLOBAL g\nINCLUDE "DSK1.MORE"\n', [('MORE', 'GLOBAL h\nGLOBAL H\n')]),
+    ('a bad token in lines EXTENDed from another file', 'ROUTINE ZapSub\nEND\nVERB "zap"\n  noun -> Zap\nEND\nINCLUDE "DSK1.MORE"\n',
+     [('MORE', 'EXTEND "zap"\n  thing -> Zap\nEND\n')]),
+]
 if which in ('errors', 'all'):
-    # (file the error is in, line) must match sema.py's
-    cases = [('missing include', 'INCLUDE "DSK1.NOSUCH"\nROUTINE Main\nEND\n', None, 40)]
-    for label, text, libdir, code in cases:
-        d, ppath = stage(text, 'GAME', libdir)
+    cases = [('missing include', 'INCLUDE "DSK1.NOSUCH"\nROUTINE Main\nEND\n')] + ERRS
+    for case in cases:
+        label, text = case[0], case[1]
+        d, ppath = stage(text, 'GAME', None, case[2] if len(case) > 2 else ())
         try:
-            s = Sema([d]); s.load(ppath, []); pe = None
+            Sema([d]).run(ppath); pe = None
         except TxaError as e:
             pe = e
         m, _ = run_ti(d, 'GAME')
         files = ti_files(m) + ['?'] * 16
         got = (m.rw(sy['WBERR']), files[m.rw(sy['WBERRF'])], m.rw(sy['WBERRL']))
-        want = (code, os.path.splitext(pe.file)[0].upper(), pe.line) if pe else None
+        want = (code_of(pe.msg), os.path.splitext(pe.file)[0].upper(), pe.line) if pe else (0, '?', 0)
         check(f'error: {label}: {pe.msg if pe else "(none)"}', got == want, f'ti {got}, expected {want}')
+    text = 'ROUTINE F\n  RETURN SELF\nEND\nOBJECT O "o"\n  NAME "extraordinarily"\nEND\nOBJECT Q "q"\nEND\nROOM R "r"\nEND\n'
+    d, ppath = stage(text, 'GAME', None)
+    p = Sema([d]).run(ppath)
+    m, _ = run_ti(d, 'GAME')
+    check(f'warnings: SELF outside a property, a long NAME word, an OBJECT without NAME words ({len(p.warnings)})',
+          ti_warnings(m) == dump.warnings(p), f'ti {ti_warnings(m)!r}, expected {dump.warnings(p)!r}')
 
 print('ALL PASS' if not fails else f'{fails} FAILED')
 sys.exit(1 if fails else 0)

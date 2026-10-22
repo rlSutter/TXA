@@ -3,7 +3,7 @@
 Status, what remains, and Rebecca's decisions. Start a new session with
 `docs/CONTEXT.md`.
 
-## Status (19 October 2026)
+## Status (19 October 2026; see the M5 notes below for the latest)
 
 **M0, the hardware probe: complete.** 25 simulator checks pass
 (`tests/m0_test.py`) and Rebecca confirmed every screen and key.
@@ -716,13 +716,58 @@ M5 part 3 done (21 October 2026): the parser on the TI.
   spoils it (now the CI is last before B *R11); EINS indexed with R0
   (the TMS9900 cannot); a call's argument count written low byte first.
 
+M5 part 4 done (22 October 2026): meaning on the TI.
+- Overlays: the lexer and parser had filled >A000 nearly to >C66C.  Now
+  the resident part is >A000->AFFF and each stage an overlay running at
+  >B000->CFFF from two SAMS pages of its own (OVSEL): 1 lexer, 2 parser,
+  3 and 4 the meaning stage.  They are assembled at >B000 with XORG,
+  staged in the image at >4000, and the cartridge loader copies each
+  into its pages: SEGTAB pieces now carry a SAMS page (0 for plain RAM;
+  the engine's are all 0).  The loader maps the identity, copies, and
+  turns mapping off again (AMSDET expects pass-through: the first try
+  hung there).
+- Loading every file (src/wload.a99, resident): LOADF reads, lexes and
+  parses one file onto the end of one tree (the trees follow each other
+  from TREEPG); WALK makes the declaration index in sema.py's load()
+  order, loading an INCLUDE's file where it stands (each base name once;
+  "cannot find the file" at the INCLUDE).  WBONLY keeps parts 1-3's
+  one-file behaviour for their tests.
+- SAMS: 16-31 overlays, 32-47 source, 48-63 tokens, 64-111 trees,
+  112-115 the declaration index; the meaning tables reuse 32-63 once
+  every file is loaded, and 116-127 (wsym.a99, wsymdef.a99).
+- The meaning stage: shared parts in the kernel window after the kernel
+  (wsym.a99: symbol hash and records with a name heap, the dictionary,
+  a 4-byte-cell heap, errors and warnings, the built-ins); overlay 3
+  (wsema.a99): REPLACE and EXTEND, declare_all, the constants (fold with
+  the VM's signed division), build_objects (class chains, parents, the
+  twelve exits, children, loops); overlay 4 (wsema2.a99): collect_actions,
+  check_routines, finish_tables (the dictionary sorted by Shell's sort),
+  the NAME-word warning.  It runs on its own 2K return stack at >3800
+  down over the lexer's and parser's buffers: the body checks recurse
+  deeply and overflowed the 240-byte stack into the variables.
+- dump.py: symbols, objects, tables, warnings.  tests/m5_sema_test.py:
+  decls, meaning (symbols, objects, tables, warnings) on the corpus, and
+  48 malformed programs (every sema.py error but "more than 1000
+  objects") with the same code on the same line of the same file, and
+  the three warnings.
+- tools/fixjumps.py rewrites jumps xas99 reports out of range.
+- Bugs found: DXINF read the REPLACE mark with SRL, so a replaced routine
+  was still declared (world1, world3); the checker never read PRINT's
+  newline field; several loop counters lived in registers the shared
+  routines use; SETPAR and SLOOKK shared a return slot; SEMA1 cleared
+  its variables after saving the stack.
+- demos/m1demo.txa no longer compiles with the current library (Python
+  says ListContents is declared twice); it is out of the corpus.
+- Speed: Lamplight's whole compile so far, about 23M instructions (77 s
+  on a TI).
+
 ## Next
 
-1. M5 part 4: meaning on the TI (sema.py: the symbol table, numbering,
-   objects and classes, REPLACE and EXTEND, grammar tables; a symbol
-   dump to add to dump.py; identical for the corpus; the semantic errors
-   identical).
-2. M5 parts 5-6 as in the design doc.
+1. M5 part 5: code (codegen.py): routines to bytecode, constant folding
+   (FOLD exists), property tables, the object table; each routine's
+   bytecode identical.  It will need overlays of its own, and FOLD moved
+   where both can use it.
+2. M5 part 6 as in the design doc.
 
 ## (was) M5 (waiting on D1-D4): the native compiler (the workbench cartridge: source loading,
    three passes, the precompiled library, error list; done when the TI

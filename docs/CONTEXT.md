@@ -11,7 +11,10 @@ keep it current when the language changes.  The six manuals still to
 write are stubbed in the Claude Doc
 https://claude.ai/artifact/VqqmmXaB3E5RBxdTcfBtU2 (one tab each).
 
-**State (21 October 2026, checkpoint-m4):** M0-M4 complete (engine 1.0
+**State (22 October 2026, checkpoint-m5c):** M5 parts 1-4 done: the
+workbench loads every file, lexes, parses and does sema.py's whole
+meaning stage, identical to Python on the corpus.  Next: part 5, code.
+Earlier: **(checkpoint-m4):** M0-M4 complete (engine 1.0
 beta: save, restore, undo, scrollback, pictures, sound and music, stories
 on disk and the game writer, title page, end screen).  Next: M5, the
 native compiler on the TI; its design (decisions D1-D4 for Rebecca) is
@@ -67,7 +70,12 @@ owns it; Claude builds it. The engine comes first; the story later.
 | `src/save.a99` | SAVE/RESTORE: the portable save file built in and read from VRAM; FNAME (DSK1. prefix) |
 | `tools/txa_game.py` | the game writer: E/A 5 engine files, 4K story (and picture) files, disk image, optional cartridge |
 | `src/picture.a99` | PICTURE: the picture area through window D into the bitmap layer; PICOFF, PICRDW (kernel window) |
-| `src/wbench.a99` | the TXA Workbench cartridge (M5): the native compiler's home; part 1 reads DV80 source into SAMS |
+| `src/wbench.a99` | the TXA Workbench cartridge (M5): the front end, the overlay switch (OVSEL), the memory and SAMS layout |
+| `src/wload.a99` | resident: LOADF (one file read, lexed, parsed onto the tree), WALK (the declaration index, INCLUDEs followed), the tree reader (XB, XW, XSKIP), DMAP, and the routines both meaning overlays use |
+| `src/wsymdef.a99`, `src/wsym.a99` | the meaning stage's constants, variables, error codes; and its shared routines (symbols, dictionary, heap, errors, warnings, built-ins), in the kernel window |
+| `src/wsema.a99`, `src/wsema2.a99` | overlays 3 and 4: the meaning stage's two halves |
+| `tests/m5_sema_test.py` | the meaning stage against sema.py (decls, meaning, errors) |
+| `tools/fixjumps.py` | rewrites jumps xas99 reports out of range as branches |
 | `src/wlex.a99` | the workbench's lexer: SAMS source to SAMS tokens, identical to lexer.py |
 | `tests/m5_lex_test.py` | the TI lexer against the Python lexer on the corpus (args: lib, samples, tests, errors) |
 | `src/wparse.a99` | the workbench's parser: SAMS tokens to the SAMS tree, identical to parser.py (dump.tree_bytes) |
@@ -111,10 +119,13 @@ owns it; Claude builds it. The engine comes first; the story later.
    `sample_test.py --quick`; the slow engine ones, `m1_vm_test.py`,
    `m2_engine_test.py`, `m3_engine_test.py`, `sample_test.py`,
    `m4_save_test.py`, `m4_disk_test.py`, `m4_picture_test.py`, `m4_quit_test.py`,
-   `m4_sound_test.py`, `m4_scrollback_test.py`, `m5_load_test.py`, run
+   `m4_sound_test.py`, `m4_scrollback_test.py`, `m5_load_test.py`,
+   `m5_lex_test.py all`, `m5_parse_test.py all`, `m5_sema_test.py all`
+   (the longest: about 25 minutes), run
    1-4 minutes each.  Quick: `txc_wrap_test.py`.  Start each
    in the background with output to a file and collect it in a later
-   call: the tool stops any command after 300 s.  Run them one after
+   call: the tool stops any command after 300 s, and kills what a plain
+  `nohup ... &` started when the call ends: start it with `setsid nohup`.  Run them one after
    another, never two at once, and never build anything while they run
    (they share build/ and src/gen/).
 5. Read `plan.md` (status, decisions, next) and the spec Claude Doc.
@@ -207,3 +218,13 @@ owns it; Claude builds it. The engine comes first; the story later.
 - In 30-row mode the >D0 sprite terminator is disabled: TXA keeps the
   sprite patterns blank instead.
 - 30-row mode survives a console reset: F18RST turns it off before quitting.
+- The workbench's overlays must not refer to each other's labels: the
+  assembler accepts it, but the other overlay is not mapped in.  Shared
+  code goes in wload.a99 (resident) or wsym.a99 (kernel window, nearly
+  full: about 200 bytes left).
+- EQUs cannot refer forward in xas99: the meaning stage's are in
+  wsymdef.a99, COPYed at the top of wbench.a99.
+- The meaning stage's routines document which registers they use;
+  SLOOK, SLOOKK, SADD, DWORD and DADD use R0-R7, so loop counters across
+  them live in R8, R9 or memory.
+- A fresh clone has no build/shots: create it before m4_picture_test.
