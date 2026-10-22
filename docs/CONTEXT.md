@@ -227,4 +227,3 @@ owns it; Claude builds it. The engine comes first; the story later.
 - The meaning stage's routines document which registers they use;
   SLOOK, SLOOKK, SADD, DWORD and DADD use R0-R7, so loop counters across
   them live in R8, R9 or memory.
-- A fresh clone has no build/shots: create it before m4_picture_test.

@@ -10,6 +10,7 @@ The PNG is 960 pixels wide whatever the mode: a T80 pixel is 2 wide
 (80 x 6 x 2) and a 256-grid pixel is 3.75 wide, the ratio the F18A
 draws them in.  Scanlines are 3.75 tall, so a 256 x 192 screen comes out
 4:3 with square grid pixels, as on a monitor."""
+import os
 from PIL import Image
 
 STDPAL = [0x000, 0x000, 0x2C3, 0x5D6, 0x54F, 0x76F, 0xD54, 0x4EF, 0xF54, 0xF76,
@@ -102,4 +103,5 @@ def render(m, path):
                     c = (b >> ((3 - x % 4) * 2)) & 3; ci = (ps << 2) | c
                 if c or not trans:
                     plot(X * 3.75, (X + 1) * 3.75, Y, rgb(ci))
+    os.makedirs(os.path.dirname(os.path.abspath(path)), exist_ok=True)   # (build/shots is not in git)
     img.save(path)
