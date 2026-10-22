@@ -673,12 +673,14 @@ STFOR  BL   @KEYRD             FOR EACH: the variable must be a LOCAL
 STFR1  BL   @EXPR
        BL   @SSTMTS
        JMP  ST99
-STPRN  BL   @XB                PRINT: its items (form, expression)
-       BL   @XW
+STPRN  BL   @XB                PRINT: its items (form, expression),
+       BL   @XW                then newline (True / False)
        MOV  R0,R5
 STPR1  MOV  R5,R5
-       JEQ  ST99
-       DEC  R5
+       JNE  STPR2
+       BL   @XB
+       JMP  ST99
+STPR2  DEC  R5
        BL   @XB
        BL   @XB
        BL   @XW
