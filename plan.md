@@ -802,6 +802,28 @@ M5 part 5 (22 October 2026): the code generator on the TI.
    PAB operation and mode, its errors, the on-disk file format).  Read
    them only: libre99 is under a Modified MIT License with the Commons
    Clause, so none of its code or binaries go into this repository.
+   What its notes say that matters here (the workbench writes the story
+   as 4K PROGRAM files with SAVE, opcode 6, through the kernel's DSKCAL,
+   as the game writer's LAMPS01.. files are):
+   - SAVE needs no OPEN and takes the byte count in PAB+6/7; LOAD gives
+     the bytes back to VRAM at PAB+2 and leaves PAB+6/7 alone.
+   - SAVE writes the last, partial sector whole, straight from VRAM: the
+     bytes past the file's length are whatever follows it in VRAM, never
+     zeros.  So the test compares each file's first n bytes (n its
+     length), not disk sectors; and the workbench should not rely on what
+     the tail holds.
+   - Error bits in PAB+1 (bits 5-7) are sticky: the DSR never clears
+     them.  DSKCAL builds a fresh PAB each call, so this is safe; any new
+     code must do the same.
+   - A protected file refuses DELETE and write-mode OPEN with error 1, so
+     a SAVE over a protected story file must be reported, not ignored;
+     an unreadable drive gives error 6.  The workbench should show the
+     DSR's error with the file's name.
+   - STATUS (opcode 9) also needs no OPEN: PAB+8 gets >08 for an existing
+     PROGRAM file, >80 for none.  A way to ask before overwriting, if the
+     front end wants one.
+   - The controller keeps its buffers from >37D8 up (it lowers >8370 to
+     >37D7); our PAB at >37A0 sits below them, as it must.
 
 ## Later: a more faithful disk test (candidate)
 
