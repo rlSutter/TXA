@@ -4,7 +4,15 @@
 * Bank 0 holds this loader and SEGTAB; banks 1 onward hold the image.
 * tools/build.py writes gen/cartsegs.a99 (SEGTAB: pieces of at most one
 * bank each, as bank, address in the >6000 window, RAM destination,
-* byte count, ending with a >FFFF bank) and appends the image banks.
+* byte count, SAMS page, ending with a >FFFF bank) and appends the image
+* banks.  A piece's SAMS page is 0 for plain RAM; otherwise the piece is
+* copied into that page, mapped for the copy into the destination's 4K
+* window (the workbench's overlays: code that runs at >B000 from pages of
+* its own).  The first paged piece sets every window to its own page and
+* turns mapping on (at power-up the registers may hold anything); after
+* each copy the window gets its own page back, so the program finds the
+* identity map it would have had in pass-through mode, and at the end
+* mapping is turned off again (pass-through), as the program expects.
 * The program then runs from RAM exactly as if E/A had loaded it, so the
 * cartridge and the disk files test the same code.
 *
@@ -31,6 +39,7 @@ LDR1   MOV  *R1+,*R2+
        DEC  R3
        JNE  LDR1
        LI   R4,SEGTAB
+       CLR  R8                 no paged piece yet
 LDR2   MOV  *R4+,R5            bank
        CI   R5,>FFFF
        JEQ  LDR3
@@ -39,9 +48,48 @@ LDR2   MOV  *R4+,R5            bank
        MOV  *R4+,R1            source in the window
        MOV  *R4+,R2            destination in RAM
        MOV  *R4+,R3            byte count
+       MOV  *R4+,R6            SAMS page (0: none)
+       JEQ  LDR5
+       MOV  R2,R9              the window: dest >> 12
+       SRL  R9,12
+       MOV  R9,R7              its register: >4000 + 2 * window
+       SLA  R7,1
+       AI   R7,>4000
+       LI   R12,>1E00
+       SBO  0                  registers visible
+       MOV  R8,R8              the first paged piece?
+       JNE  LDR4
+       SETO R8
+       CLR  R0                 every window its own page (identity)
+       LI   R13,>4000
+LDR3A  MOV  R0,R14
+       SWPB R14
+       SOC  R0,R14
+       MOV  R14,*R13+
+       INC  R0
+       CI   R0,16
+       JL   LDR3A
+       SBO  1                  mapping on
+LDR4   MOV  R6,R14             the page, in both bytes
+       SWPB R14
+       SOC  R6,R14
+       MOV  R14,*R7
+       SBZ  0
        BL   @TRAMP
+       SBO  0                  the window's own page back
+       MOV  R9,R14
+       SWPB R14
+       SOC  R9,R14
+       MOV  R14,*R7
+       SBZ  0
        JMP  LDR2
-LDR3   B    @>2000             the image's entry (KENTRY)
+LDR5   BL   @TRAMP
+       JMP  LDR2
+LDR3   MOV  R8,R8              mapping turned on for paged pieces?
+       JEQ  LDR3B
+       LI   R12,>1E00          then back to pass-through, as at power-up
+       SBZ  1                  (the program's AMSDET expects it)
+LDR3B  B    @>2000             the image's entry (KENTRY)
 
 * TRSRC - select the bank at address R5, copy R3 bytes from R1 to R2,
 * select bank 0 again.  Copied to TRAMP and run there.

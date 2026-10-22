@@ -1,0 +1,558 @@
+*======================================================================
+* wsym.a99 - what the meaning stage's overlays share (M5 part 4),
+* resident in the kernel window after the kernel: the symbol table, the
+* dictionary, the cell heap, errors and warnings.
+*
+* The tables (SAMS; they reuse the source and token pages, free once
+* every file is loaded):
+*   HBPG    the symbol hash: 2048 words, each the first symbol of its chain
+*   SYMPG.. symbols, 32 bytes, numbered from 1 in declaration order:
+*             +0 the next in its chain  +2 kind (byte)  +3 name length (byte)
+*             +4 number (a constant's value once folded)
+*             +6 its declaration (index entry; -1: the compiler's own)
+*             +8 flags: 1 a constant's value is known, 2 being worked out
+*             +10 the name's page, +12 its offset (the name heap)
+*             +14 more: a routine's parameter count; an object's number
+*   NAMPG.. the names as declared (never across a page)
+*   OBJPG.. objects, 32 bytes, numbered from 1 (see wsema.a99)
+*   HPPG..  the cell heap: 4-byte cells, numbered from 1 (0 is none)
+*   DHPG    the dictionary hash: 2048 words
+*   DICPG.. dictionary words, 16 bytes, numbered from 1 in the order first
+*             met: +0 next in chain, +2 length (byte), +3 the word (12)
+*   WRNPG   warnings: code, file, line (6 bytes each)
+*   VRBPG   verbs: 8 bytes each (wsema.a99)
+* Window E shows the symbols, their hash and the objects; window D the
+* names, the heap, the dictionary, the warnings, the verbs and the
+* declaration index; window F the tree.  An address in a window is good
+* only until the next call that may map that window.
+*
+* Names are compared in capitals, on their first KEYMX characters.
+*======================================================================
+* (the tables' pages, the kinds, the variables and the error codes are in
+* wsymdef.a99, COPYed before everything: xas99's EQUs cannot look ahead)
+
+* ---- windows --------------------------------------------------------------------
+* EMAP - window E onto page R0, unless it shows it already.  Keeps R1-R9.
+EMAP   C    R0,@EFPG
+       JEQ  EMA9
+       MOV  R0,@EFPG
+       MOV  R11,@ERET
+       MOV  R1,@ESV1
+       MOV  R2,@ESV2
+       MOV  R3,@ESV3
+       LI   R1,>E
+       BL   @MAPPG
+       MOV  @ESV1,R1
+       MOV  @ESV2,R2
+       MOV  @ESV3,R3
+       MOV  @ERET,R11
+EMA9   RT
+* SYMAT - R1 = window E's address of symbol R0.  Uses R0, R1.
+SYMAT  MOV  R11,@SRET4
+       MOV  R0,R1
+       ANDI R1,127
+       SLA  R1,5
+       AI   R1,>E000
+       SRL  R0,7
+       AI   R0,SYMPG
+       BL   @EMAP
+       MOV  @SRET4,R11
+       RT
+* OBJAT - R1 = window E's address of object R0 (from 1).  Uses R0, R1.
+OBJAT  MOV  R11,@SRET4
+       MOV  R0,R1
+       ANDI R1,127
+       SLA  R1,5
+       AI   R1,>E000
+       SRL  R0,7
+       AI   R0,OBJPG
+       BL   @EMAP
+       MOV  @SRET4,R11
+       RT
+* HCELL - R1 = window D's address of heap cell R0.  Uses R0, R1.
+HCELL  MOV  R11,@SRET4
+       MOV  R0,R1
+       ANDI R1,1023
+       SLA  R1,2
+       AI   R1,>D000
+       SRL  R0,10
+       AI   R0,HPPG
+       BL   @DMAP
+       MOV  @SRET4,R11
+       RT
+* HALLOC - R0 = the first of R0 new cells, all on one page, zeroed.
+* Uses R0-R3.
+HALLOC MOV  R11,@SRET3
+       MOV  R0,R3
+       MOV  @HPN,R1
+       MOV  R1,R2
+       ANDI R2,1023
+       A    R3,R2
+       CI   R2,1024
+       JLE  HAL1
+       AI   R1,1024            the next page's first cell
+       ANDI R1,>FC00
+HAL1   MOV  R1,R2
+       A    R3,R2
+       CI   R2,HPMAX
+       JLE  HAL2
+       LI   R0,SE.MNY
+       B    @SERRE
+HAL2   MOV  R2,@HPN
+       MOV  R1,R0
+       MOV  R1,@STK3
+       BL   @HCELL
+HAL3   CLR  *R1+               (4 bytes a cell)
+       CLR  *R1+
+       DEC  R3
+       JNE  HAL3
+       MOV  @STK3,R0
+       MOV  @SRET3,R11
+       RT
+
+* PGCLR - SAMS page R0 zeroed (through window E).  Uses R0, R1.
+PGCLR  MOV  R11,@SRET4
+       BL   @EMAP
+       LI   R1,>E000
+PGC1   CLR  *R1+
+       CI   R1,>F000
+       JL   PGC1
+       MOV  @SRET4,R11
+       RT
+
+* ---- errors and warnings -------------------------------------------------------
+* SERR - stop with error R0 at line R1 of file R2: back from the overlay's
+* entry (SSTK) with R0 = the code.
+SERR   MOV  R0,@WBERR
+       MOV  R1,@WBERRL
+       MOV  R2,@WBERRF
+       LI   R0,4
+       MOV  R0,@WBSTAG
+       MOV  @SSTK,R10
+       MOV  @WBERR,R0
+       .leave
+       RT
+* SERRE - error R0 where ELINE and EFILE say.
+SERRE  MOV  @ELINE,R1
+       MOV  @EFILE,R2
+       JMP  SERR
+* SERRD - error R0 at declaration (index entry) R3.
+SERRD  MOV  R0,@WBERR
+       BL   @DXLOC
+       MOV  @WBERR,R0
+       JMP  SERR
+* DXLOC - R1 = the line, R2 = the file of declaration R3.  Uses R0-R2.
+DXLOC  MOV  R11,@SRET4
+       MOV  R3,R0
+       BL   @DXAT
+       MOVB @4(R1),R2
+       SRL  R2,8
+       ANDI R2,>7F
+       MOV  @6(R1),R1
+       MOV  @SRET4,R11
+       RT
+* SWARN - warning R0 where ELINE and EFILE say.  Uses R0, R1.
+SWARN  MOV  R11,@SRET4
+       MOV  @WN,R1
+       CI   R1,WRNMAX
+       JHE  SWA9               (past the most: not kept)
+       INC  @WN
+       MPY  @D6,R1             R2 = its offset
+       MOV  R0,R1
+       LI   R0,WRNPG
+       BL   @DMAP
+       MOV  R1,@>D000(R2)
+       MOV  @EFILE,@>D002(R2)
+       MOV  @ELINE,@>D004(R2)
+SWA9   MOV  @SRET4,R11
+       RT
+D6     DATA 6
+
+* ---- names -----------------------------------------------------------------------
+* KEYRD - the string at the tree reader (>04, length, bytes) into NAMB as
+* written and KEYB in capitals, KEYL its length (at most KEYMX; the rest
+* passed over).  Uses R0-R2, R4; keeps R3.
+KEYRD  MOV  R11,@SRET2
+       BL   @XB
+       BL   @XW
+       MOV  R0,R2
+       CLR  R4
+KR1    MOV  R2,R2
+       JEQ  KR9
+       BL   @XB
+       CI   R4,KEYMX
+       JHE  KR3
+       SWPB R0
+       MOVB R0,@NAMB(R4)
+       BL   @UPPER
+       MOVB R0,@KEYB(R4)
+       INC  R4
+KR3    DEC  R2
+       JMP  KR1
+KR9    MOV  R4,@KEYL
+       MOV  @SRET2,R11
+       RT
+* KEYSET - the name at R1 (a length byte, then its characters, in
+* capitals) into KEYB and NAMB.  Uses R1-R3.
+KEYSET MOVB *R1+,R2
+       SRL  R2,8
+       MOV  R2,@KEYL
+       CLR  R3
+KS1    C    R3,R2
+       JHE  KS9
+       MOVB *R1,@KEYB(R3)
+       MOVB *R1+,@NAMB(R3)
+       INC  R3
+       JMP  KS1
+KS9    RT
+* UPPER - R0's high byte in capitals (a-z only).  Keeps the rest.
+UPPER  CB   R0,@BLWA
+       JL   UP9
+       CB   R0,@BLWZ
+       JH   UP9
+       AI   R0,->2000
+UP9    RT
+BLWA   BYTE 'a'
+BLWZ   BYTE 'z'
+BUPA   BYTE 'A'
+BUPZ   BYTE 'Z'
+BSPC   BYTE ' '
+       EVEN
+* HASH - R0 = KEYB's bucket (0-2047).  Uses R0-R3.
+HASH   CLR  R0
+       MOV  @KEYL,R2
+       LI   R1,KEYB
+HA1    MOV  R2,R2
+       JEQ  HA9
+       SRC  R0,13
+       MOVB *R1+,R3
+       SRL  R3,8
+       XOR  R3,R0
+       DEC  R2
+       JMP  HA1
+HA9    ANDI R0,2047
+       RT
+
+* ---- the symbol table --------------------------------------------------------------
+* SLOOK - R0 = the symbol named KEYB, or 0.  Uses R0-R7.
+SLOOK  MOV  R11,@SRET1
+       BL   @HASH
+       MOV  R0,R6
+       SLA  R6,1
+       LI   R0,HBPG
+       BL   @EMAP
+       MOV  @>E000(R6),R5
+SL1    MOV  R5,R5
+       JEQ  SL9
+       MOV  R5,R0
+       BL   @SYMAT
+       MOVB @3(R1),R2          the length first
+       SRL  R2,8
+       C    R2,@KEYL
+       JNE  SL5
+       MOV  @12(R1),R4
+       MOV  @10(R1),R0
+       BL   @DMAP
+       AI   R4,>D000
+       LI   R7,KEYB
+       MOV  R2,R2
+       JEQ  SL9
+SL3    MOVB *R4+,R0
+       BL   @UPPER
+       CB   R0,*R7+
+       JNE  SL5
+       DEC  R2
+       JNE  SL3
+       JMP  SL9                the same name
+SL5    MOV  R5,R0              the next in the chain
+       BL   @SYMAT
+       MOV  *R1,R5
+       JMP  SL1
+SL9    MOV  R5,R0
+       MOV  @SRET1,R11
+       RT
+* SLOOKK - SLOOK, then R1 = the symbol's kind (0 if none).  Uses R0-R7.
+SLOOKK MOV  R11,@SRET2
+       BL   @SLOOK
+       CLR  R1
+       MOV  R0,R0
+       JEQ  SLK9
+       MOV  R0,R5
+       BL   @SYMAT
+       MOVB @2(R1),R1
+       SRL  R1,8
+       MOV  R5,R0
+SLK9   MOV  @SRET2,R11
+       RT
+* SADD - a new symbol named NAMB (KEYB, KEYL): kind R2, number R3,
+* declaration R4.  R0 = its number.  Uses R0-R7.
+SADD   MOV  R11,@SRET1
+       MOV  R2,@STK1
+       MOV  R3,@STK2
+       MOV  R4,@STK3
+       MOV  @SN,R5
+       INC  R5
+       CI   R5,SYMMAX
+       JL   SA1
+       LI   R0,SE.MNY
+       B    @SERRE
+SA1    MOV  R5,@SN
+       MOV  @NHOF,R6           the name into the heap
+       MOV  R6,R0
+       A    @KEYL,R0
+       CI   R0,4096
+       JLE  SA2
+       INC  @NHPG
+       CLR  R6
+       MOV  @NHPG,R0
+       CI   R0,NAMEND
+       JL   SA2
+       LI   R0,SE.MNY
+       B    @SERRE
+SA2    MOV  @NHPG,R0
+       BL   @DMAP
+       MOV  R6,R1
+       AI   R1,>D000
+       LI   R2,NAMB
+       MOV  @KEYL,R3
+       JEQ  SA4
+SA3    MOVB *R2+,*R1+
+       DEC  R3
+       JNE  SA3
+SA4    MOV  R6,R7
+       A    @KEYL,R6
+       MOV  R6,@NHOF
+       BL   @HASH              the chain
+       SLA  R0,1
+       MOV  R0,R6
+       LI   R0,HBPG
+       BL   @EMAP
+       MOV  @>E000(R6),R4
+       MOV  R5,@>E000(R6)
+       MOV  R5,R0
+       BL   @SYMAT
+       MOV  R4,*R1
+       MOVB @STK1+1,@2(R1)
+       MOVB @KEYL+1,@3(R1)
+       MOV  @STK2,@4(R1)
+       MOV  @STK3,@6(R1)
+       CLR  @8(R1)
+       MOV  @NHPG,@10(R1)
+       MOV  R7,@12(R1)
+       CLR  @14(R1)
+       MOV  R5,R0
+       MOV  @SRET1,R11
+       RT
+
+* ---- the dictionary -------------------------------------------------------------
+* DWORD - sema.py's dict_word: the string at the tree reader, in lower
+* case; an error if it is empty or has a space; a warning past 12
+* letters, and only 12 kept.  Errors and warnings at ELINE, EFILE.
+* R0 = the word's number.  Uses R0-R7.
+DWORD  MOV  R11,@SRET1
+       BL   @XB
+       BL   @XW
+       MOV  R0,R3
+       MOV  R0,@DWL
+       CLR  @DWSP
+       CLR  R4
+DW1    MOV  R3,R3
+       JEQ  DW4
+       BL   @XB
+       SWPB R0
+       CB   R0,@BSPC
+       JNE  DW2
+       SETO @DWSP
+DW2    CI   R4,12
+       JHE  DW3
+       CB   R0,@BUPA           lower case (A-Z only, as Python's lower() does for ASCII)
+       JL   DW2A
+       CB   R0,@BUPZ
+       JH   DW2A
+       AI   R0,>2000
+DW2A   MOVB R0,@DWB(R4)
+       INC  R4
+DW3    DEC  R3
+       JMP  DW1
+DW4    MOV  R4,R4
+       JEQ  DW5
+       MOV  @DWSP,R0
+       JEQ  DW6
+DW5    LI   R0,SE.DWD
+       B    @SERRE
+DW6    MOV  @DWL,R0
+       CI   R0,12
+       JLE  DW7
+       LI   R0,SW.LNG
+       BL   @SWARN
+DW7    MOV  R4,R0
+       BL   @DADD
+       MOV  @SRET1,R11
+       RT
+* DADD - the word in DWB (R0 bytes, at most 12) into the dictionary, if
+* not there.  R0 = its number.  Uses R0-R7.
+DADD   MOV  R11,@SRET2
+       MOV  R0,R7              its length
+       CLR  R0                 its bucket: the same hash as names
+       MOV  R7,R2
+       LI   R1,DWB
+DA1    MOV  R2,R2
+       JEQ  DA2
+       SRC  R0,13
+       MOVB *R1+,R3
+       SRL  R3,8
+       XOR  R3,R0
+       DEC  R2
+       JMP  DA1
+DA2    ANDI R0,2047
+       SLA  R0,1
+       MOV  R0,R6
+       LI   R0,DHPG
+       BL   @DMAP
+       MOV  @>D000(R6),R5
+DA3    MOV  R5,R5              look along the chain
+       JEQ  DA6
+       MOV  R5,R0
+       BL   @DICAT
+       MOVB @2(R1),R2
+       SRL  R2,8
+       C    R2,R7
+       JNE  DA5
+       AI   R1,3
+       LI   R3,DWB
+       MOV  R2,R2
+       JEQ  DA9
+DA4    CB   *R1+,*R3+
+       JNE  DA5A
+       DEC  R2
+       JNE  DA4
+       JMP  DA9                there
+DA5A   MOV  R5,R0
+       BL   @DICAT
+DA5    MOV  *R1,R5
+       JMP  DA3
+DA6    MOV  @DN,R5             a new word
+       INC  R5
+       CI   R5,DICMAX
+       JL   DA7
+       LI   R0,SE.MNY
+       B    @SERRE
+DA7    MOV  R5,@DN
+       LI   R0,DHPG
+       BL   @DMAP
+       MOV  @>D000(R6),R4
+       MOV  R5,@>D000(R6)
+       MOV  R5,R0
+       BL   @DICAT
+       MOV  R4,*R1+
+       SWPB R7
+       MOVB R7,*R1+
+       SWPB R7
+       LI   R3,DWB
+       MOV  R7,R2
+       JEQ  DA9
+DA8    MOVB *R3+,*R1+
+       DEC  R2
+       JNE  DA8
+DA9    MOV  R5,R0
+       MOV  @SRET2,R11
+       RT
+* DICAT - R1 = window D's address of dictionary word R0.  Uses R0, R1.
+DICAT  MOV  R11,@SRET4
+       MOV  R0,R1
+       ANDI R1,255
+       SLA  R1,4
+       AI   R1,>D000
+       SRL  R0,8
+       AI   R0,DICPG
+       BL   @DMAP
+       MOV  @SRET4,R11
+       RT
+
+* BLOOK - R0 = KEYB's place in BUILTIN (from 1), or 0; R1 = the entry's
+* argument count, R2 = 1 if it gives a value.  Uses R0-R5.
+BLOOK  LI   R3,BUILTN
+       CLR  R0
+BL1    INC  R0
+       MOVB *R3,R4
+       JEQ  BL8                the end
+       SRL  R4,8
+       C    R4,@KEYL
+       JNE  BL5
+       MOV  R3,R1
+       INC  R1
+       LI   R2,KEYB
+       MOV  R4,R5
+BL2    CB   *R1+,*R2+
+       JNE  BL5
+       DEC  R5
+       JNE  BL2
+       MOVB *R1+,R2            found: its counts
+       SRL  R2,8
+       MOV  R2,R5
+       MOVB *R1,R2
+       SRL  R2,8
+       MOV  R5,R1
+       RT
+BL5    A    R4,R3              the next: length byte, name, two bytes
+       AI   R3,3
+       JMP  BL1
+BL8    CLR  R0
+       RT
+* sema.py's BUILTINS, in its order: name, arguments, gives a value
+BUILTN BYTE 6
+       TEXT 'PARENT'
+       BYTE 1,1,5
+       TEXT 'CHILD'
+       BYTE 1,1,7
+       TEXT 'SIBLING'
+       BYTE 1,1,6
+       TEXT 'RANDOM'
+       BYTE 1,1,7
+       TEXT 'READKEY'
+       BYTE 0,1,4
+       TEXT 'SAVE'
+       BYTE 1,1,7
+       TEXT 'RESTORE'
+       BYTE 1,1,8
+       TEXT 'UNDOSAVE'
+       BYTE 0,1,4
+       TEXT 'UNDO'
+       BYTE 0,1,4
+       TEXT 'QUIT'
+       BYTE 0,0,7
+       TEXT 'RESTART'
+       BYTE 0,0,6
+       TEXT 'STATUS'
+       BYTE 3,0,5
+       TEXT 'SOUND'
+       BYTE 1,0,5
+       TEXT 'STYLE'
+       BYTE 1,0,4
+       TEXT 'READ'
+       BYTE 2,1,8
+       TEXT 'TOKENIZE'
+       BYTE 2,1,7
+       TEXT 'HASATTR'
+       BYTE 2,1,9
+       TEXT 'FRESHLINE'
+       BYTE 0,0,4
+       TEXT 'AGET'
+       BYTE 2,1,4
+       TEXT 'APUT'
+       BYTE 3,0,6
+       TEXT 'ISNAME'
+       BYTE 2,1,3
+       TEXT 'CLS'
+       BYTE 0,0,5
+       TEXT 'MUSIC'
+       BYTE 1,0,7
+       TEXT 'FILTERN'
+       BYTE 4,1,5
+       TEXT 'ACOPY'
+       BYTE 3,0,7
+       TEXT 'PROPLEN'
+       BYTE 2,1,8
+       TEXT 'PROPWORD'
+       BYTE 3,1,0
+       EVEN

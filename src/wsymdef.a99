@@ -1,0 +1,96 @@
+*======================================================================
+* wsymdef.a99 - the meaning stage's constants (M5 part 4): the tables'
+* SAMS pages, the kinds of symbol, the variables and the error codes.
+* The tables themselves are described in wsym.a99.
+*======================================================================
+HBPG   EQU  32
+SYMPG  EQU  33                 8 pages: 1023 symbols
+SYMMAX EQU  1024
+NAMPG  EQU  41                 2 pages of names
+NAMEND EQU  43
+OBJPG  EQU  43                 8 pages: 1000 objects (MAX_OBJECTS)
+HPPG   EQU  51                 4 pages: 4095 cells
+HPMAX  EQU  4096
+DHPG   EQU  55
+DICPG  EQU  56                 4 pages: 1023 words
+DICMAX EQU  1024
+WRNPG  EQU  60                 682 warnings
+WRNMAX EQU  680
+VRBPG  EQU  61                 512 verbs
+VRBMAX EQU  512
+KEYMX  EQU  64
+* kinds of symbol (dump.symbols writes them by name)
+K.CON  EQU  1
+K.GLO  EQU  2
+K.ARR  EQU  3
+K.ATT  EQU  4
+K.PRO  EQU  5
+K.CLA  EQU  6
+K.OBJ  EQU  7
+K.ROU  EQU  8
+K.PIC  EQU  9
+K.MUS  EQU  10
+K.SND  EQU  11
+* the meaning stage's variables (the parser's, free by now)
+SV0    EQU  VOICES
+SSTK   EQU  SV0+0              the return stack at the overlay's entry
+SN     EQU  SV0+2              symbols
+NHPG   EQU  SV0+4              the name heap's next byte: page ...
+NHOF   EQU  SV0+6              ... and offset
+HPN    EQU  SV0+8              the heap's next cell
+ON     EQU  SV0+10             objects
+VN     EQU  SV0+12             verbs
+DN     EQU  SV0+14             dictionary words
+WN     EQU  SV0+16             warnings
+KEYL   EQU  SV0+18             the name in KEYB / NAMB: its length
+EFPG   EQU  SV0+20             the page window E shows (0: not known)
+SRET1  EQU  SV0+22
+SRET2  EQU  SV0+24
+SRET3  EQU  SV0+26
+SRET4  EQU  SV0+28
+STK1   EQU  SV0+30
+STK2   EQU  SV0+32
+STK3   EQU  SV0+34
+ELINE  EQU  SV0+36             where an error or warning would be: line ...
+EFILE  EQU  SV0+38             ... and file
+DWL    EQU  SV0+40             DWORD: the word's length (all of it)
+DWSP   EQU  SV0+42             DWORD: nonzero if it has a space
+ESV1   EQU  SV0+44             EMAP: registers kept
+ESV2   EQU  SV0+46
+ESV3   EQU  SV0+48
+ERET   EQU  SV0+50
+HERE   EQU  SV0+52             the first declaration kept (sema.py's "here")
+* (the overlays' own variables start at SV0+64)
+KEYB   EQU  IBUF               64 bytes: a name in capitals
+NAMB   EQU  IBUF+64            64 bytes: the name as written
+DWB    EQU  IBUF+128           16 bytes: a dictionary word, lower case
+
+* ---- the meaning stage's errors (WBERR, stage 4) and warnings ----------------
+* (each matches one of sema.py's messages; tests/m5_sema_test.py maps them)
+SE.BLT EQU  41                 is a built-in function and cannot be declared
+SE.DUP EQU  42                 is already declared
+SE.GLO EQU  43                 more than 240 globals
+SE.ATT EQU  44                 more than 48 attributes
+SE.PRO EQU  45                 more than 63 properties
+SE.OBJ EQU  46                 more than 1000 objects
+SE.SLF EQU  47                 the constant ... is defined in terms of itself
+SE.CWO EQU  48                 the value of ... must be worked out when compiling
+SE.DIV EQU  49                 division by zero
+SE.NCL EQU  50                 ... is not a class
+SE.CYC EQU  51                 the class ... includes itself
+SE.NOB EQU  52                 ... is not an object, so nothing can be IN it
+SE.TWO EQU  53                 ... is given two parents
+SE.UAT EQU  54                 unknown attribute
+SE.CIN EQU  55                 a class cannot say what its objects are IN
+SE.UPR EQU  56                 unknown property ... (declare it with PROPERTY)
+SE.UNK EQU  57                 unknown name
+SE.SLV EQU  58                 SELF has no value outside a routine
+SE.PVL EQU  59                 a property value must be a number, a string ...
+SE.DWD EQU  60                 a dictionary word cannot be empty or contain spaces
+SE.LOP EQU  61                 ... is inside itself (through IN)
+SE.RPL EQU  62                 REPLACE ..., but this file has no ROUTINE ...
+SE.EXT EQU  63                 EXTEND "...": no VERB has that word
+SW.LNG EQU  1                  warning: longer than 12 letters
+SW.SLF EQU  2                  warning: SELF in a routine that is not a property
+SW.NNM EQU  3                  warning: ... has no NAME words
+

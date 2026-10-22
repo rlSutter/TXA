@@ -95,36 +95,8 @@ BCARET BYTE '^'
 BTILDE BYTE '~'
        EVEN
 
-* ---- the token stream -------------------------------------------------------
-* TPUT - R0's high byte onto the stream.  Uses R0, R1; keeps R2-R9.
-TPUT   MOV  @TKOFF,R1
-       MOVB R0,@>F000(R1)
-       INC  R1
-       CI   R1,4096
-       JL   TPU1
-       MOV  R11,@LXRET
-       MOV  R2,@LXSV2          (MAPPG uses R2 and R3: TEMIT's text pointer
-       MOV  R3,@LXSV3          and count must survive a page change)
-       INC  @TKPAGE            the next token page
-       CLR  @TKOFF
-       MOV  @TKPAGE,R0
-       LI   R1,>F
-       BL   @MAPPG
-       MOV  @LXSV2,R2
-       MOV  @LXSV3,R3
-       MOV  @LXRET,R11
-       RT
-TPU1   MOV  R1,@TKOFF
-       RT
-* TPUTW - R0 as a word, high byte first.
-TPUTW  MOV  R11,@LXRET2
-       MOV  R0,@LXTMP2
-       BL   @TPUT
-       MOV  @LXTMP2,R0
-       SWPB R0
-       BL   @TPUT
-       MOV  @LXRET2,R11
-       RT
+* (TPUT and TPUTW, which write the stream, are in wbench.a99: the parser
+* writes the tree with them.)
 
 * TEMIT - a token: kind R6, line R7, text at R8 for R9 bytes; for a number
 * also its value (LXNUM).  Keeps R4, R5.  Records hex_ok for the next

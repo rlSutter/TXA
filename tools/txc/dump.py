@@ -101,3 +101,39 @@ def tree_text(b):
     except IndexError:
         lines.append('<the encoding ends here, unfinished>')
     return '\n'.join(lines) + '\n'
+
+
+# ---- the meaning stage (sema.py's Program) -----------------------------------
+def symbols(p):
+    """The symbol table, one line a name in declaration order: "name kind
+    number" (a constant's number is its value; classes and routines have
+    none, written -)."""
+    out = []
+    for u, s in p.symbols.items():
+        n = p.constants[u] if s.kind == 'constant' else s.number
+        out.append(f'{s.name} {s.kind} {"-" if n is None else n}')
+    return '\n'.join(out) + '\n'
+
+def value(v):
+    """One property value as sema.py gives it: (kind, value)."""
+    k, x = v
+    if k == 'str':
+        return 'str:' + esc(x)
+    return f'{k}:{x}'
+
+def objects(p):
+    """Every object after inheritance, in number order: its number, name,
+    kind, parent, child and sibling; its attributes (numbers, sorted); its
+    properties in the order they were first given (number = values, or
+    block@line for a routine); its NAME words."""
+    out = []
+    for o in p.objects:
+        props = []
+        for num, prop in o.props.items():
+            if prop[0] == 'values':
+                props.append(f'{num}=' + ','.join(value(v) for v in prop[1]))
+            else:
+                props.append(f'{num}=block@{prop[1].line}')
+        out.append(f'{o.number} {o.sym.name} {o.kind} {o.parent} {o.child} {o.sibling} '
+                   f'attrs {" ".join(str(a) for a in sorted(o.attrs))} | props {" ".join(props)} | names {" ".join(o.names)}')
+    return '\n'.join(out) + '\n'

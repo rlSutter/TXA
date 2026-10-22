@@ -41,6 +41,8 @@ def run(typed, max_steps=150_000_000):
     steps = hold = free = 0
     while steps < max_steps:
         pc = cpu.pc
+        if pc == sy['WK1'] and not m.rw(sy['WBONLY']):
+            m.ww(sy['WBONLY'], 1)               # one file, lexed and parsed only (no INCLUDEs followed)
         if pc == sy['WK1'] and not hold and steps >= free:
             if not queue:
                 return m

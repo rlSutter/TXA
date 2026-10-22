@@ -11,7 +11,7 @@
 * count is a placeholder until the list ends.  Errors stop the parser
 * with WBERR (a code: PE. below) and WBERRL (the line).
 *======================================================================
-TREEPG EQU  96                 SAMS page where the tree starts
+TREEPG EQU  64                 SAMS page where the tree starts (each file's after the last)
 * the parser's variables, in RAM only the engine otherwise uses (VOICES,
 * ULIT, IBUF): the two never run together
 PV0    EQU  VOICES
@@ -1579,9 +1579,9 @@ PARSE  .enter
        MOV  R0,@TCPG
        CLR  @TCOF
        BL   @TLOAD
-       LI   R0,TREEPG          the tree from its first page
+       MOV  @TRNPG,R0          the tree from where the last file's ended
        MOV  R0,@TKPAGE
-       CLR  @TKOFF
+       MOV  @TRNOF,@TKOFF
        LI   R1,>F
        BL   @MAPPG
        BL   @LBEG              file := decl*

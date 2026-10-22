@@ -2,7 +2,7 @@
 """m5_parse_test.py - the workbench's parser against tools/txc/parser.py.
 
 Each program of the corpus, wrapped to 80 columns, is read, lexed and
-parsed on the workbench in the simulator; its tree (SAMS from page 96, in
+parsed on the workbench in the simulator; its tree (SAMS from page TREEPG, in
 tools/txc/dump.py's encoding) must equal the Python parser's, byte for
 byte.  Malformed programs must give the same error on the same line.
 
@@ -37,6 +37,8 @@ def run_ti(text, max_steps=600_000_000):
     while steps < max_steps:
         pc = cpu.pc
         if pc == sy['PARSE'] and p0 is None: p0 = steps
+        if pc == sy['WK1'] and not m.rw(sy['WBONLY']):
+            m.ww(sy['WBONLY'], 1)               # one file, lexed and parsed only (no INCLUDEs followed)
         if pc == sy['WK1'] and not hold and steps >= free:
             if not queue:
                 break
@@ -48,7 +50,7 @@ def run_ti(text, max_steps=600_000_000):
 
 def ti_tree(m):
     n = m.rw(sy['WBTREE'])
-    return bytes(m.ams[96 * 4096: 96 * 4096 + n])
+    return bytes(m.ams[sy['TREEPG'] * 4096: sy['TREEPG'] * 4096 + n])
 
 def diff(want, got):
     a, b = dump.tree_text(want).split('\n'), dump.tree_text(got).split('\n')

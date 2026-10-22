@@ -6,9 +6,28 @@
 * TI-Writer write it, record by record into SAMS from page SRCPG, each
 * record followed by a line feed.  The compiler's stages (lexer, parser,
 * meaning, code, linking) come in the following parts.
+*
+* Memory (M5 part 4): the resident part, >A000->AFFF, holds the front end
+* and what every stage shares; each stage is an overlay that runs at
+* >B000->CFFF from two SAMS pages of its own (OVSEL maps them in).  The
+* overlays are assembled at their run address with XORG, staged in the
+* image at >4000 (not RAM here), and the cartridge loader copies each
+* into its pages (tools/build.py, workbench_cart).  Overlay n uses pages
+* OVPG+2(n-1) and OVPG+2(n-1)+1:
+*   1  the lexer (wlex.a99)
+*   2  the parser (wparse.a99)
+*   3  the meaning stage, first half (wsema.a99; wsym.a99, resident, shared)
+* SAMS windows: >D000, >E000, >F000 are the stages' data windows.
+* SAMS pages (512K, the least the workbench needs):
+*   16-31   the overlays (two pages each)
+*   32-47   a file's source text (SRCPG), while it is lexed
+*   48-63   its tokens (TOKPG), while they are parsed
+*   64-111  the trees, every file's after the last (TREEPG)
+*   112-    the meaning stage's tables (DXPG: the declaration index first)
 *======================================================================
        COPY "macros.a99"
        COPY "defs.a99"
+       COPY "wsymdef.a99"
 
 * The workbench's own variables, in RAM the engine uses only for UNDO's
 * record index (URECS): the two never run together.  (defs.a99, shared
@@ -25,7 +44,7 @@ WBRET  EQU  URECS+>0E          a saved return
 WBRET2 EQU  URECS+>10          another
 WBNAME EQU  URECS+>20          28 bytes: the name being typed
 * the lexer (wlex.a99)
-TOKPG  EQU  64                 SAMS page where the token stream starts
+TOKPG  EQU  48                 SAMS page where the token stream starts
 SRTOT  EQU  WBLENL             the text's length (low, high)
 SRTOTH EQU  WBLENH
 SRPAGE EQU  URECS+>40          the source page in window E
@@ -53,6 +72,11 @@ LXSV3  EQU  URECS+>6A
 WKLST  EQU  URECS+>6C          the key last reported (WKEY)
 KWNUM  EQU  URECS+>6E          KWIN: the entry being compared
 WBTREE EQU  URECS+>70          the tree's length
+* the resident part (from GLOBRM: the engine's globals, unused here)
+OVPG   EQU  16                 the first overlay's first SAMS page
+OVCUR  EQU  GLOBRM+>00         the overlay mapped in (0: none)
+OVRET  EQU  GLOBRM+>02
+OVTMP  EQU  GLOBRM+>04
 LINBUF EQU  >3300              256 bytes: the line being lexed (the font's
 STRBUF EQU  >3400              1K: a token's text   / space, after startup)
 
@@ -157,7 +181,10 @@ WP6    MOV  @WBNLEN,R1
        INC  @WBNLEN
        JMP  WP2
 
-* ---- reading the file ----------------------------------------------------------
+* ---- compiling ---------------------------------------------------------------------
+* WLOAD - the program named at the prompt: its first file read, lexed and
+* parsed (LOADF), then (unless WBONLY) the declaration index (WALK),
+* which loads each INCLUDEd file where it stands.
 WLOAD  MOV  @WBNLEN,R0         FNBUF = the name, with its length byte
        JEQ  WP2
        SWPB R0
@@ -170,9 +197,20 @@ WL1    MOVB *R1+,*R2+
        JNE  WL1
        LI   R0,4
        BL   @WCLR
-       BL   @DVOPEN
+       CLR  @NF
+       CLR  @DXN
+       CLR  @WBLTOT
+       CLR  @WBERR
+       CLR  @WBSTAG
+       CLR  @XFPG
+       CLR  @DFPG
+       LI   R0,TREEPG
+       MOV  R0,@TRNPG
+       CLR  @TRNOF
+       BL   @LOADF
        MOV  R0,R0
        JEQ  WL2
+       JGT  WL3
        SETO @WBDONE            it would not open: say so, ask again
        LI   R0,4
        LI   R1,1
@@ -180,78 +218,119 @@ WL1    MOVB *R1+,*R2+
        LI   R1,SNOPEN
        CLR  R2
        BL   @TXSTR
-       JMP  WP2
-WL2    CLR  @WBLNS
-       CLR  @WBLENL
-       CLR  @WBLENH
-       LI   R0,SRCPG
-       MOV  R0,@WBPAGE
-       CLR  @WBOFF
-       BL   @WMAP
-WL3    BL   @DVREAD            a record, then a line feed
+       B    @WP2
+WL3    MOV  @WBONLY,R0
+       JEQ  WL3A
+       B    @WL1E
+WL3A   B    @WLERR
+WL2    MOV  @WBONLY,R0         one file only: parts 1-3's results
+       JEQ  WL2A
+       B    @WL1F
+WL2A   BL   @WALK              the declarations, every file
        MOV  R0,R0
-       JLT  WL6
-       MOV  R0,R15             its length
-       LI   R0,FBUF
-       LI   R1,ROWBUF
-       MOV  R15,R2
+       JEQ  WL2B
+       B    @WLERR
+WL2B   LI   R0,3               the meaning, first half (overlay 3)
+       BL   @OVSEL
+       BL   @SEMA1
+       MOV  R0,R0
        JEQ  WL4
-       BL   @VMBR
-WL4    LI   R14,ROWBUF
-WL5    MOV  R15,R15
-       JEQ  WL5A
-       MOVB *R14+,R0
-       BL   @WPUT
-       DEC  R15
-       JMP  WL5
-WL5A   LI   R0,>0A00
-       BL   @WPUT
-       INC  @WBLNS
-       JMP  WL3
-WL6    BL   @DVCLOS
-       LI   R0,1
-       MOV  R0,@WBDONE
-       BL   @LEXALL            the tokens
-       MOV  R0,R0
-       JEQ  WL7
-       LI   R0,6               an error: its code and line
+       B    @WLERR
+WL4    LI   R0,4               "Read n files, m lines."
+       LI   R1,1
+       BL   @TXAT
+       LI   R1,SREAD1
+       CLR  R2
+       BL   @TXSTR
+       MOV  @NF,R0
+       CLR  R1
+       CLR  R2
+       BL   @TXDEC
+       LI   R1,SFILES
+       CLR  R2
+       BL   @TXSTR
+       MOV  @WBLTOT,R0
+       CLR  R1
+       CLR  R2
+       BL   @TXDEC
+       LI   R1,SLINES
+       CLR  R2
+       BL   @TXSTR
+       LI   R0,6               "n declarations, m symbols, k objects."
+       LI   R1,1
+       BL   @TXAT
+       MOV  @DXN,R0
+       CLR  R1
+       CLR  R2
+       BL   @TXDEC
+       LI   R1,SDECLS
+       CLR  R2
+       BL   @TXSTR
+       MOV  @SN,R0
+       CLR  R1
+       CLR  R2
+       BL   @TXDEC
+       LI   R1,SSYMS
+       CLR  R2
+       BL   @TXSTR
+       MOV  @ON,R0
+       CLR  R1
+       CLR  R2
+       BL   @TXDEC
+       LI   R1,SOBJS
+       CLR  R2
+       BL   @TXSTR
+       LI   R0,4
+       MOV  R0,@WBDONE         (4: every file loaded, the index made)
+       B    @WL9
+* WLERR - an error, with its stage, code, line and file.
+WLERR  LI   R0,6
+       LI   R1,1
+       BL   @TXAT
+       MOV  @WBSTAG,R1
+       SLA  R1,1
+       MOV  @STAGES-2(R1),R1
+       CLR  R2
+       BL   @TXSTR
+       LI   R1,SERROR
+       CLR  R2
+       BL   @TXSTR
+       MOV  @WBERR,R0
+       CLR  R1
+       CLR  R2
+       BL   @TXDEC
+       LI   R1,SLINE
+       CLR  R2
+       BL   @TXSTR
+       MOV  @WBERRL,R0
+       CLR  R1
+       CLR  R2
+       BL   @TXDEC
+       LI   R1,SINF
+       CLR  R2
+       BL   @TXSTR
+       MOV  @WBERRF,R0         the file's name
+       MPY  @DFTSIZ,R0
+       AI   R1,FTAB
+       CLR  R2
+       BL   @TXSTR
+       B    @WL9
+
+* One file only (WBONLY): the results as parts 1-3 gave them.
+WL1E   MOV  @WBSTAG,R0         an error
+       CI   R0,1
+       JNE  WL1G
+       LI   R0,6               the lexer's: its code and line
        LI   R1,1
        BL   @TXAT
        LI   R1,SLXERR
-       CLR  R2
-       BL   @TXSTR
-       MOV  @WBERR,R0
-       CLR  R1
-       CLR  R2
-       BL   @TXDEC
-       LI   R1,SLINE
-       CLR  R2
-       BL   @TXSTR
-       MOV  @WBERRL,R0
-       CLR  R1
-       CLR  R2
-       BL   @TXDEC
-       JMP  WL6A
-WL7    LI   R0,6               "n tokens."
-       LI   R1,1
-       BL   @TXAT
-       MOV  @LXTCNT,R0
-       CLR  R1
-       CLR  R2
-       BL   @TXDEC
-       LI   R1,STOKS
-       CLR  R2
-       BL   @TXSTR
-       LI   R0,2
-       MOV  R0,@WBDONE         (2: read and lexed)
-       BL   @PARSE             the tree
-       MOV  R0,R0
-       JEQ  WL7B
-       LI   R0,7               a parse error: its code and line
+       JMP  WL1H
+WL1G   BL   @WTOKS             the parser's: the tokens, then its code and line
+       LI   R0,7
        LI   R1,1
        BL   @TXAT
        LI   R1,SPSERR
-       CLR  R2
+WL1H   CLR  R2
        BL   @TXSTR
        MOV  @WBERR,R0
        CLR  R1
@@ -265,7 +344,8 @@ WL7    LI   R0,6               "n tokens."
        CLR  R2
        BL   @TXDEC
        JMP  WL6A
-WL7B   LI   R0,7               "Parsed: n bytes of tree."
+WL1F   BL   @WTOKS
+       LI   R0,7               "Parsed: n bytes of tree."
        LI   R1,1
        BL   @TXAT
        LI   R1,SPARSD
@@ -282,8 +362,6 @@ WL7B   LI   R0,7               "Parsed: n bytes of tree."
        LI   R1,STREE
        CLR  R2
        BL   @TXSTR
-       LI   R0,3
-       MOV  R0,@WBDONE         (3: read, lexed, parsed)
 WL6A
        LI   R0,4               "Read n lines, m bytes."
        LI   R1,1
@@ -319,6 +397,20 @@ WL10   MOV  R14,R0
        CI   R14,30
        JL   WL10
        B    @WPROMP
+* WTOKS - row 6: "n tokens." (the last file's).
+WTOKS  MOV  R11,@WBRET2
+       LI   R0,6
+       LI   R1,1
+       BL   @TXAT
+       MOV  @LXTCNT,R0
+       CLR  R1
+       CLR  R2
+       BL   @TXDEC
+       LI   R1,STOKS
+       CLR  R2
+       BL   @TXSTR
+       MOV  @WBRET2,R11
+       RT
 
 * WPUT - the byte in R0's high byte into the source text.  Uses R0-R3, R12.
 WPUT   MOV  R11,R13
@@ -411,6 +503,55 @@ WCLR   MOV  R11,@WBRET
        RT
 D80W   DATA 80
 
+* ---- the token stream -------------------------------------------------------
+* TPUT - R0's high byte onto the stream.  Uses R0, R1; keeps R2-R9.
+TPUT   MOV  @TKOFF,R1
+       MOVB R0,@>F000(R1)
+       INC  R1
+       CI   R1,4096
+       JL   TPU1
+       MOV  R11,@LXRET
+       MOV  R2,@LXSV2          (MAPPG uses R2 and R3: TEMIT's text pointer
+       MOV  R3,@LXSV3          and count must survive a page change)
+       INC  @TKPAGE            the next token page
+       CLR  @TKOFF
+       MOV  @TKPAGE,R0
+       LI   R1,>F
+       BL   @MAPPG
+       MOV  @LXSV2,R2
+       MOV  @LXSV3,R3
+       MOV  @LXRET,R11
+       RT
+TPU1   MOV  R1,@TKOFF
+       RT
+* TPUTW - R0 as a word, high byte first.
+TPUTW  MOV  R11,@LXRET2
+       MOV  R0,@LXTMP2
+       BL   @TPUT
+       MOV  @LXTMP2,R0
+       SWPB R0
+       BL   @TPUT
+       MOV  @LXRET2,R11
+       RT
+
+* OVSEL - overlay R0 (1, 2 ...) into >B000->CFFF: map its two SAMS
+* pages, unless it is the one there already.  Uses R0-R3, R12.
+OVSEL  C    R0,@OVCUR
+       JEQ  OVS9
+       MOV  R0,@OVCUR
+       MOV  R11,@OVRET
+       SLA  R0,1
+       AI   R0,OVPG-2
+       MOV  R0,@OVTMP
+       LI   R1,>B
+       BL   @MAPPG
+       MOV  @OVTMP,R0
+       INC  R0
+       LI   R1,>C
+       BL   @MAPPG
+       MOV  @OVRET,R11
+OVS9   RT
+
 * DSKFIX - nothing to repair after a disk call (no fast block here).
 DSKFIX RT
 
@@ -457,10 +598,51 @@ STREEX
 SLINE  BYTE SLINEX-SLINE-1
        TEXT ' at line '
 SLINEX
+SFILES BYTE SFILEX-SFILES-1
+       TEXT ' files, '
+SFILEX
+SLINES BYTE SLINSX-SLINES-1
+       TEXT ' lines.'
+SLINSX
+SDECLS BYTE SDECLX-SDECLS-1
+       TEXT ' declarations, '
+SDECLX
+SSYMS  BYTE SSYMSX-SSYMS-1
+       TEXT ' symbols, '
+SSYMSX
+SOBJS  BYTE SOBJSX-SOBJS-1
+       TEXT ' objects.'
+SOBJSX
+SERROR BYTE SERRX-SERROR-1
+       TEXT ' error '
+SERRX
+SINF   BYTE SINFX-SINF-1
+       TEXT ' in '
+SINFX
        EVEN
-       COPY "wlex.a99"
-       COPY "wparse.a99"
+STAGES DATA SSTLEX,SSTPAR,SSTLOD,SSTMNG
+SSTLEX BYTE 5
+       TEXT 'Lexer'
+SSTPAR BYTE 5
+       TEXT 'Parse'
+SSTLOD BYTE 4
+       TEXT 'Load'
+SSTMNG BYTE 7
+       TEXT 'Meaning'
+       EVEN
+       COPY "wload.a99"
 WBEND
+* ---- the overlays: each runs at >B000 (XORG), staged from >4000 ----------
+       AORG >4000
+       XORG >B000
+       COPY "wlex.a99"
+OV1END
+       XORG >B000
+       COPY "wparse.a99"
+OV2END
+       XORG >B000
+       COPY "wsema.a99"
+OV3END
 
        AORG >2000
 WENTRY B    @WSTART
@@ -471,6 +653,8 @@ WENTRY B    @WSTART
        COPY "text80.a99"
        COPY "disk.a99"
        COPY "diskrec.a99"
+       COPY "wsym.a99"
+WKEND
        AORG >3000
        COPY "gen/font.a99"
        END  WSTART

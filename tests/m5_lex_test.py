@@ -3,7 +3,7 @@
 
 Each program of the corpus, wrapped to 80 columns, is put in the
 simulator's DSK1 as a DIS/VAR 80 file; the workbench reads and lexes it;
-its token stream (SAMS from page 64) is read back and written in the
+its token stream (SAMS from page TOKPG) is read back and written in the
 canonical dump form (tools/txc/dump.py), which must equal the Python
 lexer's dump exactly.  Small malformed files must give the same error on
 the same line.  The instructions the lexing took are counted (a real TI
@@ -40,6 +40,8 @@ def run_ti(text, max_steps=400_000_000):
     while steps < max_steps:
         pc = cpu.pc
         if pc == sy['LEXALL'] and lex0 is None: lex0 = steps
+        if pc == sy['WK1'] and not m.rw(sy['WBONLY']):
+            m.ww(sy['WBONLY'], 1)               # one file, lexed and parsed only (no INCLUDEs followed)
         if pc == sy['WK1'] and not hold and steps >= free:
             if not queue:
                 break
@@ -51,7 +53,7 @@ def run_ti(text, max_steps=400_000_000):
 
 def ti_dump(m):
     n = m.rw(sy['LXTCNT'])
-    data = m.ams[64 * 4096:]
+    data = m.ams[sy['TOKPG'] * 4096:]
     out, p = [], 0
     for _ in range(n):
         k = data[p]; line = (data[p + 1] << 8) | data[p + 2]; ln = (data[p + 3] << 8) | data[p + 4]

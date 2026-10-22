@@ -1,0 +1,1533 @@
+*======================================================================
+* wsema.a99 - the meaning stage, first half (M5 part 4), overlay 3:
+* tools/txc/sema.py's replace_and_extend, declare_all (with the
+* constants worked out) and build_objects, in its order and with its
+* errors, from the declaration index (wload.a99) and the tree.  The
+* tables are described in wsym.a99.
+*
+* An object (OBJPG, 32 bytes):
+*   +0 its symbol  +2 kind: 1 OBJECT, 2 ROOM  +4 parent  +6 child  +8 sibling
+*   +10 its first property, +12 its last (heap cells)
+*   +14 its first NAME word, +16 its last (heap cells)
+*   +18 its short name's place in the tree: page (0: none), +20 offset
+*   +22 its attributes, 48 bits (attribute n: byte n/8, bit >80 >> n mod 8)
+*   +28 NAME words  +30 its declaration (index entry)
+* A property (4 heap cells, in the order first given):
+*   +0 the next  +2 its number  +4 kind: 1 values, 2 a routine, 3 the
+*   object's NAME words  +6 values: how many  +8 values: the first (each
+*   2 cells: kind 1 number, 2 string (+2 page, +4 offset of its >04 in
+*   the tree), 3 object, 4 routine (symbol), 5 dictionary word; +2 the
+*   value); a routine: +8 page, +10 offset of its PropBlock node
+* A NAME word: 1 cell: +0 the next, +2 the dictionary word.
+* A verb (VRBPG, 8 bytes): +0 its declaration, +2 its first grammar line,
+* +4 its last (heap: 2 cells each: +0 the next, +2 page, +4 offset of the
+* GLine node).  REPLACE (RPLPG, 72 bytes): +0 name length, +2 the name in
+* capitals (64), +66 file, +68 line, +70 1 once a ROUTINE is found.
+*======================================================================
+RPLPG  EQU  62
+RPLMAX EQU  56
+* variables (SV0+64 on: the overlay's own)
+RPN    EQU  SV0+64             REPLACEs
+CURO   EQU  SV0+66             the object being built
+CURD   EQU  SV0+68             its declaration
+AN     EQU  SV0+70             attributes
+PN     EQU  SV0+72             properties (NAME is 1)
+GN     EQU  SV0+74             globals
+ARN    EQU  SV0+76             arrays
+QPICN   EQU  SV0+78
+QMUSN   EQU  SV0+80
+QSNDN   EQU  SV0+82
+CHNN   EQU  SV0+84             the class chain's length
+PATHN  EQU  SV0+86             the class path's length
+LHEAD  EQU  SV0+88             BLINES: the chain made
+LTAIL  EQU  SV0+90
+DCUR   EQU  SV0+92             the declaration being declared
+XTFRST EQU  SV0+94             EXTEND: FIRST
+XTLINE EQU  SV0+96             EXTEND: its line and file
+XTFILE EQU  SV0+98
+OPL    EQU  SV0+100            OPRD: the length
+INHER  EQU  SV0+102            APPLY: nonzero for a class's body
+VCNT   EQU  SV0+104            APPLY: values
+VCELL  EQU  SV0+106            APPLY: the next value's cell
+STMP   EQU  SV0+108
+STMP2  EQU  SV0+110
+IPG    EQU  SV0+112            APPLY: the item's place: page ...
+IOF    EQU  SV0+114            ... and offset
+CHN    EQU  ULIT               64 bytes: the class chain (declarations)
+PATH   EQU  ULIT+64            32 bytes: the class path (symbols)
+OPB    EQU  ULIT+96            8 bytes: an operator or a Const's word
+
+* SEMA1 - the first half of the meaning stage.  R0 = 0, or an error.
+SEMA1  .enter
+       LI   R0,SV0             the variables
+SM1    CLR  *R0+
+       CI   R0,SV0+120
+       JL   SM1
+       MOV  R10,@SSTK          (errors come back to here)
+       CLR  @EFPG
+       CLR  @DFPG
+       CLR  @XFPG
+       LI   R0,NAMPG
+       MOV  R0,@NHPG
+       LI   R0,1
+       MOV  R0,@HPN
+       LI   R0,HBPG
+       BL   @PGCLR
+       LI   R0,DHPG
+       BL   @PGCLR
+       BL   @REPEXT
+       BL   @DECLAL
+       BL   @CONSTS
+       BL   @OBJS
+       CLR  R0
+       .leave
+       RT
+
+* ---- the index and the tree -------------------------------------------------------
+* DXINF - declaration R3: R4 = its type, R5 = its file byte (>80 if
+* dropped).  Uses R0, R1, R4, R5.
+DXINF  MOV  R11,@SRET3
+       MOV  R3,R0
+       BL   @DXAT
+       MOVB @4(R1),R5
+       SRL  R5,8
+       MOVB @5(R1),R4
+       SRL  R4,8
+       MOV  @SRET3,R11
+       RT
+* DXSEEK - the tree reader at declaration R3's first field; R4 = its
+* type; ELINE, EFILE = its line and file.  Keeps R3.  Uses R0-R2, R4.
+DXSEEK MOV  R11,@SRET3
+       MOV  R3,R0
+       BL   @DXAT
+       MOVB @5(R1),R4
+       SRL  R4,8
+       MOVB @4(R1),R2
+       SRL  R2,8
+       ANDI R2,>7F
+       MOV  R2,@EFILE
+       MOV  @6(R1),@ELINE
+       MOV  @2(R1),R2
+       MOV  *R1,R0
+       MOV  R2,R1
+       BL   @XSET
+       BL   @XB
+       BL   @XB
+       BL   @XW
+       MOV  @SRET3,R11
+       RT
+* DXDROP - declaration R3 dropped (REPLACE, or done with: EXTEND).
+DXDROP MOV  R11,@SRET3
+       MOV  R3,R0
+       BL   @DXAT
+       SOCB @B80,@4(R1)
+       MOV  @SRET3,R11
+       RT
+B80    BYTE >80
+       EVEN
+* OPRD - the string at the reader into OPB as written (8 kept), OPL its
+* length.  Uses R0-R3.
+OPRD   MOV  R11,@SRET3
+       BL   @XB
+       BL   @XW
+       MOV  R0,R3
+       MOV  R0,@OPL
+       CLR  R2
+OPR1   MOV  R3,R3
+       JEQ  OPR9
+       BL   @XB
+       CI   R2,8
+       JHE  OPR2
+       SWPB R0
+       MOVB R0,@OPB(R2)
+       INC  R2
+OPR2   DEC  R3
+       JMP  OPR1
+OPR9   MOV  @SRET3,R11
+       RT
+* OPIS - R0 = 1 if OPB is the string at R1 (length byte first), else 0.
+* Uses R0-R3.
+OPIS   MOVB *R1+,R2
+       SRL  R2,8
+       C    R2,@OPL
+       JNE  OPI8
+       LI   R3,OPB
+OPI1   MOV  R2,R2
+       JEQ  OPI9
+       CB   *R1+,*R3+
+       JNE  OPI8
+       DEC  R2
+       JMP  OPI1
+OPI8   CLR  R0
+       RT
+OPI9   LI   R0,1
+       RT
+* XSEQK - R0 = 1 if the string at the reader is KEYB, in capitals (it is
+* read past either way).  Uses R0-R2, R4, R5.
+XSEQK  MOV  R11,@SRET3
+       BL   @XB
+       BL   @XW
+       MOV  R0,R5
+       LI   R4,1               equal so far
+       C    R0,@KEYL
+       JEQ  XSQ0
+       CLR  R4
+XSQ0   CLR  R2
+XSQ1   MOV  R5,R5
+       JEQ  XSQ9
+       BL   @XB
+       MOV  R4,R4
+       JEQ  XSQ2
+       SWPB R0
+       BL   @UPPER
+       CB   R0,@KEYB(R2)
+       JEQ  XSQ2
+       CLR  R4
+XSQ2   INC  R2
+       DEC  R5
+       JMP  XSQ1
+XSQ9   MOV  R4,R0
+       MOV  @SRET3,R11
+       RT
+
+* ---- REPLACE and EXTEND --------------------------------------------------------
+* REPEXT - sema.py's replace_and_extend: a ROUTINE whose name a REPLACE
+* in another file names is dropped (with the REPLACEs); each REPLACE
+* must keep a ROUTINE of its own file; each VERB's grammar lines
+* gathered, and each EXTEND's added to the first VERB with its word.
+REPEXT .enter
+       CLR  @RPN
+       CLR  R3                 the REPLACEs: the last of a name wins
+RE1    C    R3,@DXN
+       JHE  RE5
+       BL   @DXINF
+       CI   R4,NT.REP
+       JNE  RE4
+       BL   @DXSEEK
+       BL   @KEYRD
+       BL   @RFIND
+       MOV  R0,R0
+       JGT  RE3
+       MOV  @RPN,R0            a new one
+       CI   R0,RPLMAX
+       JL   RE2
+       LI   R0,SE.MNY
+       B    @SERRE
+RE2    INC  @RPN
+       INC  R0
+       BL   @RPAT
+       MOV  @KEYL,*R1
+       MOV  R1,R2
+       INCT R2
+       LI   R4,KEYB
+       MOV  @KEYL,R5
+       JEQ  RE3A
+RE2A   MOVB *R4+,*R2+
+       DEC  R5
+       JNE  RE2A
+       JMP  RE3A
+RE3    BL   @RPAT
+RE3A   MOV  @EFILE,@66(R1)
+       MOV  @ELINE,@68(R1)
+       CLR  @70(R1)
+RE4    INC  R3
+       JMP  RE1
+RE5    CLR  R3                 the ROUTINEs they drop
+RE6    C    R3,@DXN
+       JHE  RE9
+       BL   @DXINF
+       CI   R4,NT.REP
+       JNE  RE7
+       BL   @DXDROP            (the REPLACEs themselves)
+       JMP  RE8
+RE7    CI   R4,NT.ROU
+       JNE  RE8
+       BL   @DXSEEK
+       BL   @KEYRD
+       BL   @RFIND
+       MOV  R0,R0
+       JEQ  RE8
+       BL   @RPAT
+       C    @66(R1),@EFILE
+       JEQ  RE7A
+       BL   @DXDROP            another file's: dropped
+       JMP  RE8
+RE7A   LI   R0,1               its own file's: kept
+       MOV  R0,@70(R1)
+RE8    INC  R3
+       JMP  RE6
+RE9    CLR  R3                 each REPLACE has its ROUTINE
+RE10   INC  R3
+       C    R3,@RPN
+       JH   RE11
+       MOV  R3,R0
+       BL   @RPAT
+       MOV  @70(R1),R0
+       JNE  RE10
+       MOV  @68(R1),R0
+       MOV  @66(R1),R2
+       MOV  R0,R1
+       LI   R0,SE.RPL
+       B    @SERR
+RE11   CLR  R3                 the VERBs and their lines
+RE12   C    R3,@DXN
+       JHE  RE14
+       BL   @DXINF
+       CI   R4,NT.VRB
+       JNE  RE13
+       MOV  R5,R5
+       JLT  RE13
+       MOV  @VN,R0
+       CI   R0,VRBMAX
+       JL   RE12A
+       LI   R0,SE.MNY
+       B    @SERRE
+RE12A  BL   @DXSEEK
+       BL   @XSKIP             (its words)
+       BL   @BLINES
+       INC  @VN
+       MOV  @VN,R0
+       BL   @VRBAT
+       MOV  R3,*R1
+       MOV  @LHEAD,@2(R1)
+       MOV  @LTAIL,@4(R1)
+RE13   INC  R3
+       JMP  RE12
+RE14   CLR  R3                 each EXTEND
+RE15   C    R3,@DXN
+       JHE  RE99
+       BL   @DXINF
+       CI   R4,NT.EXT
+       JEQ  RE16
+       B    @RE19
+RE16   BL   @DXSEEK
+       MOV  @ELINE,@XTLINE
+       MOV  @EFILE,@XTFILE
+       BL   @KEYRD             its word
+       BL   @XB                FIRST: True (1) or False (2)
+       MOV  R0,@XTFRST
+       BL   @BLINES
+       CLR  R6                 the first VERB with that word
+RE17   INC  R6
+       C    R6,@VN
+       JLE  RE17A
+       MOV  @XTLINE,R1
+       MOV  @XTFILE,R2
+       LI   R0,SE.EXT
+       B    @SERR
+RE17A  MOV  R6,R0
+       BL   @VRBAT
+       MOV  R3,@STMP
+       MOV  *R1,R3
+       BL   @DXSEEK
+       MOV  @STMP,R3
+       BL   @XB                its words: a list of strings
+       BL   @XW
+       MOV  R0,R7
+RE17B  MOV  R7,R7
+       JEQ  RE17
+       BL   @XSEQK
+       MOV  R0,R0
+       JNE  RE18
+       DEC  R7
+       JMP  RE17B
+RE18   MOV  @LHEAD,R0          verb R6: the lines joined
+       JEQ  RE18X
+       MOV  @XTFRST,R0
+       CI   R0,1
+       JNE  RE18B
+       MOV  R6,R0              FIRST: before its own
+       BL   @VRBAT
+       MOV  @2(R1),R4
+       MOV  @LHEAD,@2(R1)
+       MOV  @4(R1),R0
+       JNE  RE18A
+       MOV  @LTAIL,@4(R1)
+RE18A  MOV  @LTAIL,R0
+       BL   @HCELL
+       MOV  R4,*R1
+       JMP  RE18X
+RE18B  MOV  R6,R0              after its own
+       BL   @VRBAT
+       MOV  @4(R1),R4
+       MOV  @LTAIL,@4(R1)
+       MOV  R4,R4
+       JNE  RE18C
+       MOV  @LHEAD,@2(R1)
+       JMP  RE18X
+RE18C  MOV  R4,R0
+       BL   @HCELL
+       MOV  @LHEAD,*R1
+RE18X  BL   @DXDROP
+RE19   INC  R3
+       B    @RE15
+RE99   CLR  R3                 HERE: the first declaration kept
+RE99A  C    R3,@DXN
+       JHE  RE99B
+       BL   @DXINF
+       MOV  R5,R5
+       JLT  RE99C
+       JMP  RE99B
+RE99C  INC  R3
+       JMP  RE99A
+RE99B  MOV  R3,@HERE
+       .leave
+       RT
+* RFIND - R0 = the REPLACE named KEYB (from 1), or 0.  Uses R0-R7.
+RFIND  MOV  R11,@SRET2
+       CLR  R6
+RF1    INC  R6
+       C    R6,@RPN
+       JH   RF8
+       MOV  R6,R0
+       BL   @RPAT
+       C    *R1+,@KEYL
+       JNE  RF1
+       LI   R2,KEYB
+       MOV  @KEYL,R7
+       JEQ  RF9
+RF2    CB   *R1+,*R2+
+       JNE  RF1
+       DEC  R7
+       JNE  RF2
+       JMP  RF9
+RF8    CLR  R6
+RF9    MOV  R6,R0
+       MOV  @SRET2,R11
+       RT
+* RPAT - R1 = window D's address of REPLACE R0 (from 1).  Uses R0, R1.
+RPAT   MOV  R11,@SRET4
+       DEC  R0
+       MPY  @D72,R0
+       AI   R1,>D000
+       LI   R0,RPLPG
+       BL   @DMAP
+       MOV  @SRET4,R11
+       RT
+D72    DATA 72
+* VRBAT - R1 = window D's address of verb R0 (from 1).  Uses R0, R1.
+VRBAT  MOV  R11,@SRET4
+       MOV  R0,R1
+       DEC  R1
+       SLA  R1,3
+       AI   R1,>D000
+       LI   R0,VRBPG
+       BL   @DMAP
+       MOV  @SRET4,R11
+       RT
+* BLINES - the list of GLine nodes at the reader as a chain of heap
+* items (LHEAD, LTAIL; 0 if empty).  Uses R0-R2, R4-R7; keeps R3.
+BLINES .enter
+       .push R3
+       CLR  @LHEAD
+       CLR  @LTAIL
+       BL   @XB
+       BL   @XW
+       MOV  R0,R6
+LN1    MOV  R6,R6
+       JEQ  LN9
+       MOV  @XPG,R4
+       MOV  @XOF,R5
+       LI   R0,2
+       BL   @HALLOC
+       MOV  R0,R7
+       BL   @HCELL
+       MOV  R4,@2(R1)
+       MOV  R5,@4(R1)
+       MOV  @LTAIL,R0
+       JEQ  LN2
+       BL   @HCELL
+       MOV  R7,*R1
+       JMP  LN3
+LN2    MOV  R7,@LHEAD
+LN3    MOV  R7,@LTAIL
+       BL   @XSKIP
+       DEC  R6
+       JMP  LN1
+LN9    .pop R3
+       .leave
+       RT
+
+* ---- declarations ------------------------------------------------------------------
+* DECLAL - sema.py's declare_all: NAME (property 1), the generated arrays,
+* "," and "." in the dictionary, then each declaration kept, in order;
+* LASTOBJ last.  Objects get their records here.
+DECLAL .enter
+       MOV  @HERE,R3           the compiler's own are declared at HERE
+       BL   @DXSEEK
+       MOV  @HERE,@DCUR
+       LI   R1,QNAME
+       BL   @KEYSET
+       LI   R2,K.PRO
+       LI   R3,1
+       BL   @SDECL
+       LI   R0,1
+       MOV  R0,@PN
+       LI   R9,GENARR
+DCA1   MOVB *R9,R0
+       JEQ  DCA2
+       MOV  R9,R1
+       BL   @KEYSET
+       MOV  @KEYL,R0
+       A    R0,R9
+       INC  R9
+       LI   R2,K.ARR
+       MOV  @ARN,R3
+       BL   @SDECL
+       INC  @ARN
+       JMP  DCA1
+DCA2   LI   R0,>2C00           "," and "."
+       MOVB R0,@DWB
+       LI   R0,1
+       BL   @DADD
+       LI   R0,>2E00
+       MOVB R0,@DWB
+       LI   R0,1
+       BL   @DADD
+       CLR  R3                 each declaration kept
+DL1    C    R3,@DXN
+       JL   DL1A
+       B    @DL90
+DL1A   MOV  R3,@DCUR
+       BL   @DXINF
+       MOV  R5,R5
+       JLT  DL1B
+       BL   @DXSEEK
+       MOV  R4,R1
+       SLA  R1,1
+       MOV  @DLTAB-2(R1),R0
+       B    *R0
+DL1B   B    @DLNX
+DLTAB  DATA DLNX,DLCON,DLGLO,DLARR,DLATT,DLPRO,DLPIC,DLSND,DLOBJ,DLNX
+       DATA DLNX,DLNX,DLNX,DLNX,DLROU
+DLCON  BL   @KEYRD
+       LI   R2,K.CON
+       CLR  R3
+       BL   @SDECL
+       B    @DLNX
+DLGLO  MOV  @GN,R0
+       CI   R0,240
+       JL   DLGL1
+       LI   R0,SE.GLO
+       B    @SERRE
+DLGL1  BL   @KEYRD
+       LI   R2,K.GLO
+       MOV  @GN,R3
+       BL   @SDECL
+       INC  @GN
+       B    @DLNX
+DLARR  BL   @KEYRD
+       LI   R2,K.ARR
+       MOV  @ARN,R3
+       BL   @SDECL
+       INC  @ARN
+       B    @DLNX
+DLATT  BL   @XB                names: a list
+       BL   @XW
+       MOV  R0,R8
+DLAT1  MOV  R8,R8
+       JNE  $+6
+       B    @DLNX
+       MOV  @AN,R0
+       CI   R0,48
+       JL   DLAT2
+       LI   R0,SE.ATT
+       B    @SERRE
+DLAT2  BL   @KEYRD
+       LI   R2,K.ATT
+       MOV  @AN,R3
+       BL   @SDECL
+       INC  @AN
+       DEC  R8
+       JMP  DLAT1
+DLPRO  BL   @XB
+       BL   @XW
+       MOV  R0,R8
+DLPR1  MOV  R8,R8
+       JNE  $+6
+       B    @DLNX
+       MOV  @PN,R0
+       INC  R0
+       CI   R0,63
+       JLE  DLPR2
+       LI   R0,SE.PRO
+       B    @SERRE
+DLPR2  BL   @KEYRD
+       LI   R2,K.PRO
+       MOV  @PN,R3
+       INC  R3
+       BL   @SDECL
+       INC  @PN
+       DEC  R8
+       JMP  DLPR1
+DLPIC  BL   @KEYRD
+       INC  @QPICN
+       LI   R2,K.PIC
+       MOV  @QPICN,R3
+       BL   @SDECL
+       JMP  DLNX
+DLSND  BL   @OPRD              MUSIC or SOUND
+       BL   @KEYRD
+       LI   R1,QMUSIC
+       BL   @OPIS
+       MOV  R0,R0
+       JEQ  DLSN1
+       INC  @QMUSN
+       LI   R2,K.MUS
+       MOV  @QMUSN,R3
+       JMP  DLSN2
+DLSN1  INC  @QSNDN
+       LI   R2,K.SND
+       MOV  @QSNDN,R3
+DLSN2  BL   @SDECL
+       JMP  DLNX
+DLROU  BL   @KEYRD
+       LI   R2,K.ROU
+       CLR  R3
+       BL   @SDECL
+       MOV  R0,R8
+       BL   @XB                its parameters: how many
+       BL   @XW
+       MOV  R0,R7
+       MOV  R8,R0
+       BL   @SYMAT
+       MOV  R7,@14(R1)
+       JMP  DLNX
+DLOBJ  BL   @OPRD              CLASS, OBJECT or ROOM
+       BL   @KEYRD
+       LI   R1,QCLASS
+       BL   @OPIS
+       MOV  R0,R0
+       JEQ  DLOB1
+       LI   R2,K.CLA
+       CLR  R3
+       BL   @SDECL
+       JMP  DLNX
+DLOB1  MOV  @ON,R0
+       CI   R0,1000
+       JL   DLOB2
+       LI   R0,SE.OBJ
+       B    @SERRE
+DLOB2  INC  @ON
+       LI   R2,K.OBJ
+       MOV  @ON,R3
+       BL   @SDECL
+       MOV  R0,R8              its symbol
+       LI   R1,QROOM
+       BL   @OPIS
+       INC  R0                 1 OBJECT, 2 ROOM
+       MOV  R0,R7
+       MOV  @XPG,R4            its short name: a string, or None
+       MOV  @XOF,R5
+       BL   @XB
+       MOV  R0,R0
+       JNE  DLOB3
+       CLR  R4
+       JMP  DLOB4
+DLOB3  BL   @XW                (past it)
+       BL   @XADV
+DLOB4  MOV  @ON,R0             its record
+       BL   @OBJAT
+       MOV  R1,R2
+       LI   R0,16
+DLOB5  CLR  *R2+
+       DEC  R0
+       JNE  DLOB5
+       MOV  R8,*R1
+       MOV  R7,@2(R1)
+       MOV  R4,@18(R1)
+       MOV  R5,@20(R1)
+       MOV  @DCUR,@30(R1)
+       MOV  R8,R0
+       BL   @SYMAT
+       MOV  @ON,@14(R1)
+DLNX   MOV  @DCUR,R3
+       INC  R3
+       B    @DL1
+DL90   MOV  @HERE,R3           LASTOBJ: the number of objects
+       BL   @DXSEEK
+       MOV  @HERE,@DCUR
+       LI   R1,QLASTO
+       BL   @KEYSET
+       LI   R2,K.CON
+       MOV  @ON,R3
+       BL   @SDECL
+       BL   @SYMAT
+       LI   R0,1
+       MOV  R0,@8(R1)          (its value is known)
+       .leave
+       RT
+* SDECL - declare KEYB (NAMB) as kind R2, number R3, declaration DCUR:
+* not a built-in function's name, not declared before.  R0 = the symbol.
+* Errors at ELINE, EFILE.  Keeps R3 (in DCUR's place: it is the index).
+SDECL   MOV  R11,@SRET2
+       MOV  R2,@STMP
+       MOV  R3,@STMP2
+       BL   @BLOOK
+       MOV  R0,R0
+       JEQ  DE1
+       LI   R0,SE.BLT
+       B    @SERRE
+DE1    BL   @SLOOK
+       MOV  R0,R0
+       JEQ  DE2
+       LI   R0,SE.DUP
+       B    @SERRE
+DE2    MOV  @STMP,R2
+       MOV  @STMP2,R3
+       MOV  @DCUR,R4
+       BL   @SADD
+       MOV  @DCUR,R3
+       MOV  @SRET2,R11
+       RT
+QNAME  BYTE 4
+       TEXT 'NAME'
+GENARR BYTE 7
+       TEXT 'VERBTAB'
+       BYTE 7
+       TEXT 'GRAMTAB'
+       BYTE 6
+       TEXT 'ACTSUB'
+       BYTE 8
+       TEXT 'DICTVERB'
+       BYTE 0
+QLASTO BYTE 7
+       TEXT 'LASTOBJ'
+QMUSIC BYTE 5
+       TEXT 'MUSIC'
+QCLASS BYTE 5
+       TEXT 'CLASS'
+QROOM  BYTE 4
+       TEXT 'ROOM'
+       EVEN
+
+* ---- constants ---------------------------------------------------------------------
+* CONSTS - every CONSTANT's value, in declaration order (sema.py's
+* const_value, which may work out others first).
+CONSTS .enter
+       CLR  R3
+CO1    C    R3,@DXN
+       JHE  CO9
+       BL   @DXINF
+       MOV  R5,R5
+       JLT  CO2
+       CI   R4,NT.CON
+       JNE  CO2
+       BL   @DXSEEK
+       MOV  R3,@STMP
+       BL   @KEYRD
+       BL   @SLOOK
+       BL   @CVAL
+       MOV  @STMP,R3
+CO2    INC  R3
+       JMP  CO1
+CO9    .leave
+       RT
+* CVAL - R0 = the value of constant R0 (worked out if it is not yet).
+* An error at ELINE, EFILE if it depends on itself.  Keeps the reader.
+CVAL   .enter
+       .push R5
+       MOV  R0,R5
+       BL   @SYMAT
+       MOV  @8(R1),R0
+       JEQ  CV2
+       CI   R0,1
+       JNE  CV1
+       MOV  @4(R1),R0          known
+       JMP  CV9
+CV1    LI   R0,SE.SLF          being worked out: it depends on itself
+       B    @SERRE
+CV2    LI   R0,2
+       MOV  R0,@8(R1)
+       .push @XPG
+       .push @XOF
+       .push @ELINE
+       .push @EFILE
+       .push R3
+       .push R5
+       MOV  @6(R1),R3          its declaration: the value after the name
+       BL   @DXSEEK
+       BL   @XSKIP
+       BL   @FOLD
+       .pop R5
+       MOV  R1,R1
+       JNE  CV3
+       MOV  R5,R0              not worked out: at the CONSTANT
+       BL   @SYMAT
+       MOV  @6(R1),R3
+       LI   R0,SE.CWO
+       B    @SERRD
+CV3    MOV  R0,R4
+       MOV  R5,R0
+       BL   @SYMAT
+       MOV  R4,@4(R1)
+       LI   R0,1
+       MOV  R0,@8(R1)
+       .pop R3
+       .pop @EFILE
+       .pop @ELINE
+       .pop @XOF
+       .pop @XPG
+       MOV  R4,R0
+CV9    .pop R5
+       .leave
+       RT
+* FOLD - sema.py's fold: the expression at the reader (read past it):
+* R0 = its value and R1 = 1 if it is a constant one, else R1 = 0.
+* 16-bit arithmetic as the VM's.  Errors at the node's line, in EFILE.
+FOLD   .enter
+       .push R9
+       .push R8
+       .push R7
+       BL   @XB
+       CI   R0,7
+       JEQ  FO1
+       BL   @XBACK             (not a node: passed over)
+       BL   @XSKIP
+       B    @FONO
+FO1    BL   @XB
+       MOV  R0,R9              its type
+       BL   @XW
+       MOV  R0,R8              its line
+       CI   R9,NT.NUM
+       JNE  FO2
+       BL   @XB
+       BL   @XW
+       B    @FOOK
+FO2    CI   R9,NT.CST
+       JNE  FO3
+       BL   @OPRD
+       LI   R1,QTRUE
+       BL   @OPIS
+       MOV  R0,R0
+       JEQ  $+6               (TRUE: 1)
+       B    @FOOK
+       LI   R1,QFALSE
+       BL   @OPIS
+       MOV  R0,R0
+       JNE  FOZ
+       LI   R1,QNOTH
+       BL   @OPIS
+       MOV  R0,R0
+       JNE  FOZ
+       B    @FONO
+FOZ    CLR  R0
+       B    @FOOK
+FO3    CI   R9,NT.NAM
+       JNE  FO4
+       BL   @KEYRD
+       BL   @SLOOKK
+       CI   R1,K.CON
+       JNE  FONO
+       MOV  R8,@ELINE
+       BL   @CVAL
+       JMP  FOOK
+FO4    CI   R9,NT.UNA
+       JNE  FO5
+       BL   @OPRD
+       LI   R1,QMINUS
+       BL   @OPIS
+       MOV  R0,R0
+       JNE  FO4A
+       BL   @XSKIP
+       JMP  FONO
+FO4A   BL   @FOLD
+       MOV  R1,R1
+       JEQ  FONO
+       NEG  R0
+       JMP  FOOK
+FO5    CI   R9,NT.BIN
+       JEQ  FO6
+       MOVB @NFLD-1(R9),R0     anything else: not a constant
+       SRL  R0,8
+       BL   @XFLDS
+       JMP  FONO
+FO6    BL   @OPRD
+       LI   R7,BINOPS          + - * / MOD: R7 its number, 1-5
+       CLR  R6
+FO6A   INC  R6
+       MOVB *R7,R0
+       JEQ  FO6C
+       MOV  R7,R1
+       BL   @OPIS
+       MOV  R0,R0
+       JNE  FO6D
+       MOVB *R7,R0
+       SRL  R0,8
+       A    R0,R7
+       INC  R7
+       JMP  FO6A
+FO6C   BL   @XSKIP             another operator: not folded
+       BL   @XSKIP
+       JMP  FONO
+FO6D   MOV  R6,R7
+       BL   @FOLD              both sides, the left first
+       .push R0
+       .push R1
+       BL   @FOLD
+       MOV  R0,R5              b
+       MOV  R1,R6
+       .pop R1
+       .pop R4                 a
+       MOV  R1,R1
+       JEQ  FONO
+       MOV  R6,R6
+       JEQ  FONO
+       CI   R7,4
+       JL   FO7
+       MOV  R5,R5
+       JNE  FO7
+       MOV  R8,R1              / or MOD by zero
+       MOV  @EFILE,R2
+       LI   R0,SE.DIV
+       B    @SERR
+FO7    CI   R7,1
+       JNE  FO7A
+       A    R5,R4
+       JMP  FO7X
+FO7A   CI   R7,2
+       JNE  FO7B
+       S    R5,R4
+       JMP  FO7X
+FO7B   CI   R7,3
+       JNE  FO7C
+       MPY  R5,R4              (the low word is the 16-bit product)
+       MOV  R5,R4
+       JMP  FO7X
+FO7C   MOV  R4,R0              R0 = int(a / b), truncated towards zero
+       MOV  R5,R1
+       BL   @QDIV
+       CI   R7,4
+       JNE  FO7D
+       MOV  R0,R4
+       JMP  FO7X
+FO7D   MPY  R5,R0              MOD: a - int(a / b) * b
+       S    R1,R4
+FO7X   MOV  R4,R0
+FOOK   LI   R1,1
+       JMP  FO99
+FONO   CLR  R0
+       CLR  R1
+FO99   .pop R7
+       .pop R8
+       .pop R9
+       .leave
+       RT
+* QDIV - R0 = R0 / R1, signed, truncated towards zero (R1 not 0).
+* Uses R0-R3.
+QDIV   MOV  R0,R2              the sign of the quotient
+       XOR  R1,R2
+       ABS  R0
+       ABS  R1
+       MOV  R1,R3              the divisor
+       MOV  R0,R1              the dividend: R0 (0) and R1
+       CLR  R0
+       DIV  R3,R0              R0 = the quotient, R1 = the remainder
+       MOV  R2,R2
+       JLT  QDV1
+       RT
+QDV1   NEG  R0
+       RT
+* XBACK - the reader one byte back.  Uses R0.
+XBACK  MOV  @XOF,R0
+       JNE  XBK1
+       DEC  @XPG
+       LI   R0,4096
+XBK1   DEC  R0
+       MOV  R0,@XOF
+       RT
+QTRUE  BYTE 4
+       TEXT 'TRUE'
+QFALSE BYTE 5
+       TEXT 'FALSE'
+QNOTH  BYTE 7
+       TEXT 'NOTHING'
+QSELF  BYTE 4
+       TEXT 'SELF'
+QMINUS BYTE 1
+       TEXT '-'
+BINOPS BYTE 1
+       TEXT '+'
+       BYTE 1
+       TEXT '-'
+       BYTE 1
+       TEXT '*'
+       BYTE 1
+       TEXT '/'
+       BYTE 3
+       TEXT 'MOD'
+       BYTE 0
+       EVEN
+
+* ---- objects -----------------------------------------------------------------------
+* OBJS - sema.py's build_objects: each object's classes applied, base
+* classes first, then its own body; its parent; a ROOM's twelve exits;
+* then the children in declaration order; no object inside itself.
+OBJS   .enter
+       CLR  @CURO
+OB1    INC  @CURO
+       C    @CURO,@ON
+       JLE  OB1A
+       B    @OB20
+OB1A   MOV  @CURO,R0
+       BL   @OBJAT
+       MOV  @30(R1),R3
+       MOV  R3,@CURD
+       CLR  @CHNN
+       CLR  @PATHN
+       BL   @CCHAIN
+       CLR  R8                 each in the chain
+OB2    C    R8,@CHNN
+       JHE  OB3
+       MOV  R8,R1
+       SLA  R1,1
+       MOV  @CHN(R1),R3
+       CLR  @INHER
+       C    R3,@CURD
+       JEQ  OB2A
+       SETO @INHER
+OB2A   .push R8
+       BL   @APPLY
+       .pop R8
+       INC  R8
+       JMP  OB2
+OB3    MOV  @CURD,R3           its own IN: the declaration's parent
+       BL   @DXSEEK
+       BL   @XSKIP
+       BL   @XSKIP
+       BL   @XSKIP
+       BL   @XB
+       MOV  R0,R0
+       JEQ  OB4
+       BL   @XBACK
+       BL   @KEYRD
+       BL   @SETPAR
+OB4    MOV  @CURO,R0           a ROOM: every exit not given is NOTHING
+       BL   @OBJAT
+       MOV  @2(R1),R0
+       CI   R0,2
+       JNE  OB1
+       LI   R8,EXITS
+OB5    MOVB *R8,R0
+       JEQ  OB1
+       MOV  R8,R1
+       BL   @KEYSET
+       MOV  @KEYL,R0
+       A    R0,R8
+       INC  R8
+       BL   @SLOOKK
+       CI   R1,K.PRO
+       JNE  OB5
+       BL   @SYMAT
+       MOV  @4(R1),R2
+       MOV  R2,@STMP
+       BL   @PFIND
+       MOV  R0,R0
+       JNE  OB5
+       LI   R0,2               a value: number 0
+       BL   @HALLOC
+       MOV  R0,R5
+       BL   @HCELL
+       LI   R0,1
+       MOV  R0,*R1
+       MOV  @STMP,R2
+       LI   R3,1
+       LI   R4,1
+       BL   @PSET
+       JMP  OB5
+OB20   CLR  R8                 the children
+OB21   INC  R8
+       C    R8,@ON
+       JH   OB30
+       MOV  R8,R0
+       BL   @OBJAT
+       MOV  @4(R1),R7
+       JEQ  OB21
+       MOV  R7,R0
+       BL   @OBJAT
+       MOV  @6(R1),R6
+       JNE  OB22
+       MOV  R8,@6(R1)          the first child
+       JMP  OB21
+OB22   MOV  R6,R0              after the last
+       BL   @OBJAT
+       MOV  @8(R1),R0
+       JEQ  OB23
+       MOV  R0,R6
+       JMP  OB22
+OB23   MOV  R8,@8(R1)
+       JMP  OB21
+OB30   CLR  R8                 no object inside itself
+OB31   INC  R8
+       C    R8,@ON
+       JH   OB99
+       MOV  R8,R6
+       CLR  R7
+OB32   MOV  R6,R0
+       BL   @OBJAT
+       MOV  @4(R1),R6
+       JEQ  OB31
+       INC  R7
+       C    R7,@ON
+       JLE  OB32
+       MOV  R8,R0
+       BL   @OBJAT
+       MOV  @30(R1),R3
+       LI   R0,SE.LOP
+       B    @SERRD
+OB99   .leave
+       RT
+EXITS  BYTE 1
+       TEXT 'N'
+       BYTE 1
+       TEXT 'S'
+       BYTE 1
+       TEXT 'E'
+       BYTE 1
+       TEXT 'W'
+       BYTE 2
+       TEXT 'NE'
+       BYTE 2
+       TEXT 'NW'
+       BYTE 2
+       TEXT 'SE'
+       BYTE 2
+       TEXT 'SW'
+       BYTE 2
+       TEXT 'UP'
+       BYTE 4
+       TEXT 'DOWN'
+       BYTE 6
+       TEXT 'INSIDE'
+       BYTE 7
+       TEXT 'OUTSIDE'
+       BYTE 0
+       EVEN
+
+* CCHAIN - declaration R3's classes into CHN, base classes first (each
+* once), then R3 itself: sema.py's class_chain.
+CCHAIN .enter
+       .push R9
+       .push R3
+       .push @ELINE
+       .push @EFILE
+       BL   @DXSEEK
+       BL   @BODY              the reader at the body's items; R8 = how many
+CC1    MOV  R8,R8
+       JEQ  CC9
+       DEC  R8
+       BL   @XB
+       BL   @XB
+       MOV  R0,R4
+       BL   @XW
+       MOV  R0,@ELINE          (the item's line: its errors)
+       CI   R4,NT.CLS
+       JEQ  CC2
+       MOV  R4,R1
+       MOVB @NFLD-1(R1),R0
+       SRL  R0,8
+       BL   @XFLDS
+       JMP  CC1
+CC2    BL   @XB                CLASS names: a list (R9 counts: the
+       BL   @XW                calls below use R0-R7)
+       MOV  R0,R9
+CC3    MOV  R9,R9
+       JEQ  CC1
+       DEC  R9
+       BL   @KEYRD
+       BL   @SLOOKK
+       CI   R1,K.CLA
+       JEQ  CC4
+       LI   R0,SE.NCL
+       B    @SERRE
+CC4    MOV  R0,R6              in the path: it includes itself
+       CLR  R1
+CC5    C    R1,@PATHN
+       JHE  CC6
+       MOV  R1,R2
+       SLA  R2,1
+       C    @PATH(R2),R6
+       JNE  CC5A
+       LI   R0,SE.CYC
+       B    @SERRE
+CC5A   INC  R1
+       JMP  CC5
+CC6    MOV  R6,R0              its declaration: in the chain already?
+       BL   @SYMAT
+       MOV  @6(R1),R5
+       CLR  R1
+CC7    C    R1,@CHNN
+       JHE  CC8
+       MOV  R1,R2
+       SLA  R2,1
+       C    @CHN(R2),R5
+       JEQ  CC3
+       INC  R1
+       JMP  CC7
+CC8    MOV  @PATHN,R1          no: its own chain first, on the path
+       CI   R1,16
+       JL   CC8A
+       LI   R0,SE.MNY
+       B    @SERRE
+CC8A   SLA  R1,1
+       MOV  R6,@PATH(R1)
+       INC  @PATHN
+       .push R9
+       .push R8
+       .push @XPG
+       .push @XOF
+       .push @ELINE
+       MOV  R5,R3
+       BL   @CCHAIN
+       .pop @ELINE
+       .pop @XOF
+       .pop @XPG
+       .pop R8
+       .pop R9
+       DEC  @PATHN
+       JMP  CC3
+CC9    .pop @EFILE
+       .pop @ELINE
+       .pop R3
+       MOV  @CHNN,R1           then itself
+       CI   R1,32
+       JL   CC9A
+       LI   R0,SE.MNY
+       B    @SERRE
+CC9A   SLA  R1,1
+       MOV  R3,@CHN(R1)
+       INC  @CHNN
+       .pop R9
+       .leave
+       RT
+* BODY - with the reader at an ObjDecl's first field: past kind, name,
+* short and parent to its body; R8 = the body's items.  Uses R0-R2, R8.
+BODY   .enter
+       BL   @XSKIP
+       BL   @XSKIP
+       BL   @XSKIP
+       BL   @XSKIP
+       BL   @XB
+       BL   @XW
+       MOV  R0,R8
+       .leave
+       RT
+
+* APPLY - declaration R3's body into object CURO (sema.py's apply_body;
+* INHER nonzero when R3 is a class).
+APPLY  .enter
+       .push R9
+       BL   @DXSEEK
+       BL   @BODY
+AP1    MOV  R8,R8
+       JNE  AP1A
+       .pop R9
+       .leave
+       RT
+AP1A   DEC  R8
+       MOV  @XPG,@IPG          the item's place (a PropBlock's)
+       MOV  @XOF,@IOF
+       BL   @XB
+       BL   @XB
+       MOV  R0,R4
+       BL   @XW
+       MOV  R0,@ELINE
+       CI   R4,NT.HAS
+       JEQ  APHAS
+       CI   R4,NT.NMS
+       JEQ  APNMS
+       CI   R4,NT.INP
+       JNE  AP2
+       B    @APINP
+AP2    CI   R4,NT.PVL
+       JNE  AP3
+       B    @APPRV
+AP3    CI   R4,NT.PBL
+       JNE  AP4
+       B    @APPRB
+AP4    MOV  R4,R1              (CLASS lines, and anything else: passed over)
+       MOVB @NFLD-1(R1),R0
+       SRL  R0,8
+       BL   @XFLDS
+       JMP  AP1
+APHAS  BL   @XB                HAS: a list of (name, on)
+       BL   @XW
+       MOV  R0,R9
+APH1   MOV  R9,R9
+       JNE  APH1A
+       B    @AP1
+APH1A
+       DEC  R9
+       BL   @XB                (the tuple: >06, 2)
+       BL   @XB
+       BL   @KEYRD
+       BL   @SLOOKK
+       CI   R1,K.ATT
+       JEQ  APH2
+       LI   R0,SE.UAT
+       B    @SERRE
+APH2   BL   @SYMAT
+       MOV  @4(R1),R5          the attribute's number
+       BL   @XB                on: True (1) or False (2)
+       MOV  R0,R4
+       MOV  R5,R0              its bit: >80 >> (n mod 8), in the high byte
+       ANDI R0,7
+       LI   R6,>8000
+       MOV  R0,R0
+       JEQ  APH3
+       SRL  R6,0               (a count of 0: R0's low bits)
+APH3   SRL  R5,3
+       MOV  @CURO,R0
+       BL   @OBJAT
+       A    R5,R1
+       CI   R4,1
+       JNE  APH4
+       SOCB R6,@22(R1)
+       JMP  APH1
+APH4   SZCB R6,@22(R1)
+       JMP  APH1
+APNMS  BL   @XB                NAME words: a list of strings
+       BL   @XW
+       MOV  R0,R9
+APN1   MOV  R9,R9
+       JEQ  APN9
+       DEC  R9
+       BL   @DWORD
+       MOV  R0,R5              onto the object's words
+       LI   R0,1
+       BL   @HALLOC
+       MOV  R0,R6
+       BL   @HCELL
+       MOV  R5,@2(R1)
+       MOV  @CURO,R0
+       BL   @OBJAT
+       INC  @28(R1)
+       MOV  @16(R1),R0
+       MOV  R6,@16(R1)
+       MOV  R0,R0
+       JNE  APN2
+       MOV  R6,@14(R1)
+       JMP  APN1
+APN2   BL   @HCELL
+       MOV  R6,*R1
+       JMP  APN1
+APN9   LI   R2,1               property 1: the words
+       LI   R3,3
+       BL   @PSET
+       B    @AP1
+APINP  MOV  @INHER,R0          IN: not in a class
+       JEQ  APIN1
+       LI   R0,SE.CIN
+       B    @SERRE
+APIN1  BL   @KEYRD
+       BL   @SETPAR
+       B    @AP1
+APPRV  BL   @KEYRD             a property's values
+       BL   @SLOOKK
+       CI   R1,K.PRO
+       JEQ  APV1
+       LI   R0,SE.UPR
+       B    @SERRE
+APV1   BL   @SYMAT
+       .push @4(R1)            its number
+       BL   @XB                the values: a list
+       BL   @XW
+       MOV  R0,@VCNT
+       CLR  @VCELL
+       SLA  R0,1
+       JEQ  APV2
+       BL   @HALLOC
+       MOV  R0,@VCELL
+APV2   .push @VCELL
+       .push @VCNT
+APV3   MOV  @VCNT,R0
+       JEQ  APV4
+       DEC  @VCNT
+       BL   @PVAL              R4 kind, R5 value 1, R6 value 2
+       MOV  @VCELL,R0
+       BL   @HCELL
+       MOV  R4,*R1
+       MOV  R5,@2(R1)
+       MOV  R6,@4(R1)
+       INCT @VCELL
+       JMP  APV3
+APV4   .pop R4                 how many
+       .pop R5                 the first
+       .pop R2
+       LI   R3,1
+       BL   @PSET
+       B    @AP1
+APPRB  BL   @KEYRD             a property routine
+       BL   @SLOOKK
+       CI   R1,K.PRO
+       JEQ  APB1
+       LI   R0,SE.UPR
+       B    @SERRE
+APB1   BL   @SYMAT
+       MOV  @4(R1),R2
+       MOV  @IPG,R4            its node's place
+       MOV  @IOF,R5
+       BL   @XSKIP             (its body)
+       LI   R3,2
+       BL   @PSET
+       B    @AP1
+
+* PVAL - sema.py's prop_value: the expression at the reader as R4 = kind
+* (1 number, 2 string, 3 object, 4 routine), R5 and R6 the value.
+PVAL   .enter
+       .push R7
+       .push R8
+       MOV  @XPG,R7            the node's place
+       MOV  @XOF,R8
+       BL   @XB
+       BL   @XB
+       MOV  R0,R4
+       BL   @XW
+       MOV  R0,@ELINE
+       CI   R4,NT.STR
+       JNE  PV2
+       MOV  @XPG,R5            a string: its place
+       MOV  @XOF,R6
+       BL   @XSKIP
+       LI   R4,2
+       JMP  PV99
+PV2    CI   R4,NT.NAM
+       JNE  PV5
+       BL   @KEYRD
+       BL   @SLOOKK
+       MOV  R0,R0
+       JNE  PV3
+       LI   R0,SE.UNK
+       B    @SERRE
+PV3    MOV  R0,R6              (the symbol)
+       CI   R1,K.OBJ
+       JNE  PV3A
+       LI   R4,3
+       JMP  PV3N
+PV3A   CI   R1,K.ROU
+       JNE  PV3B
+       LI   R4,4
+       MOV  R6,R5
+       CLR  R6
+       JMP  PV99
+PV3B   CI   R1,K.PIC
+       JL   PV3C
+       LI   R4,1               a picture, music or sound: its number
+PV3N   MOV  R6,R0
+       BL   @SYMAT
+       MOV  @4(R1),R5
+       CLR  R6
+       JMP  PV99
+PV3C   CI   R1,K.CON
+       JNE  PV9
+       MOV  R6,R0              a constant: its value
+       BL   @CVAL
+       MOV  R0,R5
+       LI   R4,1
+       CLR  R6
+       JMP  PV99
+PV5    CI   R4,NT.CST
+       JNE  PV6
+       BL   @OPRD
+       LI   R1,QSELF
+       BL   @OPIS
+       MOV  R0,R0
+       JEQ  PV6
+       LI   R0,SE.SLV
+       B    @SERRE
+PV6    MOV  R7,R0              anything else: folded, from the node's start
+       MOV  R8,R1
+       BL   @XSET
+       .push @ELINE
+       BL   @FOLD
+       .pop @ELINE
+       MOV  R1,R1
+       JEQ  PV9
+       MOV  R0,R5
+       LI   R4,1
+       CLR  R6
+       JMP  PV99
+PV9    LI   R0,SE.PVL
+       B    @SERRE
+PV99   .pop R8
+       .pop R7
+       .leave
+       RT
+
+* PFIND - R0 = the cell of object CURO's property R2, or 0.  Uses R0, R1.
+PFIND  MOV  R11,@SRET2
+       MOV  @CURO,R0
+       BL   @OBJAT
+       MOV  @10(R1),R0
+PF1    MOV  R0,R0
+       JEQ  PF9
+       MOV  R0,@STMP2
+       BL   @HCELL
+       C    @2(R1),R2
+       JEQ  PF8
+       MOV  *R1,R0
+       JMP  PF1
+PF8    MOV  @STMP2,R0
+PF9    MOV  @SRET2,R11
+       RT
+* PSET - object CURO's property R2 := kind R3, R4 and R5 (values: how
+* many and the first; a routine: its node's page and offset).  A
+* property given again keeps its place.  Uses R0-R7.
+PSET   MOV  R11,@SRET1
+       BL   @PFIND
+       MOV  R0,R6
+       JNE  PS2
+       LI   R0,4               a new one, at the end
+       MOV  R2,R7
+       MOV  R3,@STK1
+       BL   @HALLOC
+       MOV  R7,R2
+       MOV  @STK1,R3
+       MOV  R0,R6
+       MOV  @CURO,R0
+       BL   @OBJAT
+       MOV  @12(R1),R0
+       MOV  R6,@12(R1)
+       MOV  R0,R0
+       JNE  PS1
+       MOV  R6,@10(R1)
+       JMP  PS2
+PS1    BL   @HCELL
+       MOV  R6,*R1
+PS2    MOV  R6,R0
+       BL   @HCELL
+       MOV  R2,@2(R1)
+       MOV  R3,@4(R1)
+       CI   R3,2
+       JEQ  PS3
+       MOV  R4,@6(R1)          values: how many, the first
+       MOV  R5,@8(R1)
+       CLR  @10(R1)
+       JMP  PS9
+PS3    CLR  @6(R1)             a routine: its node's page, offset
+       MOV  R4,@8(R1)
+       MOV  R5,@10(R1)
+PS9    MOV  @SRET1,R11
+       RT
+
+* SETPAR - object CURO is IN the object named KEYB (sema.py's
+* set_parent).  Errors at ELINE, EFILE.
+SETPAR .enter
+       BL   @SLOOKK
+       CI   R1,K.OBJ
+       JEQ  SP1
+       LI   R0,SE.NOB
+       B    @SERRE
+SP1    BL   @SYMAT
+       MOV  @4(R1),R5
+       MOV  @CURO,R0
+       BL   @OBJAT
+       MOV  @4(R1),R0
+       JEQ  SP2
+       C    R0,R5
+       JEQ  SP2
+       LI   R0,SE.TWO
+       B    @SERRE
+SP2    MOV  R5,@4(R1)
+       .leave
+       RT
