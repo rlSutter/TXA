@@ -22,11 +22,14 @@ wrapped files:
            output order, with its fixups, and the strings (dump.code)
   link     the linker (M5 part 6): the whole story image, byte for byte,
            and the 4K PROGRAM files it is written to (dump: the bytes)
+  date     the build date's prompt: nothing taken but a date (yymmdd,
+           month 01-12, day 01-31), the header gets it, the next compile
+           offers it again
   errors   malformed programs give the same first error, on the same
            line of the same file, one for each of sema.py's errors (but
            'more than 1000 objects'); and the warnings
 
-  python3 tests/m5_sema_test.py [decls|meaning|code|link|errors|all] [quick]
+  python3 tests/m5_sema_test.py [decls|meaning|code|link|date|errors|all] [quick] [only=name ...]
 
 (meaning checks symbols, objects and tables together, from one run each.)"""
 import os, sys, tempfile, glob, re, datetime
@@ -71,12 +74,12 @@ DATE = datetime.date(2026, 10, 22)              # the build date both compilers 
 def run_ti(d, main_name, max_steps=2_000_000_000):
     m = S.Machine(cart, f18a=True, pages=128); cpu = S.CPU(m); m.disk_dir = d
     cpu.pc = m.rw(m.rw(0x6006) + 2)
-    queue = list(keys_for('dsk1.' + main_name.lower()))
+    queue = list(keys_for('dsk1.' + main_name.lower())) + keys_for('')   # the name; ENTER takes the date
     steps = hold = free = 0
     dated = False
     while steps < max_steps:
         pc = cpu.pc
-        if pc == sy['WK1'] and not dated:            # (the TI has no clock: WDATE, yymmdd)
+        if pc == sy['WK1'] and not dated:            # (the TI has no clock: the date the prompt offers, WDATE)
             for i, c in enumerate(DATE.strftime('%y%m%d').encode()):
                 m.wb(sy['WDATE'] + i, c)
             dated = True
@@ -247,6 +250,11 @@ def first_diff(a, b):
     return f'lengths {len(al)} / {len(bl)} lines'
 
 def corpus(quick):
+    sel = [a[5:] for a in sys.argv[1:] if a.startswith('only=')]
+    progs = corpus_all(quick)
+    return [x for x in progs if any(k in x[0] for k in sel)] if sel else progs
+
+def corpus_all(quick):
     lamp = [('samples/lamplight.txa', LIB)]
     if quick:
         return lamp
@@ -423,6 +431,39 @@ if which in ('link', 'all'):
         want = [f'{prefix}S{i + 1:02d}' for i in range((len(img) + 4095) // 4096)]
         check(f'{rel}: written as {len(files)} PROGRAM files, {prefix}S01.., together the image',
               joined == img and [os.path.basename(f) for f in files] == want, f'files {[os.path.basename(f) for f in files]}, {len(joined)} bytes')
+
+if which in ('date', 'all'):
+    def run_keys(d, lines, max_steps=200_000_000):
+        """The workbench from power-up, typing lines (each with ENTER), no
+        date set beforehand; returns the machine and the screen at the end."""
+        m = S.Machine(cart, f18a=True, pages=128); cpu = S.CPU(m); m.disk_dir = d
+        cpu.pc = m.rw(m.rw(0x6006) + 2)
+        queue = [k for ln in lines for k in keys_for(ln)]
+        steps = hold = free = 0
+        while steps < max_steps:
+            pc = cpu.pc
+            if pc == sy['WK1'] and not hold and steps >= free:
+                if not queue:
+                    break
+                m.held = queue.pop(0); hold = steps + 12_000
+            if hold and steps >= hold:
+                m.held = None; hold = 0; free = steps + 12_000
+            cpu.step(); steps += 1
+        return m, R.screen(m).splitlines()
+    path = os.path.join(ROOT, 'tests/txa/run1.txa')
+    d, ppath = stage(open(path).read(), 'run1', TLIB)
+    # no date yet: ENTER alone, then month 13, are refused; a rub-out; then a date
+    m, scr = run_keys(d, ['dsk1.run1', '', '261322'])
+    check('date: the prompt asks for the build date', 'Build date (yymmdd):' in scr[3], scr[3])
+    check('date: ENTER without a date, or month 13, compiles nothing', m.rw(sy['WBDONE']) < 4 and '261322' in scr[3], scr[3])
+    m, scr = run_keys(d, ['dsk1.run1', '', '261322', '261023\b2'])
+    base = m.rw(sy['IMGPG']) * 4096
+    check('date: a date (with a rub-out) compiles, and the header has it',
+          m.rw(sy['WBDONE']) >= 4 and bytes(m.ams[base + 38: base + 44]) == b'261022', f'{bytes(m.ams[base + 38: base + 44])} {scr[3]}')
+    m, scr = run_keys(d, ['dsk1.run1', '261022', '', 'dsk1.run1'])
+    check('date: the next compile offers the last date', '261022' in scr[3], scr[3])
+    m, scr = run_keys(d, ['dsk1.run1', '261022', '', 'dsk1.run1', ''])
+    check('date: ENTER takes it', m.rw(sy['WBDONE']) >= 4 and bytes(m.ams[m.rw(sy['IMGPG']) * 4096 + 38:][:6]) == b'261022', scr[3])
 
 if which in ('errors', 'all'):
     cases = [('missing include', 'INCLUDE "DSK1.NOSUCH"\nROUTINE Main\nEND\n')] + ERRS
