@@ -137,3 +137,26 @@ def objects(p):
         out.append(f'{o.number} {o.sym.name} {o.kind} {o.parent} {o.child} {o.sibling} '
                    f'attrs {" ".join(str(a) for a in sorted(o.attrs))} | props {" ".join(props)} | names {" ".join(o.names)}')
     return '\n'.join(out) + '\n'
+
+def tables(p):
+    """After finish_tables: the actions in order; the dictionary sorted,
+    each word with its VERB's number (0: none); the generated arrays
+    VERBTAB, GRAMTAB, ACTSUB, DICTVERB, value by value."""
+    words = sorted(p.dictionary, key=lambda w: w.encode('latin-1'))
+    out = ['actions ' + ' '.join(p.actions),
+           'dictionary ' + ' '.join(f'{esc(w)}/{p.verb_of.get(w, 0)}' for w in words)]
+    for name in ('VERBTAB', 'GRAMTAB', 'ACTSUB', 'DICTVERB'):
+        out.append(name + ' ' + ' '.join(value(v) for v in p.sym(name).gen_values))
+    return '\n'.join(out) + '\n'
+
+WARNINGS = [('is longer than', 1), ('SELF in a routine', 2), ('has no NAME words', 3)]
+
+def warnings(p):
+    """Each warning as "code file line" (file: its base name in capitals)."""
+    import re
+    out = []
+    for w in p.warnings:
+        m = re.match(r'(.*) line (\d+): warning: (.*)$', w)
+        code = next((c for k, c in WARNINGS if k in m.group(3)), 0)
+        out.append(f'{code} {m.group(1).rsplit(".", 1)[0].upper()} {m.group(2)}')
+    return '\n'.join(out) + '\n'

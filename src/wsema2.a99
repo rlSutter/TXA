@@ -1,0 +1,1416 @@
+*======================================================================
+* wsema2.a99 - the meaning stage, second half (M5 part 4), overlay 4:
+* tools/txc/sema.py's collect_actions, check_routines and finish_tables,
+* and the warning for objects without NAME words, in its order and with
+* its errors.  The tables are described in wsym.a99 and wsema.a99.
+*
+* Its own tables:
+*   ACTPG..  actions, 72 bytes, numbered from 0 in the order first met:
+*              +0 name length, +2 the name in capitals (64), +66 its
+*              routine NameSub (a symbol), +68 page, +70 offset of the
+*              name's string in the tree (as first written)
+*   DVBPG    each dictionary word's VERB (a word, by word number; 0 none)
+*   LOCPG    the routine being checked: its parameters and locals, 72
+*              bytes: +0 length, +2 the name in capitals
+*   DSPG     the dictionary sorted (word numbers, by place from 1)
+*   DNPG     each word's place in the sorted dictionary (by word number)
+*   VTBPG    VERBTAB: words, from 0
+*   DVTPG    DICTVERB: words, from 0
+*   GRMPG..  GRAMTAB: 4 bytes an element: kind (1 number, 4 routine), value
+* (window E shows DSPG, DNPG, VTBPG, DVTPG and GRAMTAB; window D the rest)
+* The pages and the error codes are in wsymdef.a99.
+*======================================================================
+* variables (SV0+64 on: this overlay's own)
+ACN    EQU  SV0+64             actions
+LCN    EQU  SV0+66             parameters and locals of the routine checked
+INOBJ  EQU  SV0+68             nonzero: checking a property routine
+OWNL   EQU  SV0+70             the routine being checked: its line, file
+OWNF   EQU  SV0+72
+BDPG   EQU  SV0+74             its body's place
+BDOF   EQU  SV0+76
+GRN    EQU  SV0+78             GRAMTAB's length
+CURV   EQU  SV0+80             the verb
+NSLOT  EQU  SV0+82             a grammar line's slots
+GLHERE EQU  SV0+84             where the grammar line starts in GRAMTAB
+GLTOK  EQU  SV0+86             its tokens
+APG    EQU  SV0+88             USEACT: the name's place
+AOF    EQU  SV0+90
+T1     EQU  SV0+92
+T2     EQU  SV0+94
+T3     EQU  SV0+96
+SGAP   EQU  SV0+98             the sort's gap
+SBI    EQU  SV0+100
+SBJ    EQU  SV0+102
+STMPV  EQU  SV0+104
+NEXTP  EQU  SV0+106            ACTS: the next property
+WBUF1  EQU  ULIT               16 bytes: a word being compared
+WBUF2  EQU  ULIT+16            16 bytes: another
+
+* SEMA2 - the second half of the meaning stage.  R0 = 0, or an error.
+SEMA2  MOV  R10,@OLDR10         its own stack (see MSTKT)
+       LI   R10,MSTKT
+       .enter
+       LI   R0,SV0+64          this overlay's variables (the shared ones stay)
+SM2A   CLR  *R0+
+       CI   R0,SV0+120
+       JL   SM2A
+       MOV  R10,@SSTK
+       CLR  @EFPG
+       CLR  @DFPG
+       CLR  @XFPG
+       LI   R0,DVBPG
+       BL   @PGCLR
+       BL   @ACTS
+       BL   @CHECKS
+       BL   @TABLES
+       BL   @NONAME
+       CLR  R0
+       .leave
+       MOV  @OLDR10,R10
+       RT
+
+* ---- actions ---------------------------------------------------------------------
+* ACTS - sema.py's collect_actions: each VERB numbered, its words in the
+* dictionary (each a word of one VERB only), each grammar line's tokens
+* checked and its action used; then every rule case's actions, object by
+* object, property by property.
+ACTS   .enter
+       CLR  @CURV
+AC1    INC  @CURV
+       C    @CURV,@VN
+       JLE  AC1A
+       B    @AC20
+AC1A   MOV  @CURV,R0
+       BL   @VRBAT
+       MOV  *R1,R3
+       MOV  @2(R1),R8          its first grammar line
+       BL   @DXSEEK            (errors at the VERB)
+       BL   @XB                its words: a list
+       BL   @XW
+       MOV  R0,R9
+AC2    MOV  R9,R9
+       JEQ  AC5
+       DEC  R9
+       BL   @DWORD
+       MOV  R0,R5
+       BL   @DVBAT
+       MOV  *R1,R0
+       JEQ  AC3
+       LI   R0,SE.VWD          a word of another VERB
+       B    @SERRE
+AC3    MOV  @CURV,*R1
+       JMP  AC2
+AC5    MOV  R8,R8              each line
+       JEQ  AC1
+       MOV  R8,R0
+       BL   @HCELL
+       MOV  *R1,R8             (the next)
+       MOV  @6(R1),@EFILE      the line's file (an EXTEND's may differ)
+       MOV  @4(R1),R2
+       MOV  @2(R1),R0
+       MOV  R2,R1
+       BL   @XSET
+       BL   @XB
+       BL   @XB
+       BL   @XW
+       MOV  R0,@T1             the line's line
+       CLR  @NSLOT
+       BL   @XB                its tokens: a list
+       BL   @XW
+       MOV  R0,R9
+AC6    MOV  R9,R9
+       JEQ  AC10
+       DEC  R9
+       BL   @XB                a GTok: kind, value, filter
+       BL   @XB
+       BL   @XW
+       MOV  R0,@ELINE
+       BL   @OPRD
+       LI   R1,QSLOT
+       BL   @OPIS
+       MOV  R0,R0
+       JEQ  AC7
+       INC  @NSLOT
+       BL   @KEYRD             a slot: noun, held ... or an attribute
+       BL   @SLOTN
+       MOV  R0,R0
+       JNE  AC8
+       BL   @SLOOKK
+       CI   R1,K.ATT
+       JEQ  AC8
+       LI   R0,SE.GTK
+       B    @SERRE
+AC7    BL   @DWORD             a word
+AC8    BL   @XB                its filter: None, or a routine's name
+       MOV  R0,R0
+       JEQ  AC6
+       BL   @XBACK
+       BL   @KEYRD
+       BL   @SLOOKK
+       CI   R1,K.ROU
+       JEQ  AC6
+       LI   R0,SE.FLT
+       B    @SERRE
+AC10   MOV  @T1,@ELINE         (at the line)
+       MOV  @NSLOT,R0
+       CI   R0,2
+       JLE  AC11
+       LI   R0,SE.TWS
+       B    @SERRE
+AC11   BL   @USEACT            its action
+       BL   @XB                (REVERSE)
+       JMP  AC5
+AC20   CLR  R8                 the rule cases
+AC21   INC  R8
+       C    R8,@ON
+       JH   AC29
+       MOV  R8,R0
+       BL   @OBJAT
+       MOV  @10(R1),R7
+AC22   MOV  R7,R7
+       JNE  AC22A
+       B    @AC21
+AC22A  MOV  R7,R0
+       BL   @HCELL
+       MOV  *R1,@NEXTP         (the next: kept in memory, USEACT uses R0-R7)
+       MOV  @NEXTP,R7
+       MOV  @4(R1),R0
+       CI   R0,2
+       JNE  AC22
+       MOV  @6(R1),@EFILE      a routine: its items
+       MOV  @10(R1),R2
+       MOV  @8(R1),R0
+       MOV  R2,R1
+       BL   @XSET
+       BL   @XB
+       BL   @XB
+       BL   @XW
+       BL   @XSKIP             (its name)
+       BL   @XB                its body
+       BL   @XW
+       MOV  R0,R9
+AC23   MOV  R9,R9
+       JNE  AC23A
+       MOV  @NEXTP,R7
+       B    @AC22
+AC23A
+       DEC  R9
+       BL   @XB
+       BL   @XB
+       MOV  R0,R4
+       BL   @XW
+       MOV  R0,@ELINE
+       CI   R4,NT.CAS
+       JEQ  AC24
+       MOV  R4,R1
+       MOVB @NFLD-1(R1),R0
+       SRL  R0,8
+       BL   @XFLDS
+       JMP  AC23
+AC24   BL   @XB                a case: its actions, a list
+       BL   @XW
+       MOV  R0,R6
+AC25   MOV  R6,R6
+       JEQ  AC26
+       DEC  R6
+       .push R6
+       BL   @USEACT
+       .pop R6
+       JMP  AC25
+AC26   BL   @XSKIP             (its body)
+       JMP  AC23
+AC29   .leave
+       RT
+* SLOTN - R0 = KEYB's slot code (noun 1 ... scope 10), or 0.  Uses R0-R3.
+SLOTN  LI   R1,SLOTS
+       CLR  R0
+SN1    INC  R0
+       MOVB *R1,R2
+       JEQ  SN8
+       SRL  R2,8
+       C    R2,@KEYL
+       JNE  SN5
+       MOV  R1,R3
+       INC  R3
+       .push R0
+       LI   R0,KEYB
+SN2    CB   *R3+,*R0+
+       JNE  SN4
+       DEC  R2
+       JNE  SN2
+       .pop R0
+       RT
+SN4    .pop R0
+       MOVB *R1,R2
+       SRL  R2,8
+SN5    A    R2,R1
+       INC  R1
+       JMP  SN1
+SN8    CLR  R0
+       RT
+SLOTS  BYTE 4
+       TEXT 'NOUN'
+       BYTE 4
+       TEXT 'HELD'
+       BYTE 5
+       TEXT 'MULTI'
+       BYTE 9
+       TEXT 'MULTIHELD'
+       BYTE 11
+       TEXT 'MULTIEXCEPT'
+       BYTE 11
+       TEXT 'MULTIINSIDE'
+       BYTE 8
+       TEXT 'CREATURE'
+       BYTE 6
+       TEXT 'NUMBER'
+       BYTE 5
+       TEXT 'TOPIC'
+       BYTE 5
+       TEXT 'SCOPE'
+       BYTE 0
+QSLOT  BYTE 4
+       TEXT 'slot'
+QWORD  BYTE 4
+       TEXT 'word'
+       EVEN
+* USEACT - sema.py's use_action: the action named by the string at the
+* reader; a new one needs a routine NameSub, and is numbered next.
+* Errors at ELINE, EFILE.  Uses R0-R7.
+USEACT MOV  R11,@SRET3
+       MOV  @XPG,@APG
+       MOV  @XOF,@AOF
+       BL   @KEYRD
+       BL   @AFIND
+       MOV  R0,R0
+       JLT  UA1
+       MOV  @SRET3,R11         known
+       RT
+UA1    MOV  @ACN,R0            a new one: its name, before Sub is added
+       CI   R0,ACMAX
+       JL   UA2
+       LI   R0,SE.MNY
+       B    @SERRE
+UA2    BL   @ACTAT
+       MOV  @KEYL,*R1
+       MOV  R1,R2
+       INCT R2
+       LI   R3,KEYB
+       MOV  @KEYL,R4
+       JEQ  UA4
+UA3    MOVB *R3+,*R2+
+       DEC  R4
+       JNE  UA3
+UA4    MOV  @APG,@68(R1)
+       MOV  @AOF,@70(R1)
+       MOV  @KEYL,R2           NameSub (in capitals: names ignore case)
+       CI   R2,KEYMX-3
+       JLE  UA5
+       LI   R2,KEYMX-3
+UA5    LI   R3,QSUB
+       LI   R4,3
+UA6    MOVB *R3,@KEYB(R2)
+       MOVB *R3+,@NAMB(R2)
+       INC  R2
+       DEC  R4
+       JNE  UA6
+       MOV  R2,@KEYL
+       BL   @SLOOKK
+       CI   R1,K.ROU
+       JEQ  UA7
+       LI   R0,SE.ASB
+       B    @SERRE
+UA7    MOV  R0,R5
+       MOV  @ACN,R0
+       BL   @ACTAT
+       MOV  R5,@66(R1)
+       INC  @ACN
+       MOV  @SRET3,R11
+       RT
+QSUB   TEXT 'SUB'
+       EVEN
+* AFIND - R0 = the action named KEYB (from 0), or -1.  Uses R0-R7.
+AFIND  MOV  R11,@SRET2
+       CLR  R6
+AF1    C    R6,@ACN
+       JHE  AF8
+       MOV  R6,R0
+       BL   @ACTAT
+       C    *R1+,@KEYL
+       JNE  AF5
+       LI   R2,KEYB
+       MOV  @KEYL,R7
+       JEQ  AF9
+AF2    CB   *R1+,*R2+
+       JNE  AF5
+       DEC  R7
+       JNE  AF2
+       JMP  AF9
+AF5    INC  R6
+       JMP  AF1
+AF8    SETO R6
+AF9    MOV  R6,R0
+       MOV  @SRET2,R11
+       RT
+* ACTAT - R1 = window D's address of action R0 (from 0).  Uses R0-R2.
+ACTAT  MOV  R11,@SRET4
+       MOV  R0,R1
+       CLR  R0
+       DIV  @D56,R0
+       MPY  @D72A,R1
+       MOV  R2,R1
+       AI   R1,>D000
+       AI   R0,ACTPG
+       BL   @DMAP
+       MOV  @SRET4,R11
+       RT
+D56    DATA 56
+D72A   DATA 72
+* DVBAT - R1 = window D's address of word R5's VERB.  Uses R0, R1.
+DVBAT  MOV  R11,@SRET4
+       LI   R0,DVBPG
+       BL   @DMAP
+       MOV  R5,R1
+       SLA  R1,1
+       AI   R1,>D000
+       MOV  @SRET4,R11
+       RT
+
+* ---- routine bodies ------------------------------------------------------------
+* CHECKS - sema.py's check_routines: each ROUTINE kept, in order, then
+* each object's property routines, in the order its properties were
+* given.
+CHECKS .enter
+       CLR  R3
+CK1    C    R3,@DXN
+       JHE  CK5
+       BL   @DXINF
+       MOV  R5,R5
+       JLT  CK4
+       CI   R4,NT.ROU
+       JNE  CK4
+       .push R3
+       BL   @DXSEEK
+       MOV  @ELINE,@OWNL
+       MOV  @EFILE,@OWNF
+       CLR  @INOBJ
+       BL   @XSKIP             (its name)
+       BL   @CHKBDY            its parameters, then its body
+       .pop R3
+CK4    INC  R3
+       JMP  CK1
+CK5    CLR  R8                 the property routines
+CK6    INC  R8
+       C    R8,@ON
+       JH   CK9
+       MOV  R8,R0
+       BL   @OBJAT
+       MOV  @10(R1),R7
+CK7    MOV  R7,R7
+       JEQ  CK6
+       MOV  R7,R0
+       BL   @HCELL
+       MOV  *R1,R7
+       MOV  @4(R1),R0
+       CI   R0,2
+       JNE  CK7
+       MOV  @6(R1),@EFILE
+       MOV  @6(R1),@OWNF
+       MOV  @10(R1),R2
+       MOV  @8(R1),R0
+       MOV  R2,R1
+       BL   @XSET
+       BL   @XB
+       BL   @XB
+       BL   @XW
+       MOV  R0,@OWNL
+       BL   @XSKIP             (its name)
+       SETO @INOBJ
+       .push R7
+       .push R8
+       BL   @CHKBD2            no parameters: its body
+       .pop R8
+       .pop R7
+       JMP  CK7
+CK9    .leave
+       RT
+* CHKBDY - with the reader at a ROUTINE's parameters: sema.py's
+* check_body.  CHKBD2: the same with no parameters, at the body.
+CHKBDY .enter
+       CLR  @LCN
+       BL   @XB                the parameters: a list of names
+       BL   @XW
+       MOV  R0,R9
+CB1    MOV  R9,R9
+       JEQ  CB3
+       DEC  R9
+       BL   @KEYRD
+       BL   @LADD
+       JMP  CB1
+CHKBD2 .enter
+       CLR  @LCN
+CB3    MOV  @XPG,@BDPG         the body: the locals first, from every block
+       MOV  @XOF,@BDOF
+       BL   @COLECT
+       MOV  @LCN,R0
+       CI   R0,16
+       JLE  CB4
+       MOV  @OWNL,R1
+       MOV  @OWNF,R2
+       LI   R0,SE.LCS
+       B    @SERR
+CB4    MOV  @BDPG,R0           then each statement
+       MOV  @BDOF,R1
+       BL   @XSET
+       BL   @SSTMTS
+       .leave
+       RT
+
+* COLECT - the LOCAL names in the statements at the reader (a list), and
+* in the blocks inside them; a name twice is an error.
+COLECT .enter
+       .push R9
+       BL   @XB
+       BL   @XW
+       MOV  R0,R9
+CL1    MOV  R9,R9
+       JNE  CL1A
+       .pop R9
+       .leave
+       RT
+CL1A   DEC  R9
+       BL   @XB
+       BL   @XB
+       MOV  R0,R4
+       BL   @XW
+       MOV  R0,@ELINE
+       CI   R4,NT.LOC
+       JNE  CL3
+       BL   @XB                LOCAL: its names
+       BL   @XW
+       MOV  R0,R8
+CL2    MOV  R8,R8
+       JEQ  CL1
+       DEC  R8
+       BL   @KEYRD
+       BL   @LFIND
+       MOV  R0,R0
+       JEQ  CL2A
+       LI   R0,SE.LTW
+       B    @SERRE
+CL2A   BL   @LADD
+       JMP  CL2
+CL3    CI   R4,NT.IF
+       JNE  CL5
+       BL   @XB                IF: its arms (cond, block) and ELSE
+       BL   @XW
+       MOV  R0,R8
+CL4    MOV  R8,R8
+       JEQ  CL4B
+       DEC  R8
+       BL   @XB                (the tuple)
+       BL   @XB
+       BL   @XSKIP             (the condition)
+       .push R8
+       BL   @COLECT
+       .pop R8
+       JMP  CL4
+CL4B   BL   @XB
+       MOV  R0,R0
+       JEQ  CL1
+       BL   @XBACK
+       BL   @COLECT
+       JMP  CL1
+CL5    CI   R4,NT.WHL
+       JNE  CL6
+       BL   @XSKIP             WHILE: its condition, its block
+       JMP  CL8
+CL6    CI   R4,NT.FOR
+       JNE  CL7
+       BL   @XSKIP             FOR EACH: the variable, the parent, the block
+       BL   @XSKIP
+       JMP  CL8
+CL7    CI   R4,NT.CAS
+       JNE  CL9
+       BL   @XSKIP             a case: its actions, its block
+CL8    BL   @COLECT
+       JMP  CL1
+CL9    MOV  R4,R1              anything else: no blocks
+       MOVB @NFLD-1(R1),R0
+       SRL  R0,8
+       BL   @XFLDS
+       B    @CL1
+* LADD - KEYB onto the locals.  Uses R0-R3.
+LADD   MOV  R11,@SRET3
+       MOV  @LCN,R0
+       CI   R0,LOCMAX
+       JL   LA1
+       LI   R0,SE.MNY
+       B    @SERRE
+LA1    INC  @LCN
+       BL   @LOCAT
+       MOV  @KEYL,*R1+
+       LI   R2,KEYB
+       MOV  @KEYL,R3
+       JEQ  LA9
+LA2    MOVB *R2+,*R1+
+       DEC  R3
+       JNE  LA2
+LA9    MOV  @SRET3,R11
+       RT
+* LFIND - R0 = 1 if KEYB is a parameter or local of this routine, else 0.
+* Uses R0-R3.
+LFIND  MOV  R11,@SRET3
+       CLR  R3
+LQ1    C    R3,@LCN
+       JL  $+6
+       B    @LQ8
+       MOV  R3,R0
+       BL   @LOCAT
+       C    *R1+,@KEYL
+       JEQ  $+6
+       B    @LQ5
+       LI   R2,KEYB
+       MOV  @KEYL,R0
+       JEQ  LQ9
+LQ2    CB   *R1+,*R2+
+       JEQ  $+6
+       B    @LQ5
+       DEC  R0
+       JEQ  $+6
+       B    @LQ2
+       JMP  LQ9
+LQ5    INC  R3
+       B    @LQ1
+LQ8    CLR  R0
+       MOV  @SRET3,R11
+       RT
+LQ9    LI   R0,1
+       MOV  @SRET3,R11
+       RT
+* LOCAT - R1 = window D's address of local R0 (from 0).  Uses R0, R1.
+LOCAT  MOV  R11,@SRET4
+       MPY  @D72A,R0
+       AI   R1,>D000
+       LI   R0,LOCPG
+       BL   @DMAP
+       MOV  @SRET4,R11
+       RT
+
+* SSTMTS - each statement of the list at the reader (sema.py's stmt).
+SSTMTS  .enter
+       .push R9
+       BL   @XB
+       BL   @XW
+       MOV  R0,R9
+ST1    MOV  R9,R9
+       JNE  ST1A
+       .pop R9
+       .leave
+       RT
+ST1A   DEC  R9
+       BL   @SSTMT
+       JMP  ST1
+* SSTMT - the statement at the reader.
+SSTMT   .enter
+       .push R8
+       BL   @XB
+       BL   @XB
+       MOV  R0,R4
+       BL   @XW
+       MOV  R0,R8              its line
+       MOV  R4,R1
+       CI   R1,NT.IF
+       JL   STX
+       CI   R1,NT.EST
+       JH   STX
+       AI   R1,-NT.IF
+       SLA  R1,1
+       MOV  @STTAB(R1),R0
+       B    *R0
+STX    CI   R4,NT.CAS          a rule case: its block
+       JNE  STY
+       BL   @XSKIP
+       BL   @SSTMTS
+       JMP  ST99
+STY    MOV  R4,R1              (nothing else to check)
+       MOVB @NFLD-1(R1),R0
+       SRL  R0,8
+       BL   @XFLDS
+ST99   .pop R8
+       .leave
+       RT
+STTAB  DATA STIF,STWHL,STFOR,STY,STPRN,STY,STEXP2,STEXP,STGIV,STRET,STEXP,STASG,STEST
+STIF   BL   @XB                IF: (condition, block) ..., then ELSE
+       BL   @XW
+       MOV  R0,R5
+STIF1  MOV  R5,R5
+       JEQ  STIF2
+       DEC  R5
+       BL   @XB
+       BL   @XB
+       .push R5
+       BL   @EXPR
+       BL   @SSTMTS
+       .pop R5
+       JMP  STIF1
+STIF2  BL   @XB
+       MOV  R0,R0
+       JEQ  ST99
+       BL   @XBACK
+       BL   @SSTMTS
+       JMP  ST99
+STWHL  BL   @EXPR
+       BL   @SSTMTS
+       JMP  ST99
+STFOR  BL   @KEYRD             FOR EACH: the variable must be a LOCAL
+       BL   @LFIND
+       MOV  R0,R0
+       JNE  STFR1
+       MOV  R8,@ELINE
+       LI   R0,SE.LPV
+       B    @SERRE
+STFR1  BL   @EXPR
+       BL   @SSTMTS
+       JMP  ST99
+STPRN  BL   @XB                PRINT: its items (form, expression)
+       BL   @XW
+       MOV  R0,R5
+STPR1  MOV  R5,R5
+       JEQ  ST99
+       DEC  R5
+       BL   @XB
+       BL   @XB
+       BL   @XW
+       BL   @XSKIP
+       .push R5
+       BL   @EXPR
+       .pop R5
+       JMP  STPR1
+STEXP2 BL   @EXPR              MOVE: two expressions
+STEXP  BL   @EXPR              REMOVE, PICTURE: one
+       JMP  ST99
+STGIV  BL   @EXPR              GIVE: the object, then attributes
+       BL   @XB
+       BL   @XW
+       MOV  R0,R5
+STGV1  MOV  R5,R5
+       JEQ  ST99
+       DEC  R5
+       BL   @XB
+       BL   @XB
+       BL   @KEYRD
+       MOV  R8,@ELINE
+       .push R5
+       BL   @ATTRC
+       .pop R5
+       BL   @XB
+       JMP  STGV1
+STRET  BL   @XB                RETURN: None, or a value
+       MOV  R0,R0
+       JNE  $+6
+       B    @ST99
+       BL   @XBACK
+       BL   @EXPR
+       B    @ST99
+STASG  BL   @TARGET
+       BL   @EXPR
+       B    @ST99
+STEST  MOV  @XPG,@T2           an expression statement
+       MOV  @XOF,@T3
+       BL   @XB
+       BL   @XB
+       MOV  R0,R4
+       BL   @XW
+       MOV  R0,R7              (the expression's line)
+       CI   R4,NT.NAM
+       JEQ  STES1
+       MOV  @T2,R0
+       MOV  @T3,R1
+       BL   @XSET
+       BL   @EXPR
+       B    @ST99
+STES1  BL   @KEYRD             a name on its own
+       BL   @LFIND
+       MOV  R0,R6
+       JNE  STES2
+       BL   @BLOOK             a built-in function: a call of none
+       MOV  R0,R0
+       JEQ  STES2
+       MOV  R1,R1
+       JNE  $+6
+       B    @ST99
+       MOV  R7,@ELINE
+       LI   R0,SE.ARG
+       B    @SERRE
+STES2  MOV  R6,R6              a routine: a call of none
+       JNE  STES3
+       BL   @SLOOKK
+       CI   R1,K.ROU
+       JNE  $+6
+       B    @ST99
+STES3  MOV  R8,@ELINE
+       LI   R0,SE.NOP
+       B    @SERRE
+
+* ATTRC - KEYB must be an attribute (else an error at ELINE).  Uses R0-R7.
+ATTRC  MOV  R11,@SRET3
+       BL   @SLOOKK
+       CI   R1,K.ATT
+       JEQ  ATC9
+       LI   R0,SE.UAT
+       B    @SERRE
+ATC9   MOV  @SRET3,R11
+       RT
+
+* TARGET - an assignment's target (sema.py's target).
+TARGET .enter
+       .push R8
+       MOV  @XPG,@T2
+       MOV  @XOF,@T3
+       BL   @XB
+       BL   @XB
+       MOV  R0,R4
+       BL   @XW
+       MOV  R0,R8
+       MOV  R8,@ELINE
+       CI   R4,NT.NAM
+       JNE  TG3
+       BL   @KEYRD             a name: a local, or a global
+       BL   @LFIND
+       MOV  R0,R0
+       JNE  TG99
+       BL   @SLOOKK
+       MOV  R0,R0
+       JNE  TG2
+       LI   R0,SE.UNK
+       B    @SERRE
+TG2    CI   R1,K.GLO
+       JEQ  TG99
+       LI   R0,SE.NVR
+       B    @SERRE
+TG3    CI   R4,NT.PRF
+       JNE  TG4
+       MOV  @T2,R0             obj.prop: an expression
+       MOV  @T3,R1
+       BL   @XSET
+       BL   @EXPR
+       JMP  TG99
+TG4    CI   R4,NT.CAL
+       JNE  TG8
+       BL   @XB                a(i): the function must name an array
+       BL   @XB
+       CI   R0,NT.NAM
+       JNE  TG6
+       BL   @XW
+       BL   @KEYRD
+       BL   @SLOOKK
+       CI   R1,K.ARR
+       JEQ  TG7
+TG6    MOV  R8,@ELINE
+       LI   R0,SE.ARE
+       B    @SERRE
+TG7    BL   @XB                its arguments: one
+       BL   @XW
+       CI   R0,1
+       JEQ  TG7A
+       MOV  R8,@ELINE
+       LI   R0,SE.IDX
+       B    @SERRE
+TG7A   BL   @EXPR
+       JMP  TG99
+TG8    MOV  R4,R1
+       MOVB @NFLD-1(R1),R0
+       SRL  R0,8
+       BL   @XFLDS
+TG99   .pop R8
+       .leave
+       RT
+
+* EXPR - the expression at the reader (sema.py's expr).
+EXPR   .enter
+       .push R8
+       .push R9
+       MOV  @XPG,@T2           (its place)
+       MOV  @XOF,@T3
+       BL   @XB
+       BL   @XB
+       MOV  R0,R4
+       BL   @XW
+       MOV  R0,R8              its line
+       MOV  R8,@ELINE
+       CI   R4,NT.DIC
+       JNE  EX2
+       BL   @DWORD             'word'
+       B    @EX99
+EX2    CI   R4,NT.ACT
+       JNE  EX3
+       BL   @USEACT            ##Action
+       B    @EX99
+EX3    CI   R4,NT.NUM
+       JNE  EX4
+       BL   @XB
+       BL   @XW
+       B    @EX99
+EX4    CI   R4,NT.STR
+       JNE  EX5
+       BL   @XSKIP
+       B    @EX99
+EX5    CI   R4,NT.CST
+       JNE  EX6
+       BL   @OPRD              TRUE, FALSE, NOTHING, SELF
+       MOV  @INOBJ,R0
+       JEQ  $+6
+       B    @EX99
+       LI   R1,QSELF4
+       BL   @OPIS
+       MOV  R0,R0
+       JEQ  EX99
+       LI   R0,SW.SLF
+       BL   @SWARN
+       JMP  EX99
+EX6    CI   R4,NT.NAM
+       JNE  EX7
+       BL   @KEYRD             a name: a local, or a value's name
+       BL   @LFIND
+       MOV  R0,R0
+       JNE  EX99
+       BL   @SLOOKK
+       MOV  R0,R0
+       JNE  EX6A
+       LI   R0,SE.UNK
+       B    @SERRE
+EX6A   CI   R1,K.ATT
+       JEQ  EX6B
+       CI   R1,K.PRO
+       JEQ  EX6B
+       CI   R1,K.CLA
+       JNE  EX99
+EX6B   LI   R0,SE.NVL
+       B    @SERRE
+EX7    CI   R4,NT.UNA
+       JNE  EX8
+       BL   @XSKIP             (the operator)
+       BL   @EXPR
+       JMP  EX99
+EX8    CI   R4,NT.BIN
+       JNE  EX10
+       BL   @OPRD              HAS / HASNT: an attribute's name after
+       CLR  R9
+       LI   R1,QHAS
+       BL   @OPIS
+       SOC  R0,R9
+       LI   R1,QHASNT
+       BL   @OPIS
+       SOC  R0,R9
+       BL   @EXPR
+       MOV  R9,R9
+       JNE  EX8A
+       BL   @EXPR
+       JMP  EX99
+EX8A   BL   @XB
+       BL   @XB
+       CI   R0,NT.NAM
+       JEQ  EX8B
+       MOV  R8,@ELINE
+       LI   R0,SE.HAS
+       B    @SERRE
+EX8B   BL   @XW
+       MOV  R0,@ELINE          (the name's line)
+       BL   @KEYRD
+       BL   @ATTRC
+       JMP  EX99
+EX10   CI   R4,NT.PRF
+       JNE  EX11
+       BL   @EXPR              obj.prop: a property's name
+       BL   @KEYRD
+       BL   @SLOOKK
+       CI   R1,K.PRO
+       JEQ  EX99
+       MOV  R8,@ELINE
+       LI   R0,SE.UPX
+       B    @SERRE
+EX11   CI   R4,NT.CAL
+       JEQ  EX12
+       MOV  R4,R1              (nothing else can be here)
+       MOVB @NFLD-1(R1),R0
+       SRL  R0,8
+       BL   @XFLDS
+EX99   .pop R9
+       .pop R8
+       .leave
+       RT
+EX12   BL   @CALL
+       JMP  EX99
+QSELF4 BYTE 4
+       TEXT 'SELF'
+QHAS   BYTE 3
+       TEXT 'HAS'
+QHASNT BYTE 5
+       TEXT 'HASNT'
+       EVEN
+
+* CALL - the rest of a Call node (its line in R8): its function, then its
+* arguments.
+CALL   .enter
+       MOV  @XPG,@T2           the function: a name?
+       MOV  @XOF,@T3
+       BL   @XB
+       BL   @XB
+       CI   R0,NT.NAM
+       JEQ  CA2
+CA1    MOV  @T2,R0             no: an expression, then the arguments
+       MOV  @T3,R1
+       BL   @XSET
+       BL   @EXPR
+       BL   @ARGS
+       .leave
+       RT
+CA2    BL   @XW
+       BL   @KEYRD
+       BL   @LFIND
+       MOV  R0,R0
+       JNE  CA1                (a local: an expression)
+       BL   @BLOOK
+       MOV  R0,R0
+       JEQ  CA5
+       MOV  R0,R9              a built-in function: its argument count
+       MOV  R1,R7
+       BL   @XB
+       BL   @XW
+       MOV  R0,R6
+       C    R6,R7
+       JEQ  CA3
+       MOV  R8,@ELINE
+       LI   R0,SE.ARG
+       B    @SERRE
+CA3    CLR  R5                 each argument; PROPLEN's and PROPWORD's
+CA3A   C    R5,R6              second is a property's name
+       JHE  CA9
+       CI   R5,1
+       JNE  CA4
+       CI   R9,BPROPL
+       JL   CA4
+       BL   @XB
+       BL   @XB
+       MOV  R0,R4
+       BL   @XW
+       CI   R4,NT.NAM
+       JEQ  CA3B
+       MOV  R4,R1
+       MOVB @NFLD-1(R1),R0
+       SRL  R0,8
+       BL   @XFLDS
+       JMP  CA3C
+CA3B   .push R5
+       .push R6
+       BL   @KEYRD
+       BL   @SLOOKK
+       .pop R6
+       .pop R5
+       CI   R1,K.PRO
+       JEQ  CA4A
+CA3C   MOV  R8,@ELINE
+       LI   R0,SE.PAR
+       B    @SERRE
+CA4    .push R5
+       .push R6
+       .push R9
+       BL   @EXPR
+       .pop R9
+       .pop R6
+       .pop R5
+CA4A   INC  R5
+       JMP  CA3A
+CA5    BL   @SLOOKK            a declared name
+       MOV  R0,R0
+       JNE  CA6
+       MOV  R8,@ELINE
+       LI   R0,SE.UNK
+       B    @SERRE
+CA6    MOV  R0,R5
+       MOV  R1,R4
+       BL   @XB                its argument count
+       BL   @XW
+       MOV  R0,R6
+       BL   @XBACK             (ARGS reads the list again)
+       BL   @XBACK
+       BL   @XBACK
+       MOV  R8,@ELINE
+       CI   R4,K.ARR
+       JNE  CA7
+       CI   R6,1
+       JEQ  CA8
+       LI   R0,SE.IDX
+       B    @SERRE
+CA7    CI   R4,K.ROU
+       JEQ  CA7A
+       LI   R0,SE.NCA
+       B    @SERRE
+CA7A   MOV  R5,R0
+       BL   @SYMAT
+       C    R6,@14(R1)
+       JLE  CA8
+       LI   R0,SE.ARG
+       B    @SERRE
+CA8    BL   @ARGS
+CA9    .leave
+       RT
+* ARGS - each argument of the list at the reader.
+ARGS   .enter
+       .push R9
+       BL   @XB
+       BL   @XW
+       MOV  R0,R9
+AR1    MOV  R9,R9
+       JEQ  AR9
+       DEC  R9
+       BL   @EXPR
+       JMP  AR1
+AR9    .pop R9
+       .leave
+       RT
+
+* ---- the generated tables -------------------------------------------------------
+* TABLES - sema.py's finish_tables: the dictionary sorted (by its bytes)
+* and numbered from 1; VERBTAB, GRAMTAB, DICTVERB (ACTSUB is the actions'
+* routines).
+TABLES .enter
+       LI   R0,DSPG            the sorted list starts in word order
+       BL   @EMAP
+       LI   R1,>E002
+       LI   R0,1
+TB1    C    R0,@DN
+       JH   TB2
+       MOV  R0,*R1+
+       INC  R0
+       JMP  TB1
+TB2    BL   @DSORT
+       CLR  R6                 each word's place
+TB3    INC  R6
+       C    R6,@DN
+       JH   TB4
+       LI   R0,DSPG
+       BL   @EMAP
+       MOV  R6,R1
+       SLA  R1,1
+       MOV  @>E000(R1),R5      the word at place R6
+       LI   R0,DNPG
+       BL   @EMAP
+       MOV  R5,R1
+       SLA  R1,1
+       MOV  R6,@>E000(R1)
+       BL   @DVBAT             DICTVERB(place) = its VERB
+       MOV  *R1,R4
+       LI   R0,DVTPG
+       BL   @EMAP
+       MOV  R6,R1
+       SLA  R1,1
+       MOV  R4,@>E000(R1)
+       JMP  TB3
+TB4    LI   R0,DVTPG
+       BL   @EMAP
+       CLR  @>E000
+       CLR  @GRN               VERBTAB and GRAMTAB
+       LI   R0,VTBPG
+       BL   @EMAP
+       CLR  @>E000
+       CLR  @CURV
+TB5    INC  @CURV
+       C    @CURV,@VN
+       JLE  TB5A
+       B    @TB20
+TB5A   LI   R0,VTBPG
+       BL   @EMAP
+       MOV  @CURV,R1
+       SLA  R1,1
+       MOV  @GRN,@>E000(R1)    VERBTAB(v): where its grammar starts
+       CLR  R7                 its line count
+       MOV  @CURV,R0
+       BL   @VRBAT
+       MOV  @2(R1),R8
+       MOV  R8,R6
+TB6    MOV  R6,R6
+       JEQ  TB7
+       INC  R7
+       MOV  R6,R0
+       BL   @HCELL
+       MOV  *R1,R6
+       JMP  TB6
+TB7    LI   R4,1
+       MOV  R7,R5
+       BL   @GPUT
+TB8    MOV  R8,R8              each line
+       JEQ  TB5
+       MOV  R8,R0
+       BL   @HCELL
+       MOV  *R1,R8
+       MOV  @4(R1),R2
+       MOV  @2(R1),R0
+       MOV  R2,R1
+       BL   @XSET
+       BL   @XB
+       BL   @XB
+       BL   @XW
+       MOV  @GRN,@GLHERE       (the next line's place: patched below)
+       LI   R4,1
+       CLR  R5
+       BL   @GPUT
+       MOV  @XPG,@T2           the action comes after the tokens: read it first
+       MOV  @XOF,@T3
+       BL   @XSKIP
+       BL   @KEYRD
+       BL   @AFIND
+       MOV  R0,R5
+       LI   R4,1
+       BL   @GPUT
+       BL   @XB                REVERSE: True (1) gives 1
+       CLR  R5
+       CI   R0,1
+       JNE  TB9
+       INC  R5
+TB9    LI   R4,1
+       BL   @GPUT
+       MOV  @T2,R0             then the tokens
+       MOV  @T3,R1
+       BL   @XSET
+       BL   @XB
+       BL   @XW
+       MOV  R0,R9
+       MOV  R0,R5              their count
+       LI   R4,1
+       BL   @GPUT
+TB10   MOV  R9,R9
+       JEQ  TB15
+       DEC  R9
+       BL   @XB
+       BL   @XB
+       BL   @XW
+       BL   @OPRD
+       LI   R1,QWORD
+       BL   @OPIS
+       MOV  R0,R0
+       JEQ  TB11
+       BL   @XB                a word: >2000 + its place
+       BL   @XW
+       MOV  R0,R3
+       CLR  R4
+TB10A  MOV  R3,R3
+       JEQ  TB10C
+       BL   @XB
+       CI   R4,12
+       JHE  TB10B
+       SWPB R0
+       CB   R0,@BUPA
+       JL   TB10D
+       CB   R0,@BUPZ
+       JH   TB10D
+       AI   R0,>2000
+TB10D  MOVB R0,@DWB(R4)
+       INC  R4
+TB10B  DEC  R3
+       JMP  TB10A
+TB10C  MOV  R4,R0
+       BL   @DADD
+       MOV  R0,R1
+       SLA  R1,1
+       LI   R0,DNPG
+       BL   @EMAP
+       MOV  @>E000(R1),R5
+       AI   R5,>2000
+       LI   R4,1
+       BL   @GPUT
+       BL   @XSKIP             (no filter)
+       JMP  TB10
+TB11   BL   @KEYRD             a slot, or an attribute
+       BL   @SLOTN
+       MOV  R0,R0
+       JEQ  TB13
+       MOV  R0,R5
+       AI   R5,>1000
+       BL   @XB                a filter: +>0800, then the routine
+       MOV  R0,R0
+       JNE  TB12
+       LI   R4,1
+       BL   @GPUT
+       JMP  TB10
+TB12   AI   R5,>0800
+       LI   R4,1
+       BL   @GPUT
+       BL   @XBACK
+       BL   @KEYRD
+       BL   @SLOOK
+       MOV  R0,R5
+       LI   R4,4
+       BL   @GPUT
+       JMP  TB10
+TB13   BL   @SLOOK             an attribute: >3000 + its number
+       BL   @SYMAT
+       MOV  @4(R1),R5
+       AI   R5,>3000
+       LI   R4,1
+       BL   @GPUT
+       BL   @XSKIP
+       JMP  TB10
+TB15   MOV  @GLHERE,R0         the next line starts here
+       MOV  @GRN,R5
+       BL   @GRMAT
+       MOV  R5,@2(R1)
+       B    @TB8
+TB20   MOV  @GRN,R0            GRAMTAB: [0] if empty
+       JNE  TB99
+       LI   R4,1
+       CLR  R5
+       BL   @GPUT
+TB99   .leave
+       RT
+* GPUT - kind R4, value R5 onto GRAMTAB.  Uses R0, R1.
+GPUT   MOV  R11,@SRET3
+       MOV  @GRN,R0
+       CI   R0,GRMMAX
+       JL   GP1
+       LI   R0,SE.MNY
+       B    @SERRE
+GP1    INC  @GRN
+       BL   @GRMAT
+       MOV  R4,*R1
+       MOV  R5,@2(R1)
+       MOV  @SRET3,R11
+       RT
+* GRMAT - R1 = window E's address of GRAMTAB element R0.  Uses R0, R1.
+GRMAT  MOV  R11,@SRET4
+       MOV  R0,R1
+       ANDI R1,1023
+       SLA  R1,2
+       AI   R1,>E000
+       SRL  R0,10
+       AI   R0,GRMPG
+       BL   @EMAP
+       MOV  @SRET4,R11
+       RT
+
+* DSORT - DSPG's words 1..DN sorted by their bytes (Shell's sort).
+DSORT  .enter
+       MOV  @DN,R0
+       MOV  R0,@SGAP
+DS1    MOV  @SGAP,R0
+       SRL  R0,1
+       MOV  R0,@SGAP
+       JEQ  DS9
+       MOV  R0,@SBI            i from gap+1 to n
+DS2    INC  @SBI
+       C    @SBI,@DN
+       JH   DS1
+       MOV  @SBI,R0            the word at i, into WBUF1
+       BL   @DSGET
+       MOV  R0,@STMPV
+       LI   R2,WBUF1
+       BL   @DWGET
+       MOV  @SBI,@SBJ
+DS3    MOV  @SBJ,R0            j - gap: past it?
+       S    @SGAP,R0
+       JLT  DS6
+       JEQ  DS6
+       BL   @DSGET
+       MOV  R0,R7
+       LI   R2,WBUF2
+       BL   @DWGET
+       BL   @WCMP              WBUF2 > WBUF1: move it up
+       JLT  DS6
+       JEQ  DS6
+       MOV  @SBJ,R0
+       S    @SGAP,R0
+       BL   @DSGET
+       MOV  R0,R5
+       MOV  @SBJ,R0
+       BL   @DSPUT
+       S    @SGAP,@SBJ
+       JMP  DS3
+DS6    MOV  @STMPV,R5
+       MOV  @SBJ,R0
+       BL   @DSPUT
+       JMP  DS2
+DS9    .leave
+       RT
+* DSGET - R0 = DSPG's element R0.  DSPUT - element R0 := R5.  Use R0, R1.
+DSGET  MOV  R11,@SRET4
+       MOV  R0,R1
+       SLA  R1,1
+       LI   R0,DSPG
+       BL   @EMAP
+       MOV  @>E000(R1),R0
+       MOV  @SRET4,R11
+       RT
+DSPUT  MOV  R11,@SRET4
+       MOV  R0,R1
+       SLA  R1,1
+       LI   R0,DSPG
+       BL   @EMAP
+       MOV  R5,@>E000(R1)
+       MOV  @SRET4,R11
+       RT
+* DWGET - word R0 into the buffer at R2 (a length byte, then the word).
+* Uses R0-R3.
+DWGET  MOV  R11,@SRET3
+       BL   @DICAT
+       AI   R1,2
+       MOVB *R1,R3
+       SRL  R3,8
+       INC  R3
+DWG1   MOVB *R1+,*R2+
+       DEC  R3
+       JNE  DWG1
+       MOV  @SRET3,R11
+       RT
+* WCMP - compare WBUF2 with WBUF1 byte by byte (a shorter word that
+* begins the other comes first): R0 = 1 if WBUF2 comes after, -1 if
+* before, 0 if they are equal (the status set by R0).  Uses R0-R4.
+WCMP   LI   R1,WBUF2
+       LI   R2,WBUF1
+       MOVB *R1+,R3
+       SRL  R3,8
+       MOVB *R2+,R4
+       SRL  R4,8
+WC1    MOV  R3,R3
+       JEQ  WC8
+       MOV  R4,R4
+       JEQ  WC7
+       CB   *R1+,*R2+
+       JNE  WC6
+       DEC  R3
+       DEC  R4
+       JMP  WC1
+WC6    JH   WC7                (bytes compared as unsigned, as latin-1)
+WC5    LI   R0,-1
+       JMP  WC9
+WC7    LI   R0,1
+       JMP  WC9
+WC8    MOV  R4,R4              WBUF2 ended: equal, or first
+       JNE  WC5
+       CLR  R0
+WC9    MOV  R0,R0
+       RT
+
+* NONAME - sema.py's last check: an OBJECT (not a ROOM) without NAME
+* words gets a warning at its declaration.
+NONAME .enter
+       CLR  R8
+NN1    INC  R8
+       C    R8,@ON
+       JH   NN9
+       MOV  R8,R0
+       BL   @OBJAT
+       MOV  @28(R1),R0
+       JNE  NN1
+       MOV  @2(R1),R0
+       CI   R0,1
+       JNE  NN1
+       MOV  @30(R1),R3
+       BL   @DXLOC
+       MOV  R1,@ELINE
+       MOV  R2,@EFILE
+       LI   R0,SW.NNM
+       BL   @SWARN
+       JMP  NN1
+NN9    .leave
+       RT

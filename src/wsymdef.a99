@@ -60,6 +60,12 @@ ESV2   EQU  SV0+46
 ESV3   EQU  SV0+48
 ERET   EQU  SV0+50
 HERE   EQU  SV0+52             the first declaration kept (sema.py's "here")
+OPL    EQU  SV0+54             OPRD: the length
+OLDR10 EQU  SV0+56             R10 before the overlay's own stack
+MSTKT  EQU  >3800              the meaning stage's return stack: 2K down from
+*                              here, over the lexer's and parser's buffers
+*                              (free by now): its checks recurse deeply
+OPB    EQU  ULIT+96            8 bytes: OPRD's string (an operator, a Const's word)
 * (the overlays' own variables start at SV0+64)
 KEYB   EQU  IBUF               64 bytes: a name in capitals
 NAMB   EQU  IBUF+64            64 bytes: the name as written
@@ -94,3 +100,35 @@ SW.LNG EQU  1                  warning: longer than 12 letters
 SW.SLF EQU  2                  warning: SELF in a routine that is not a property
 SW.NNM EQU  3                  warning: ... has no NAME words
 
+
+* the meaning stage's second half (wsema2.a99)
+DVBPG  EQU  63                 each dictionary word's VERB
+DSPG   EQU  116                the dictionary sorted
+DNPG   EQU  117                each word's place
+VTBPG  EQU  118                VERBTAB
+DVTPG  EQU  119                DICTVERB
+ACTPG  EQU  120                4 pages: 224 actions
+ACMAX  EQU  224
+LOCPG  EQU  124                a routine's locals
+LOCMAX EQU  56
+GRMPG  EQU  125                3 pages: GRAMTAB
+GRMMAX EQU  3072
+BPROPL EQU  26                 PROPLEN's place in BUILTN (PROPWORD follows)
+SE.ASB EQU  64                 the action ... has no routine ...Sub
+SE.VWD EQU  65                 "..." is already a word of another VERB
+SE.GTK EQU  66                 ... is not a grammar token (noun, held, multi ...) or an attribute
+SE.FLT EQU  67                 ... is not a routine (a grammar token's filter)
+SE.TWS EQU  68                 a grammar line takes at most two objects
+SE.LTW EQU  69                 ... is declared twice in this routine
+SE.LCS EQU  70                 more than 16 parameters and locals in one routine
+SE.LPV EQU  71                 the loop variable ... must be a LOCAL
+SE.NOP EQU  72                 ... on its own does nothing
+SE.NVR EQU  73                 ... is a ..., not a variable: it cannot be assigned to
+SE.ARE EQU  74                 only an array element can be assigned to with ( )
+SE.IDX EQU  75                 an array element takes one index
+SE.NVL EQU  76                 ... is a ... and has no value here
+SE.HAS EQU  77                 HAS / HASNT needs an attribute name after it
+SE.UPX EQU  78                 unknown property ... (after a dot)
+SE.ARG EQU  79                 ... takes n arguments, not m
+SE.PAR EQU  80                 the second argument of ... must be a property name
+SE.NCA EQU  82                 ... is a ... and cannot be called

@@ -17,11 +17,11 @@
 *   object's NAME words  +6 values: how many  +8 values: the first (each
 *   2 cells: kind 1 number, 2 string (+2 page, +4 offset of its >04 in
 *   the tree), 3 object, 4 routine (symbol), 5 dictionary word; +2 the
-*   value); a routine: +8 page, +10 offset of its PropBlock node
+*   value); a routine: +6 its file, +8 page, +10 offset of its PropBlock
 * A NAME word: 1 cell: +0 the next, +2 the dictionary word.
 * A verb (VRBPG, 8 bytes): +0 its declaration, +2 its first grammar line,
 * +4 its last (heap: 2 cells each: +0 the next, +2 page, +4 offset of the
-* GLine node).  REPLACE (RPLPG, 72 bytes): +0 name length, +2 the name in
+* GLine node, +6 its file).  REPLACE (RPLPG, 72 bytes): +0 name length, +2 the name in
 * capitals (64), +66 file, +68 line, +70 1 once a ROUTINE is found.
 *======================================================================
 RPLPG  EQU  62
@@ -45,7 +45,6 @@ DCUR   EQU  SV0+92             the declaration being declared
 XTFRST EQU  SV0+94             EXTEND: FIRST
 XTLINE EQU  SV0+96             EXTEND: its line and file
 XTFILE EQU  SV0+98
-OPL    EQU  SV0+100            OPRD: the length
 INHER  EQU  SV0+102            APPLY: nonzero for a class's body
 VCNT   EQU  SV0+104            APPLY: values
 VCELL  EQU  SV0+106            APPLY: the next value's cell
@@ -55,14 +54,16 @@ IPG    EQU  SV0+112            APPLY: the item's place: page ...
 IOF    EQU  SV0+114            ... and offset
 CHN    EQU  ULIT               64 bytes: the class chain (declarations)
 PATH   EQU  ULIT+64            32 bytes: the class path (symbols)
-OPB    EQU  ULIT+96            8 bytes: an operator or a Const's word
 
 * SEMA1 - the first half of the meaning stage.  R0 = 0, or an error.
-SEMA1  .enter
+SEMA1  MOV  R10,R9             its own stack (see MSTKT)
+       LI   R10,MSTKT
+       .enter
        LI   R0,SV0             the variables
 SM1    CLR  *R0+
        CI   R0,SV0+120
        JL   SM1
+       MOV  R9,@OLDR10         (kept past the clearing)
        MOV  R10,@SSTK          (errors come back to here)
        CLR  @EFPG
        CLR  @DFPG
@@ -81,115 +82,10 @@ SM1    CLR  *R0+
        BL   @OBJS
        CLR  R0
        .leave
+       MOV  @OLDR10,R10
        RT
 
 * ---- the index and the tree -------------------------------------------------------
-* DXINF - declaration R3: R4 = its type, R5 = its file byte (>80 if
-* dropped).  Uses R0, R1, R4, R5.
-DXINF  MOV  R11,@SRET3
-       MOV  R3,R0
-       BL   @DXAT
-       MOVB @4(R1),R5
-       SRL  R5,8
-       MOVB @5(R1),R4
-       SRL  R4,8
-       MOV  @SRET3,R11
-       RT
-* DXSEEK - the tree reader at declaration R3's first field; R4 = its
-* type; ELINE, EFILE = its line and file.  Keeps R3.  Uses R0-R2, R4.
-DXSEEK MOV  R11,@SRET3
-       MOV  R3,R0
-       BL   @DXAT
-       MOVB @5(R1),R4
-       SRL  R4,8
-       MOVB @4(R1),R2
-       SRL  R2,8
-       ANDI R2,>7F
-       MOV  R2,@EFILE
-       MOV  @6(R1),@ELINE
-       MOV  @2(R1),R2
-       MOV  *R1,R0
-       MOV  R2,R1
-       BL   @XSET
-       BL   @XB
-       BL   @XB
-       BL   @XW
-       MOV  @SRET3,R11
-       RT
-* DXDROP - declaration R3 dropped (REPLACE, or done with: EXTEND).
-DXDROP MOV  R11,@SRET3
-       MOV  R3,R0
-       BL   @DXAT
-       SOCB @B80,@4(R1)
-       MOV  @SRET3,R11
-       RT
-B80    BYTE >80
-       EVEN
-* OPRD - the string at the reader into OPB as written (8 kept), OPL its
-* length.  Uses R0-R3.
-OPRD   MOV  R11,@SRET3
-       BL   @XB
-       BL   @XW
-       MOV  R0,R3
-       MOV  R0,@OPL
-       CLR  R2
-OPR1   MOV  R3,R3
-       JEQ  OPR9
-       BL   @XB
-       CI   R2,8
-       JHE  OPR2
-       SWPB R0
-       MOVB R0,@OPB(R2)
-       INC  R2
-OPR2   DEC  R3
-       JMP  OPR1
-OPR9   MOV  @SRET3,R11
-       RT
-* OPIS - R0 = 1 if OPB is the string at R1 (length byte first), else 0.
-* Uses R0-R3.
-OPIS   MOVB *R1+,R2
-       SRL  R2,8
-       C    R2,@OPL
-       JNE  OPI8
-       LI   R3,OPB
-OPI1   MOV  R2,R2
-       JEQ  OPI9
-       CB   *R1+,*R3+
-       JNE  OPI8
-       DEC  R2
-       JMP  OPI1
-OPI8   CLR  R0
-       RT
-OPI9   LI   R0,1
-       RT
-* XSEQK - R0 = 1 if the string at the reader is KEYB, in capitals (it is
-* read past either way).  Uses R0-R2, R4, R5.
-XSEQK  MOV  R11,@SRET3
-       BL   @XB
-       BL   @XW
-       MOV  R0,R5
-       LI   R4,1               equal so far
-       C    R0,@KEYL
-       JEQ  XSQ0
-       CLR  R4
-XSQ0   CLR  R2
-XSQ1   MOV  R5,R5
-       JEQ  XSQ9
-       BL   @XB
-       MOV  R4,R4
-       JEQ  XSQ2
-       SWPB R0
-       BL   @UPPER
-       CB   R0,@KEYB(R2)
-       JEQ  XSQ2
-       CLR  R4
-XSQ2   INC  R2
-       DEC  R5
-       JMP  XSQ1
-XSQ9   MOV  R4,R0
-       MOV  @SRET3,R11
-       RT
-
 * ---- REPLACE and EXTEND --------------------------------------------------------
 * REPEXT - sema.py's replace_and_extend: a ROUTINE whose name a REPLACE
 * in another file names is dropped (with the REPLACEs); each REPLACE
@@ -405,18 +301,8 @@ RPAT   MOV  R11,@SRET4
        MOV  @SRET4,R11
        RT
 D72    DATA 72
-* VRBAT - R1 = window D's address of verb R0 (from 1).  Uses R0, R1.
-VRBAT  MOV  R11,@SRET4
-       MOV  R0,R1
-       DEC  R1
-       SLA  R1,3
-       AI   R1,>D000
-       LI   R0,VRBPG
-       BL   @DMAP
-       MOV  @SRET4,R11
-       RT
 * BLINES - the list of GLine nodes at the reader as a chain of heap
-* items (LHEAD, LTAIL; 0 if empty).  Uses R0-R2, R4-R7; keeps R3.
+* items (LHEAD, LTAIL; 0 if empty), each with its file (EFILE).  Uses R0-R2, R4-R7; keeps R3.
 BLINES .enter
        .push R3
        CLR  @LHEAD
@@ -434,6 +320,7 @@ LN1    MOV  R6,R6
        BL   @HCELL
        MOV  R4,@2(R1)
        MOV  R5,@4(R1)
+       MOV  @EFILE,@6(R1)      (its file: an EXTEND's lines may be another's)
        MOV  @LTAIL,R0
        JEQ  LN2
        BL   @HCELL
@@ -927,14 +814,6 @@ QDIV   MOV  R0,R2              the sign of the quotient
        JLT  QDV1
        RT
 QDV1   NEG  R0
-       RT
-* XBACK - the reader one byte back.  Uses R0.
-XBACK  MOV  @XOF,R0
-       JNE  XBK1
-       DEC  @XPG
-       LI   R0,4096
-XBK1   DEC  R0
-       MOV  R0,@XOF
        RT
 QTRUE  BYTE 4
        TEXT 'TRUE'
@@ -1504,7 +1383,7 @@ PS2    MOV  R6,R0
        MOV  R5,@8(R1)
        CLR  @10(R1)
        JMP  PS9
-PS3    CLR  @6(R1)             a routine: its node's page, offset
+PS3    MOV  @EFILE,@6(R1)      a routine: its file, its node's page, offset
        MOV  R4,@8(R1)
        MOV  R5,@10(R1)
 PS9    MOV  @SRET1,R11

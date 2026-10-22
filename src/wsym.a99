@@ -131,6 +131,7 @@ SERR   MOV  R0,@WBERR
        MOV  @SSTK,R10
        MOV  @WBERR,R0
        .leave
+       MOV  @OLDR10,R10        (the caller's stack again)
        RT
 * SERRE - error R0 where ELINE and EFILE say.
 SERRE  MOV  @ELINE,R1

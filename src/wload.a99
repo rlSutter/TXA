@@ -454,3 +454,129 @@ WF8B   MOV  @NF,R0
        B    @WF1
 WF9    .leave
        RT
+
+* ---- shared by the meaning stage's overlays (moved here from wsema.a99) ------
+* DXINF - declaration R3: R4 = its type, R5 = its file (negative if
+* dropped).  Uses R0, R1, R4, R5.
+DXINF  MOV  R11,@SRET3
+       MOV  R3,R0
+       BL   @DXAT
+       MOVB @4(R1),R5
+       SRA  R5,8               (sign-extended: negative if dropped)
+       MOVB @5(R1),R4
+       SRL  R4,8
+       MOV  @SRET3,R11
+       RT
+* DXSEEK - the tree reader at declaration R3's first field; R4 = its
+* type; ELINE, EFILE = its line and file.  Keeps R3.  Uses R0-R2, R4.
+DXSEEK MOV  R11,@SRET3
+       MOV  R3,R0
+       BL   @DXAT
+       MOVB @5(R1),R4
+       SRL  R4,8
+       MOVB @4(R1),R2
+       SRL  R2,8
+       ANDI R2,>7F
+       MOV  R2,@EFILE
+       MOV  @6(R1),@ELINE
+       MOV  @2(R1),R2
+       MOV  *R1,R0
+       MOV  R2,R1
+       BL   @XSET
+       BL   @XB
+       BL   @XB
+       BL   @XW
+       MOV  @SRET3,R11
+       RT
+* DXDROP - declaration R3 dropped (REPLACE, or done with: EXTEND).
+DXDROP MOV  R11,@SRET3
+       MOV  R3,R0
+       BL   @DXAT
+       SOCB @B80,@4(R1)
+       MOV  @SRET3,R11
+       RT
+B80    BYTE >80
+       EVEN
+* OPRD - the string at the reader into OPB as written (8 kept), OPL its
+* length.  Uses R0-R3.
+OPRD   MOV  R11,@SRET3
+       BL   @XB
+       BL   @XW
+       MOV  R0,R3
+       MOV  R0,@OPL
+       CLR  R2
+OPR1   MOV  R3,R3
+       JEQ  OPR9
+       BL   @XB
+       CI   R2,8
+       JHE  OPR2
+       SWPB R0
+       MOVB R0,@OPB(R2)
+       INC  R2
+OPR2   DEC  R3
+       JMP  OPR1
+OPR9   MOV  @SRET3,R11
+       RT
+* OPIS - R0 = 1 if OPB is the string at R1 (length byte first), else 0.
+* Uses R0-R3.
+OPIS   MOVB *R1+,R2
+       SRL  R2,8
+       C    R2,@OPL
+       JNE  OPI8
+       LI   R3,OPB
+OPI1   MOV  R2,R2
+       JEQ  OPI9
+       CB   *R1+,*R3+
+       JNE  OPI8
+       DEC  R2
+       JMP  OPI1
+OPI8   CLR  R0
+       RT
+OPI9   LI   R0,1
+       RT
+* XSEQK - R0 = 1 if the string at the reader is KEYB, in capitals (it is
+* read past either way).  Uses R0-R2, R4, R5.
+XSEQK  MOV  R11,@SRET3
+       BL   @XB
+       BL   @XW
+       MOV  R0,R5
+       LI   R4,1               equal so far
+       C    R0,@KEYL
+       JEQ  XSQ0
+       CLR  R4
+XSQ0   CLR  R2
+XSQ1   MOV  R5,R5
+       JEQ  XSQ9
+       BL   @XB
+       MOV  R4,R4
+       JEQ  XSQ2
+       SWPB R0
+       BL   @UPPER
+       CB   R0,@KEYB(R2)
+       JEQ  XSQ2
+       CLR  R4
+XSQ2   INC  R2
+       DEC  R5
+       JMP  XSQ1
+XSQ9   MOV  R4,R0
+       MOV  @SRET3,R11
+       RT
+
+* VRBAT - R1 = window D's address of verb R0 (from 1).  Uses R0, R1.
+VRBAT  MOV  R11,@SRET4
+       MOV  R0,R1
+       DEC  R1
+       SLA  R1,3
+       AI   R1,>D000
+       LI   R0,VRBPG
+       BL   @DMAP
+       MOV  @SRET4,R11
+       RT
+* XBACK - the reader one byte back.  Uses R0.
+XBACK  MOV  @XOF,R0
+       JNE  XBK1
+       DEC  @XPG
+       LI   R0,4096
+XBK1   DEC  R0
+       MOV  R0,@XOF
+       RT

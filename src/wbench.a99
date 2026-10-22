@@ -17,6 +17,7 @@
 *   1  the lexer (wlex.a99)
 *   2  the parser (wparse.a99)
 *   3  the meaning stage, first half (wsema.a99; wsym.a99, resident, shared)
+*   4  the meaning stage, second half (wsema2.a99)
 * SAMS windows: >D000, >E000, >F000 are the stages' data windows.
 * SAMS pages (512K, the least the workbench needs):
 *   16-31   the overlays (two pages each)
@@ -233,6 +234,12 @@ WL2A   BL   @WALK              the declarations, every file
 WL2B   LI   R0,3               the meaning, first half (overlay 3)
        BL   @OVSEL
        BL   @SEMA1
+       MOV  R0,R0
+       JEQ  WL2C
+       B    @WLERR
+WL2C   LI   R0,4               the meaning, second half (overlay 4)
+       BL   @OVSEL
+       BL   @SEMA2
        MOV  R0,R0
        JEQ  WL4
        B    @WLERR
@@ -643,6 +650,9 @@ OV2END
        XORG >B000
        COPY "wsema.a99"
 OV3END
+       XORG >B000
+       COPY "wsema2.a99"
+OV4END
 
        AORG >2000
 WENTRY B    @WSTART

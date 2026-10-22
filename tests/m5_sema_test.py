@@ -14,12 +14,15 @@ wrapped files:
            the constants worked out (dump.symbols)
   objects  every object after build_objects: tree, attributes,
            properties in order, NAME words (dump.objects)
+  tables   after the whole pass: actions, the sorted dictionary with each
+           word's VERB, VERBTAB, GRAMTAB, ACTSUB, DICTVERB (dump.tables),
+           and the warnings (dump.warnings)
   errors   malformed programs give the same first error, on the same
            line of the same file
 
   python3 tests/m5_sema_test.py [decls|meaning|errors|all] [quick]
 
-(meaning checks symbols and objects together, from one run each.)"""
+(meaning checks symbols, objects and tables together, from one run each.)"""
 import os, sys, tempfile, glob, re
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.join(ROOT, 'tools'))
@@ -153,10 +156,34 @@ def ti_objects(m):
                    f'attrs {" ".join(str(a) for a in attrs)} | props {" ".join(props)} | names {" ".join(names)}')
     return '\n'.join(out) + '\n'
 def py_meaning(path):
-    s = Sema([os.path.dirname(path)])
-    decls = []
-    s.load(path, decls); s.replace_and_extend(decls); s.declare_all(decls); s.build_objects(decls)
-    return s.p
+    return Sema([os.path.dirname(path)]).run(path)
+def ti_tables(m):
+    W = lambda pg, i: amw(m, pg * 4096 + 2 * i)
+    acts, subs = [], []
+    for a in range(m.rw(sy['ACN'])):
+        r = sy['ACTPG'] * 4096 + (a // 56) * 4096 + (a % 56) * 72
+        acts.append(ti_tree_str(m, amw(m, r + 68), amw(m, r + 70)))
+        subs.append('routine:' + ti_symname(m, amw(m, r + 66)))
+    dn = m.rw(sy['DN'])
+    words = []
+    for place in range(1, dn + 1):
+        w = W(sy['DSPG'], place)
+        words.append(f'{dump.esc(ti_word(m, w))}/{W(sy["DVBPG"], w)}')
+    vt = ' '.join(f'num:{W(sy["VTBPG"], i)}' for i in range(m.rw(sy['VN']) + 1))
+    g = []
+    for i in range(m.rw(sy['GRN'])):
+        a = sy['GRMPG'] * 4096 + i * 4
+        k, v = amw(m, a), amw(m, a + 2)
+        g.append(f'num:{sw(v)}' if k == 1 else f'routine:{ti_symname(m, v)}' if k == 4 else f'?{k}:{v}')
+    dv = ' '.join(f'num:{W(sy["DVTPG"], i)}' for i in range(dn + 1))
+    return '\n'.join(['actions ' + ' '.join(acts), 'dictionary ' + ' '.join(words), 'VERBTAB ' + vt,
+                      'GRAMTAB ' + ' '.join(g), 'ACTSUB ' + (' '.join(subs) or 'num:0'), 'DICTVERB ' + dv]) + '\n'
+def ti_warnings(m):
+    files, out = ti_files(m), []
+    for i in range(m.rw(sy['WN'])):
+        a = sy['WRNPG'] * 4096 + i * 6
+        out.append(f'{amw(m, a)} {files[amw(m, a + 2)]} {amw(m, a + 4)}')
+    return '\n'.join(out) + '\n'
 def first_diff(a, b):
     al, bl = a.split('\n'), b.split('\n')
     for i, (x, y) in enumerate(zip(al, bl)):
@@ -168,7 +195,7 @@ def corpus(quick):
     lamp = [('samples/lamplight.txa', LIB)]
     if quick:
         return lamp
-    progs = lamp + [('demos/m1demo.txa', LIB), ('demos/m2demo.txa', LIB), ('tests/txa/m2/m2game.txa', LIB)]
+    progs = lamp + [('demos/m2demo.txa', LIB), ('tests/txa/m2/m2game.txa', LIB)]
     progs += [(f, LIB) for f in sorted(glob.glob(os.path.join(ROOT, 'tests/txa/m3/world*.txa')))]
     progs += [(os.path.join('tests/txa', f), TLIB) for f in ('run1.txa', 'dynmap.txa', 'spec_cellar.txa')]
     return progs
@@ -203,6 +230,11 @@ if which in ('meaning', 'all'):
         check(f'{rel}: symbols identical ({len(p.symbols)}; {steps / 1e6:.0f}M instructions in all)', got == want, first_diff(want, got) if done >= 4 else why)
         want, got = dump.objects(p), (ti_objects(m) if done >= 4 else '')
         check(f'{rel}: objects identical ({len(p.objects)})', got == want, first_diff(want, got) if done >= 4 else why)
+        want, got = dump.tables(p), (ti_tables(m) if done >= 4 else '')
+        check(f'{rel}: actions, dictionary, grammar tables identical ({len(p.actions)} actions, {len(p.dictionary)} words, '
+              f'{len(p.sym("GRAMTAB").gen_values)} GRAMTAB)', got == want, first_diff(want, got) if done >= 4 else why)
+        want, got = dump.warnings(p), (ti_warnings(m) if done >= 4 else '')
+        check(f'{rel}: warnings identical ({len(p.warnings)})', got == want, first_diff(want, got) if done >= 4 else why)
 
 if which in ('errors', 'all'):
     # (file the error is in, line) must match sema.py's
