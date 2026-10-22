@@ -12,13 +12,17 @@
 * >B000->CFFF from two SAMS pages of its own (OVSEL maps them in).  The
 * overlays are assembled at their run address with XORG, staged in the
 * image at >4000 (not RAM here), and the cartridge loader copies each
-* into its pages (tools/build.py, workbench_cart).  Overlay n uses pages
-* OVPG+2(n-1) and OVPG+2(n-1)+1:
+* into its pages (tools/build.py, workbench_cart).  Overlays 5 on are
+* assembled apart (wovl.a99), with this file's symbols, and staged from
+* >0000 in their own image; the resident part enters them at OVENT
+* (>B000), where each begins with a branch to its entry.  Overlay n uses
+* pages OVPG+2(n-1) and OVPG+2(n-1)+1:
 *   1  the lexer (wlex.a99)
 *   2  the parser (wparse.a99)
 *   3  the meaning stage, first half (wsema.a99; wsym.a99, resident, shared)
 *   4  the meaning stage, second half (wsema2.a99)
 *   5  the code generator (wcode.a99)
+*   6  the linker, first half (wlink.a99): substitutions, the first tables
 * SAMS windows: >D000, >E000, >F000 are the stages' data windows.
 * SAMS pages (512K, the least the workbench needs):
 *   16-31   the overlays (two pages each)
@@ -77,6 +81,7 @@ KWNUM  EQU  URECS+>6E          KWIN: the entry being compared
 WBTREE EQU  URECS+>70          the tree's length
 * the resident part (from GLOBRM: the engine's globals, unused here)
 OVPG   EQU  16                 the first overlay's first SAMS page
+OVENT  EQU  >B000              overlays 5 on: their entry is their first word
 OVCUR  EQU  GLOBRM+>00         the overlay mapped in (0: none)
 OVRET  EQU  GLOBRM+>02
 OVTMP  EQU  GLOBRM+>04
@@ -247,7 +252,13 @@ WL2C   LI   R0,4               the meaning, second half (overlay 4)
        B    @WLERR
 WL2D   LI   R0,5               the code (overlay 5)
        BL   @OVSEL
-       BL   @GEN5
+       BL   @OVENT
+       MOV  R0,R0
+       JEQ  WL2E
+       B    @WLERR
+WL2E   LI   R0,6               the linker, first half (overlay 6)
+       BL   @OVSEL
+       BL   @OVENT
        MOV  R0,R0
        JEQ  WL4
        B    @WLERR
@@ -664,10 +675,8 @@ OV3END
        XORG >B000
        COPY "wsema2.a99"
 OV4END
-       XORG >B000
-       COPY "wcode.a99"
-       COPY "gen/bops.a99"
-OV5END
+* (overlays 5 on are assembled apart, in wovl.a99: these four already
+* fill most of the >4000->9FFF staging room)
 
        AORG >2000
 WENTRY B    @WSTART

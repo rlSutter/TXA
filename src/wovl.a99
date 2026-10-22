@@ -1,0 +1,27 @@
+*======================================================================
+* wovl.a99 - the workbench's overlays 5 on (M5 parts 5 and 6), assembled
+* apart from wbench.a99: the first assembly's staging room (>4000->9FFF)
+* holds overlays 1-4 and little more.  tools/build.py assembles wbench.a99
+* first, writes its symbols (but the overlays' own labels, >B000->CFFF)
+* into src/gen/wres.a99, then assembles this file with them; these
+* overlays are staged from >0000 here (this assembly has nothing else) and
+* go into their SAMS pages like the others.
+*
+* Each overlay runs at >B000 and begins there with a branch to its entry:
+* the resident part calls OVENT after OVSEL.  Overlays never refer to
+* each other's labels (the other is not mapped in).
+*======================================================================
+       COPY "macros.a99"
+       COPY "gen/wres.a99"
+
+       AORG >0000
+       XORG >B000
+       B    @GEN5              overlay 5: the code generator
+       COPY "wcode.a99"
+       COPY "gen/bops.a99"
+OV5END
+       XORG >B000
+       B    @LINK6             overlay 6: the linker, first half
+       COPY "wlink.a99"
+OV6END
+       END

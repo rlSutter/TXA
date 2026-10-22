@@ -150,3 +150,45 @@ CODMAX EQU  16384              the code: pages 0, 1, 4, 5 (CODAT)
 SE.MAIN EQU 83                 there is no ROUTINE Main: the game starts there
 SE.ACT EQU  84                 rule cases need the library's global "action"
 SE.CNC EQU  85                 cannot compile Case (a case outside a rule block)
+
+* the linker (wlink.a99, wlink2.a99: overlays 6 and 7)
+IMGEND EQU  112                the image ends before the declaration index
+LFXPG  EQU  124                the tables' fixups: 8 bytes (place hi, lo, kind, key)
+LFXMAX EQU  512
+WHRPG  EQU  62                 where things went (packed addresses): routines by
+*                              place in RDIRPG (+0), strings (+1024), routines
+*                              by symbol (+2048)
+ABBPG  EQU  60                 the 128 substitutions: 8 bytes each (+0 length,
+*                              +2 the text's place here, +4 the next in its
+*                              chain + 1, +6 hash), 64 chains at +1024, the
+*                              texts from +1152
+FLGOFF EQU  2048               DVBPG +2048: each dictionary word's flags byte
+* (variables: what both overlays keep, in ULIT; their own from SV0+66)
+IMGPG  EQU  ULIT+0             the image's first page
+IPH    EQU  ULIT+2             the next byte's place, high word ...
+IPL    EQU  ULIT+4             ... and low
+LFN    EQU  ULIT+6             the tables' fixups
+NABB   EQU  ULIT+8             substitutions chosen
+ISVH   EQU  ULIT+10
+ISVL   EQU  ULIT+12
+IRET   EQU  ULIT+14
+IRET2  EQU  ULIT+16
+IRET3  EQU  ULIT+18
+IRET4  EQU  ULIT+20
+IRET5  EQU  ULIT+22
+ITMP   EQU  ULIT+24
+ITMP2  EQU  ULIT+26
+ABBTXT EQU  ULIT+28            ABBPG: the next free byte for texts
+* the code generator's results, kept for the linker (GLOBRM: no overlay clears it)
+CTOP   EQU  GLOBRM+>40         the code's length
+RN     EQU  GLOBRM+>42         routines
+FXN    EQU  GLOBRM+>44         fixups
+STRN   EQU  GLOBRM+>46         strings
+WDATE  EQU  GLOBRM+>38         6 bytes: the build date, yymmdd (zeros until the
+*                              front end asks: the TI has no clock)
+SE.ROOM EQU 86                 not enough SAMS for the story image (the workbench's limit)
+SE.P255 EQU 87                 a property holds at most 255 words
+SE.DYN EQU  88                 the dynamic area is ... bytes; the limit is 16384
+SE.TAB EQU  89                 the tables before the routines pass 64K
+SE.IMG EQU  90                 the story is ... bytes; the limit is ...
+SE.DSK EQU  91                 a disk error writing the story (the DSR's code in WBERRL)

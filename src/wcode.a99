@@ -23,12 +23,9 @@
 *           1), and at +1024 its jumps (4 bytes: place, label)
 *   LOCPG   its parameters and locals (as overlay 4)
 *======================================================================
-* variables (SV0+66 on: this overlay's own)
-CTOP   EQU  SV0+66             the code's length
+* variables (SV0+66 on: this overlay's own; CTOP, RN, FXN, STRN, its
+* results, are in wsymdef.a99, where the linker finds them)
 CSTART EQU  SV0+68             where this routine starts
-RN     EQU  SV0+70             routines
-FXN    EQU  SV0+72             fixups
-STRN   EQU  SV0+74             strings
 NLAB   EQU  SV0+76             this routine's labels
 NJMP   EQU  SV0+78             its jumps
 LCN5   EQU  SV0+80             its parameters and locals
@@ -58,6 +55,10 @@ GN1    CLR  *R0+
        CLR  @EFPG
        CLR  @DFPG
        CLR  @XFPG
+       CLR  @CTOP              (its results, kept outside SV0)
+       CLR  @RN
+       CLR  @FXN
+       CLR  @STRN
        LI   R0,STRPG           the string hash
        BL   @PGCLR
        LI   R1,QMAIN           ROUTINE Main must exist
@@ -1157,9 +1158,6 @@ GE99   .pop R9
        .pop R8
        .leave
        RT
-QMIN5  BYTE 1
-       TEXT '-'
-       EVEN
 * PROPN - R0 = the number of the property named by the string at the
 * reader.  Uses R0-R7.
 PROPN  MOV  R11,@G4
@@ -1363,35 +1361,6 @@ QHAS5  BYTE 3
        TEXT 'HAS'
 QHASN5 BYTE 5
        TEXT 'HASNT'
-* operators: name, opcode, then 1 if NOT follows
-BINMAP BYTE 1
-       TEXT '+'
-       BYTE OP.ADD,0,1
-       TEXT '-'
-       BYTE OP.SUB,0,1
-       TEXT '*'
-       BYTE OP.MUL,0,1
-       TEXT '/'
-       BYTE OP.DIV,0,3
-       TEXT 'MOD'
-       BYTE OP.MOD,0,1
-       TEXT '='
-       BYTE OP.EQ,0,2
-       TEXT '<>'
-       BYTE OP.NE,0,1
-       TEXT '<'
-       BYTE OP.LT,0,1
-       TEXT '>'
-       BYTE OP.GT,0,2
-       TEXT '<='
-       BYTE OP.LE,0,2
-       TEXT '>='
-       BYTE OP.GE,0,2
-       TEXT 'IN'
-       BYTE OP.IN,0,5
-       TEXT 'NOTIN'
-       BYTE OP.IN,1,0
-       EVEN
 
 * GCALL - the rest of a Call node: obj.prop(args) (RUNPROP, CALLPROP); a
 * built-in function; an array's element; a routine (CALL); a routine
@@ -1748,6 +1717,39 @@ QFAL5  BYTE 5
        TEXT 'FALSE'
 QNOT5  BYTE 7
        TEXT 'NOTHING'
+       EVEN
+
+* operators: name, opcode, then 1 if NOT follows
+BINMAP BYTE 1
+       TEXT '+'
+       BYTE OP.ADD,0,1
+       TEXT '-'
+       BYTE OP.SUB,0,1
+       TEXT '*'
+       BYTE OP.MUL,0,1
+       TEXT '/'
+       BYTE OP.DIV,0,3
+       TEXT 'MOD'
+       BYTE OP.MOD,0,1
+       TEXT '='
+       BYTE OP.EQ,0,2
+       TEXT '<>'
+       BYTE OP.NE,0,1
+       TEXT '<'
+       BYTE OP.LT,0,1
+       TEXT '>'
+       BYTE OP.GT,0,2
+       TEXT '<='
+       BYTE OP.LE,0,2
+       TEXT '>='
+       BYTE OP.GE,0,2
+       TEXT 'IN'
+       BYTE OP.IN,0,5
+       TEXT 'NOTIN'
+       BYTE OP.IN,1,0
+       EVEN
+QMIN5  BYTE 1
+       TEXT '-'
        EVEN
 
 * ---- strings -------------------------------------------------------------------

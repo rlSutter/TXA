@@ -1,0 +1,1396 @@
+*======================================================================
+* wlink.a99 - the linker, first half (M5 part 6), overlay 6: the first
+* part of tools/txc/codegen.py's link().  The text substitutions are
+* chosen (choose_abbrevs: every token of every string counted, the 128
+* with the best score kept); then the image's first tables: the header's
+* room, the object table, the property tables, the globals and the arrays,
+* to the end of the dynamic area.  Overlay 7 (wlink2.a99) does the rest.
+*
+* The image is built from IMGPG, the SAMS page after the trees (see the
+* image helpers in wload.a99).  Choosing the substitutions borrows those
+* pages first: a hash of 1024 chains on IMGPG and 12-byte token records
+* from IMGPG+1 (+0 the next in its chain + 1, +2 its count, +4 its
+* length, +6 its hash, +8 page, +10 offset of its first occurrence in the
+* tree).  RAM >3000->317F holds the list being chosen and a token's text
+* (the meaning stage's stack keeps >3180->37FF).
+*======================================================================
+TOPL   EQU  >3000              128 words: the best tokens so far, best first
+TOKB2  EQU  >3100              128 bytes: a token's text, for comparing
+TOKB   EQU  KEYB               128 bytes (KEYB and NAMB): the token being read
+TOKMAX EQU  128
+* variables (SV0+66 on)
+NTOK   EQU  SV0+66             tokens counted
+NTOP   EQU  SV0+68             in TOPL
+TOKL   EQU  SV0+70             the token in TOKB: its length
+TREM   EQU  SV0+72             the string's bytes still to read
+TPEND  EQU  SV0+74             a byte read ahead (-1: none)
+TPPG   EQU  SV0+76             ... and its place
+TPOF   EQU  SV0+78
+TSPG   EQU  SV0+80             the token's first byte's place
+TSOF   EQU  SV0+82
+THASH  EQU  SV0+84
+K1     EQU  SV0+86             temporaries
+K2     EQU  SV0+88
+K3     EQU  SV0+90
+K4     EQU  SV0+92
+KCUR   EQU  SV0+94             the object (or the record) being worked on
+KGST   EQU  SV0+96             the globals' place in the image
+KDIR   EQU  SV0+98             the arrays' directory
+KANUM  EQU  SV0+100            the array being written
+KS1H   EQU  SV0+102            BETTER: scores
+KS1L   EQU  SV0+104
+KGPG   EQU  SV0+106            SFIND6: the string's place, length, hash
+KGOF   EQU  SV0+108
+KGLEN  EQU  SV0+110
+KGHSH  EQU  SV0+112
+KARN   EQU  SV0+114            arrays: the generated four and every ARRAY kept
+
+* LINK6 - the first half of the linker.  R0 = 0, or an error.
+LINK6  MOV  R10,R9             its own stack (see MSTKT)
+       LI   R10,MSTKT
+       .enter
+       LI   R0,SV0+66
+LK1    CLR  *R0+
+       CI   R0,SV0+120
+       JL   LK1
+       LI   R0,ULIT            the image's variables
+LK2    CLR  *R0+
+       CI   R0,ULIT+96
+       JL   LK2
+       MOV  R9,@OLDR10
+       MOV  R10,@SSTK
+       CLR  @EFPG
+       CLR  @DFPG
+       CLR  @XFPG
+       MOV  @TRNPG,R0          the image: from the page after the trees
+       MOV  @TRNOF,R1
+       JEQ  LK3
+       INC  R0
+LK3    MOV  R0,@IMGPG
+       BL   @CHOOSE
+       LI   R2,H.SIZE          the header's room
+       BL   @IZERO
+       BL   @KOBJS
+       BL   @KGLOBS
+       BL   @KARRS
+       CLR  R0
+       .leave
+       MOV  @OLDR10,R10
+       RT
+
+* ---- choosing the substitutions ---------------------------------------------------
+* CHOOSE - codegen.py's choose_abbrevs: every token longer than one byte,
+* of every string, counted; score (length - 1) x count; the 128 best with
+* a score above 0, ties broken by the token's bytes; into ABBPG.
+CHOOSE .enter
+       MOV  @IMGPG,R0          the hash
+       BL   @PGCLR
+       CLR  @NTOK
+       CLR  R8                 each string
+CH1    C    R8,@STRN
+       JHE  CH5
+       MOV  R8,R0
+       SLA  R0,3
+       MOV  R0,R1
+       AI   R1,>D200
+       LI   R0,STRPG
+       BL   @DMAP
+       MOV  @4(R1),R2
+       MOV  @2(R1),R0
+       MOV  R2,R1
+       BL   @XSET
+       BL   @XB                (>04)
+       BL   @XW
+       MOV  R0,@TREM
+       SETO @TPEND
+CH2    BL   @TNEXT
+       MOV  R0,R0
+       JEQ  CH4
+       MOV  @TOKL,R0
+       CI   R0,1
+       JEQ  CH2
+       BL   @TCOUNT
+       JMP  CH2
+CH4    INC  R8
+       JMP  CH1
+CH5    CLR  @NTOP              the best 128
+       CLR  R8
+CH6    C    R8,@NTOK
+       JHE  CH10
+       MOV  @NTOP,R7
+       CI   R7,128
+       JL   CH7
+       LI   R7,127             full: better than the last?
+       MOV  @TOPL+254,R1
+       MOV  R8,R0
+       .push R7                (BETTER uses R0-R7)
+       BL   @BETTER
+       .pop R7
+       MOV  R0,R0
+       JEQ  CH9
+CH7    MOV  R7,R7              then up the list while it beats the one above
+       JEQ  CH8
+       MOV  R7,R1
+       DEC  R1
+       SLA  R1,1
+       MOV  @TOPL(R1),R1
+       MOV  R8,R0
+       .push R7
+       BL   @BETTER
+       .pop R7
+       MOV  R0,R0
+       JEQ  CH8
+       MOV  R7,R1
+       SLA  R1,1
+       MOV  @TOPL-2(R1),@TOPL(R1)
+       DEC  R7
+       JMP  CH7
+CH8    MOV  R7,R1
+       SLA  R1,1
+       MOV  R8,@TOPL(R1)
+       MOV  @NTOP,R0
+       CI   R0,128
+       JHE  CH9
+       INC  @NTOP
+CH9    INC  R8
+       JMP  CH6
+CH10   MOV  @NTOP,@NABB        into ABBPG: each one's text, its chain
+       LI   R0,ABBPG
+       BL   @PGCLR             (through window E)
+       LI   R0,1152
+       MOV  R0,@ABBTXT
+       CLR  R8
+CH11   C    R8,@NABB
+       JHE  CH19
+       MOV  R8,R1
+       SLA  R1,1
+       MOV  @TOPL(R1),R0       its record
+       BL   @KREC
+       MOV  @4(R1),R6          its length
+       MOV  @6(R1),R5          its hash
+       MOV  @10(R1),R3
+       MOV  @8(R1),R2
+       MOV  @ABBTXT,R4
+       MOV  R4,R0
+       A    R6,R0
+       CI   R0,4096
+       JLE  CH12
+       LI   R0,SE.MNY
+       B    @SERRE
+CH12   MOV  R0,@ABBTXT
+       .push R6
+CH13   MOV  R6,R6              its text, from the tree
+       JEQ  CH14
+       MOV  R2,R0
+       BL   @EMAP
+       MOV  R3,R1
+       AI   R1,>E000
+       MOVB *R1,R7
+       LI   R0,ABBPG
+       BL   @DMAP
+       MOVB R7,@>D000(R4)
+       INC  R4
+       INC  R3
+       CI   R3,4096
+       JL   CH13A
+       CLR  R3
+       INC  R2
+CH13A  DEC  R6
+       JMP  CH13
+CH14   .pop R6
+       LI   R0,ABBPG           its entry: length, text, chain, hash
+       BL   @DMAP
+       MOV  R8,R1
+       SLA  R1,3
+       AI   R1,>D000
+       MOV  R6,*R1
+       MOV  @ABBTXT,R0
+       S    R6,R0
+       MOV  R0,@2(R1)
+       MOV  R5,@6(R1)
+       MOV  R5,R2              into chain hash AND 63
+       ANDI R2,63
+       SLA  R2,1
+       MOV  @>D400(R2),@4(R1)
+       MOV  R8,R0
+       INC  R0
+       MOV  R0,@>D400(R2)
+       INC  R8
+       JMP  CH11
+CH19   .leave
+       RT
+
+* TNEXT - the next token of the string being read (TREM bytes left, TPEND
+* a byte read ahead): a run of letters with one space after it if there
+* is one, or one other byte.  Into TOKB, TOKL; TSPG:TSOF its first
+* byte's place.  R0 = 0 when the string is done.  Uses R0-R3.
+TNEXT  MOV  R11,@K1
+       MOV  @TPEND,R0
+       JLT  TN1
+       SETO @TPEND             the byte read ahead
+       MOV  @TPPG,@TSPG
+       MOV  @TPOF,@TSOF
+       JMP  TN2
+TN1    MOV  @TREM,R0
+       JEQ  TN9
+       DEC  @TREM
+       MOV  @XPG,@TSPG
+       MOV  @XOF,@TSOF
+       BL   @XB
+TN2    SWPB R0
+       MOVB R0,@TOKB
+       LI   R2,1
+       BL   @LETTER
+       MOV  R1,R1
+       JEQ  TN8                not a letter: itself
+TN3    MOV  @TREM,R0           letters: the run
+       JEQ  TN8
+       DEC  @TREM
+       MOV  @XPG,@TPPG
+       MOV  @XOF,@TPOF
+       BL   @XB
+       SWPB R0
+       BL   @LETTER
+       MOV  R1,R1
+       JEQ  TN4
+       BL   @TPUTC
+       JMP  TN3
+TN4    CB   R0,@BSPC           a space ends it, and is part of it
+       JNE  TN5
+       BL   @TPUTC
+       JMP  TN8
+TN5    SWPB R0                 anything else: read ahead
+       MOV  R0,@TPEND
+TN8    MOV  R2,@TOKL
+       LI   R0,1
+       MOV  @K1,R11
+       RT
+TN9    CLR  R0
+       MOV  @K1,R11
+       RT
+* TPUTC - R0's high byte onto TOKB (R2 its length).  Uses R2.
+TPUTC  CI   R2,TOKMAX
+       JL   TPC1
+       LI   R0,SE.MNY          (a word of more than 127 letters)
+       B    @SERRE
+TPC1   MOVB R0,@TOKB(R2)
+       INC  R2
+       RT
+* LETTER - R1 = 1 if R0's high byte is A-Z or a-z, else 0.
+LETTER CLR  R1
+       CB   R0,@BUPA
+       JL   LT9
+       CB   R0,@BUPZ
+       JLE  LT8
+       CB   R0,@BLWA
+       JL   LT9
+       CB   R0,@BLWZ
+       JH   LT9
+LT8    INC  R1
+LT9    RT
+
+* TCOUNT - the token in TOKB counted: found by its hash and text, or a new
+* record (its first occurrence's place).  Uses R0-R7.
+TCOUNT .enter
+       CLR  R0                 its hash (as names', every byte)
+       MOV  @TOKL,R2
+       LI   R1,TOKB
+TC1    MOV  R2,R2
+       JEQ  TC2
+       SRC  R0,13
+       MOVB *R1+,R3
+       SRL  R3,8
+       XOR  R3,R0
+       DEC  R2
+       JMP  TC1
+TC2    MOV  R0,@THASH
+       ANDI R0,1023
+       SLA  R0,1
+       MOV  R0,R6              its chain
+       MOV  @IMGPG,R0
+       BL   @DMAP
+       MOV  @>D000(R6),R5
+TC3    MOV  R5,R5
+       JEQ  TC6
+       DEC  R5
+       MOV  R5,R0
+       BL   @KREC
+       C    @6(R1),@THASH
+       JNE  TC5
+       C    @4(R1),@TOKL
+       JNE  TC5
+       MOV  @8(R1),R2
+       MOV  @10(R1),R3
+       BL   @TCMP
+       MOV  R0,R0
+       JEQ  TC4
+       MOV  R5,R0              the same: one more
+       BL   @KREC
+       INC  @2(R1)
+       JMP  TC9
+TC4    MOV  R5,R0
+       BL   @KREC
+TC5    MOV  *R1,R5
+       JMP  TC3
+TC6    MOV  @NTOK,R5           a new one
+       MOV  R5,R0
+       BL   @KREC              (it checks there is room)
+       MOV  @IMGPG,R0
+       BL   @DMAP
+       MOV  @>D000(R6),R4
+       MOV  R5,R0
+       INC  R0
+       MOV  R0,@>D000(R6)
+       MOV  R5,R0
+       BL   @KREC
+       MOV  R4,*R1
+       LI   R0,1
+       MOV  R0,@2(R1)
+       MOV  @TOKL,@4(R1)
+       MOV  @THASH,@6(R1)
+       MOV  @TSPG,@8(R1)
+       MOV  @TSOF,@10(R1)
+       INC  @NTOK
+TC9    .leave
+       RT
+* KREC - R1 = window D's address of token record R0.  Uses R0, R1.
+KREC   MOV  R11,@K2
+       MOV  R0,R1
+       CLR  R0
+       DIV  @D341,R0           R0 = its page from IMGPG + 1, R1 = its place
+       MPY  @D12,R1            (R2 = the offset)
+       MOV  R2,R1
+       AI   R1,>D000
+       A    @IMGPG,R0
+       INC  R0
+       CI   R0,IMGEND
+       JL   KRC1
+       LI   R0,SE.ROOM
+       B    @SERRE
+KRC1    BL   @DMAP
+       MOV  @K2,R11
+       RT
+D341   DATA 341
+D12    DATA 12
+* TCMP - R0 = 1 if TOKB (TOKL bytes) is the text at tree page R2, offset
+* R3 (read through window E).  Uses R0-R4.
+TCMP   MOV  R11,@K3
+       CLR  R4
+TCM1   C    R4,@TOKL
+       JHE  TCM8
+       MOV  R2,R0
+       BL   @EMAP
+       MOV  R3,R1
+       AI   R1,>E000
+       CB   *R1,@TOKB(R4)
+       JNE  TCM7
+       INC  R4
+       INC  R3
+       CI   R3,4096
+       JL   TCM1
+       CLR  R3
+       INC  R2
+       JMP  TCM1
+TCM7   CLR  R0
+       MOV  @K3,R11
+       RT
+TCM8   LI   R0,1
+       MOV  @K3,R11
+       RT
+* BETTER - R0 = 1 if token record R0 comes before record R1: a higher
+* score, or the same score and its bytes first (a shorter text that
+* begins the other first).  Uses R0-R7.
+BETTER .enter
+       MOV  R1,R7              (the other)
+       BL   @KREC              this one's score: (length - 1) x count
+       MOV  @4(R1),R3
+       DEC  R3
+       MPY  @2(R1),R3
+       MOV  R3,@KS1H
+       MOV  R4,@KS1L
+       MOV  @8(R1),@K1         (and its text's place, length)
+       MOV  @10(R1),@K4
+       MOV  @4(R1),R6
+       MOV  R7,R0
+       BL   @KREC
+       MOV  @4(R1),R3
+       DEC  R3
+       MPY  @2(R1),R3
+       C    @KS1H,R3
+       JH   BT8
+       JL   BT7
+       C    @KS1L,R4
+       JH   BT8
+       JL   BT7
+       MOV  @4(R1),R5          the same score: the other's text into TOKB2
+       MOV  @8(R1),R2
+       MOV  @10(R1),R3
+       CLR  R4
+BT1    C    R4,R5
+       JHE  BT2
+       MOV  R2,R0
+       BL   @EMAP
+       MOV  R3,R1
+       AI   R1,>E000
+       MOVB *R1,@TOKB2(R4)
+       INC  R4
+       INC  R3
+       CI   R3,4096
+       JL   BT1
+       CLR  R3
+       INC  R2
+       JMP  BT1
+BT2    MOV  @K1,R2             this one's text against it
+       MOV  @K4,R3
+       CLR  R4
+BT3    C    R4,R6
+       JHE  BT5                this one ended
+       C    R4,R5
+       JHE  BT7                the other ended first: it comes first
+       MOV  R2,R0
+       BL   @EMAP
+       MOV  R3,R1
+       AI   R1,>E000
+       CB   *R1,@TOKB2(R4)
+       JH   BT7
+       JL   BT8
+       INC  R4
+       INC  R3
+       CI   R3,4096
+       JL   BT3
+       CLR  R3
+       INC  R2
+       JMP  BT3
+BT5    C    R6,R5              this one ended: first if the other is longer
+       JL   BT8
+BT7    CLR  R0
+       JMP  BT9
+BT8    LI   R0,1
+BT9    .leave
+       RT
+
+* ---- the object table and the property tables ----------------------------------
+* KOBJS - every object's 14-byte entry (parent, sibling, child, its 48
+* attribute bits, its property table's place), then the property tables:
+* the short name's string (or 0), each property in number order (a
+* routine: number + 128, 1, its address; one string: number + 64, 1, its
+* address; one routine name: number + 128, 1, its address; else the
+* number, how many words, the words), then a 0 byte, to an even place.
+KOBJS  .enter
+       .push R9
+       LI   R0,H.OBJECTS
+       MOV  @IPL,R2
+       BL   @HDRW
+       LI   R0,H.OBJECT_COUNT
+       MOV  @ON,R2
+       BL   @HDRW
+       MOV  @ON,R2             the entries: zeros for now
+       MPY  @DOBJE,R2
+       MOV  R3,R2
+       BL   @IZERO
+       LI   R2,1
+       BL   @IALIGN
+       LI   R0,H.PROPS_START
+       MOV  @IPL,R2
+       BL   @HDRW
+       CLR  @KCUR
+KO1    INC  @KCUR
+       C    @KCUR,@ON
+       JLE  KO2
+       .pop R9
+       .leave
+       RT
+KO2    MOV  @KCUR,R0           its entry: e = H.SIZE + 14 (n - 1)
+       DEC  R0
+       MPY  @DOBJE,R0
+       AI   R1,H.SIZE
+       MOV  R1,R8              (e)
+       MOV  @KCUR,R0
+       BL   @OBJAT
+       MOV  @4(R1),R0          parent, sibling, child
+       CLR  R2
+       MOV  R8,R3
+       BL   @IPUTW
+       MOV  @KCUR,R0
+       BL   @OBJAT
+       MOV  @8(R1),R0
+       CLR  R2
+       MOV  R8,R3
+       INCT R3
+       BL   @IPUTW
+       MOV  @KCUR,R0
+       BL   @OBJAT
+       MOV  @6(R1),R0
+       CLR  R2
+       MOV  R8,R3
+       AI   R3,4
+       BL   @IPUTW
+       CLR  R7                 its attributes: 6 bytes, as the image has them
+KO3    MOV  @KCUR,R0
+       BL   @OBJAT
+       A    R7,R1
+       MOVB @22(R1),R0
+       MOVB R0,@K1
+       MOV  @IPH,@ISVH         (the byte at e + 6 + i)
+       MOV  @IPL,@ISVL
+       CLR  @IPH
+       MOV  R8,R0
+       AI   R0,6
+       A    R7,R0
+       MOV  R0,@IPL
+       MOVB @K1,R0
+       SWPB R0
+       BL   @IBYTE
+       MOV  @ISVH,@IPH
+       MOV  @ISVL,@IPL
+       INC  R7
+       CI   R7,6
+       JL   KO3
+       MOV  @IPL,R0            e + 12: the property table's place
+       CLR  R2
+       MOV  R8,R3
+       AI   R3,12
+       BL   @IPUTW
+       MOV  @KCUR,R0           the short name
+       BL   @OBJAT
+       MOV  @18(R1),R0
+       JEQ  KO4
+       MOV  @20(R1),R1
+       BL   @XSET
+       BL   @SFIND6
+       MOV  R0,R5
+       LI   R4,2
+       BL   @LFIX
+       JMP  KO5
+KO4    CLR  R0
+       BL   @IWORD
+KO5    CLR  R9                 the properties, by number
+KO6    INC  R9
+       CI   R9,63
+       JLE   $+6
+       B    @KO20
+       MOV  R9,R2
+       BL   @KPFIND            R0 = its cell, or 0
+       MOV  R0,R7
+       JEQ  KO6
+       BL   @HCELL
+       MOV  @4(R1),R0
+       CI   R0,2
+       JNE  KO7
+       MOV  R9,R0              a routine: number + 128, 1, its address
+       AI   R0,PK.ROUT
+       BL   @IBYTE
+       LI   R0,1
+       BL   @IBYTE
+       MOV  @KCUR,R4           (its place in RDIRPG)
+       MOV  R9,R5
+       BL   @RDFIND
+       MOV  R0,R5
+       LI   R4,3
+       BL   @LFIX
+       JMP  KO6
+KO7    CI   R0,3
+       JNE  KO10
+       MOV  @KCUR,R0           NAME words: number, how many, each word's place
+       BL   @OBJAT
+       MOV  @28(R1),R5
+       CI   R5,255
+       JLE  KO8
+       B    @KP255
+KO8    MOV  R9,R0
+       BL   @IBYTE
+       MOV  R5,R0
+       BL   @IBYTE
+       MOV  @KCUR,R0
+       BL   @OBJAT
+       MOV  @14(R1),R5
+KO9    MOV  R5,R5
+       JEQ  KO6
+       MOV  R5,R0
+       BL   @HCELL
+       MOV  *R1,R5
+       MOV  @2(R1),R0
+       BL   @DNUM
+       BL   @IWORD
+       JMP  KO9
+KO10   MOV  R7,R0              values: one string, one routine, or the words
+       BL   @HCELL
+       MOV  @6(R1),R5          how many
+       MOV  @8(R1),R4          the first
+       CI   R5,1
+       JNE  KO13
+       MOV  R4,R0
+       BL   @HCELL
+       MOV  *R1,R0
+       CI   R0,2
+       JNE  KO11
+       MOV  @2(R1),R0          one string: a string value's place: its number
+       MOV  @4(R1),R1
+       BL   @XSET
+       BL   @SFIND6
+       MOV  R0,R5
+       MOV  R9,R0
+       AI   R0,PK.STR
+       BL   @IBYTE
+       LI   R0,1
+       BL   @IBYTE
+       LI   R4,2
+       BL   @LFIX
+       JMP  KO6
+KO11   CI   R0,4
+       JNE  KO13
+       MOV  @2(R1),R5          one routine's name
+       MOV  R9,R0
+       AI   R0,PK.ROUT
+       BL   @IBYTE
+       LI   R0,1
+       BL   @IBYTE
+       LI   R4,1
+       BL   @LFIX
+       B    @KO6
+KO13   CI   R5,255
+       JLE  KO14
+       B    @KP255
+KO14   MOV  R9,R0              the number, how many, the words
+       BL   @IBYTE
+       MOV  R5,R0
+       BL   @IBYTE
+KO15   MOV  R5,R5
+       JNE  KO15A
+       B    @KO6
+KO15A  DEC  R5
+       MOV  R4,R0
+       BL   @HCELL
+       MOV  *R1,R0             kind: 1 number, 2 string, 3 object, 4 routine, 5 word
+       MOV  @2(R1),R2
+       MOV  @4(R1),R3
+       .push R4
+       .push R5
+       BL   @KVALW
+       .pop R5
+       .pop R4
+       INCT R4
+       JMP  KO15
+KO20   CLR  R0                 the end, to an even place
+       BL   @IBYTE
+       LI   R2,1
+       BL   @IALIGN
+       B    @KO1
+KP255  MOV  @KCUR,R0           more than 255 words: at the object's declaration
+       BL   @OBJAT
+       MOV  @30(R1),R3
+       LI   R0,SE.P255
+       B    @SERRD
+DOBJE  DATA OBJENT
+* KVALW - one value's word: kind R0 (1 number, 2 string at tree page R2
+* offset R3, 3 object, 4 routine symbol R2, 5 dictionary word R2; else
+* R2 the value).  Uses R0-R7.
+KVALW  .enter
+       CI   R0,2
+       JNE  KV2
+       MOV  R2,R0              a string: its address, fixed up later
+       MOV  R3,R1
+       BL   @XSET
+       BL   @SFIND6
+       MOV  R0,R5
+       LI   R4,2
+       BL   @LFIX
+       JMP  KV9
+KV2    CI   R0,4
+       JNE  KV3
+       MOV  R2,R5              a routine
+       LI   R4,1
+       BL   @LFIX
+       JMP  KV9
+KV3    CI   R0,5
+       JNE  KV4
+       MOV  R2,R0              a word: its place in the dictionary
+       BL   @DNUM
+       BL   @IWORD
+       JMP  KV9
+KV4    MOV  R2,R0              a number, an object
+       BL   @IWORD
+KV9    .leave
+       RT
+* DNUM - R0 = dictionary word R0's place (DNPG).  Uses R0, R1.
+DNUM   MOV  R11,@K2
+       MOV  R0,R1
+       SLA  R1,1
+       LI   R0,DNPG
+       BL   @EMAP
+       MOV  @>E000(R1),R0
+       MOV  @K2,R11
+       RT
+* HDRW - header field R0 := R2.  Uses R0-R3.
+HDRW   MOV  R11,@K3
+       MOV  R0,R3
+       MOV  R2,R0
+       CLR  R2
+       BL   @IPUTW
+       MOV  @K3,R11
+       RT
+* KPFIND - R0 = the cell of object KCUR's property R2, or 0.  Uses R0, R1.
+KPFIND MOV  R11,@K2
+       MOV  @KCUR,R0
+       BL   @OBJAT
+       MOV  @10(R1),R0
+KPF1   MOV  R0,R0
+       JEQ  KPF9
+       MOV  R0,@K4
+       BL   @HCELL
+       C    @2(R1),R2
+       JEQ  KPF8
+       MOV  *R1,R0
+       JMP  KPF1
+KPF8   MOV  @K4,R0
+KPF9   MOV  @K2,R11
+       RT
+* RDFIND - R0 = the place in RDIRPG of object R4's property routine R5.
+* Uses R0-R3.
+RDFIND MOV  R11,@K2
+       CLR  R3
+RDF1   C    R3,@RN
+       JHE  RDF8
+       MOV  R3,R1
+       SLA  R1,3
+       AI   R1,>D000
+       LI   R0,RDIRPG
+       BL   @DMAP
+       MOVB *R1,R0             kind 2, the property, the object
+       SRL  R0,8
+       CI   R0,2
+       JNE  RDF5
+       MOVB @1(R1),R0
+       SRL  R0,8
+       C    R0,R5
+       JNE  RDF5
+       C    @2(R1),R4
+       JEQ  RDF9
+RDF5   INC  R3
+       JMP  RDF1
+RDF8   CLR  R3                 (cannot happen: the code generator made it)
+RDF9   MOV  R3,R0
+       MOV  @K2,R11
+       RT
+
+* ---- globals and arrays ----------------------------------------------------------
+* KGLOBS - 240 global words, zero; each GLOBAL's starting value in its
+* place (a string or a routine: fixed up later).
+KGLOBS .enter
+       LI   R0,H.GLOBALS
+       MOV  @IPL,R2
+       MOV  R2,@KGST
+       BL   @HDRW
+       LI   R2,480
+       BL   @IZERO
+       CLR  R3                 each GLOBAL kept, numbered in order
+       CLR  R8
+KGL1    C    R3,@DXN
+       JHE  KGL9
+       BL   @DXINF
+       MOV  R5,R5
+       JLT  KGL5
+       CI   R4,NT.GLO
+       JNE  KGL5
+       .push R3
+       BL   @DXSEEK
+       BL   @XSKIP             (its name)
+       BL   @XB                its value: None, or an expression
+       MOV  R0,R0
+       JEQ  KGL4
+       BL   @XBACK
+       BL   @PVAL6
+       MOV  @KGST,R3           its place: globals + 2n
+       MOV  R8,R0
+       SLA  R0,1
+       A    R0,R3
+       CLR  R2
+       CI   R4,2
+       JEQ  KGL3
+       CI   R4,4
+       JEQ  KGL3
+       MOV  R5,R0              a number, an object: the word
+       BL   @IPUTW
+       JMP  KGL4
+KGL3    CI   R4,4               a string, a routine: a fixup there
+       JEQ  KGL3A
+       LI   R4,2
+       JMP  KGL3B
+KGL3A   LI   R4,1
+KGL3B   BL   @LFIXAT
+KGL4    .pop R3
+       INC  R8
+KGL5    INC  R3
+       JMP  KGL1
+KGL9    .leave
+       RT
+
+* KARRS - the arrays: a directory (their count, then each one's place and
+* length), then their words; the generated four first (VERBTAB, GRAMTAB,
+* ACTSUB, DICTVERB), then each ARRAY in declaration order.  Then the end of
+* the dynamic area, to an even place.
+KARRS  .enter
+       LI   R0,4               how many: the generated four, and each ARRAY kept
+       MOV  R0,@KARN
+       CLR  R3
+KAN1   C    R3,@DXN
+       JHE  KAN2
+       BL   @DXINF
+       MOV  R5,R5
+       JLT  KAN1A
+       CI   R4,NT.ARR
+       JNE  KAN1A
+       INC  @KARN
+KAN1A  INC  R3
+       JMP  KAN1
+KAN2   LI   R0,H.ARRAYS
+       MOV  @IPL,R2
+       BL   @HDRW
+       MOV  @KARN,R0
+       BL   @IWORD
+       MOV  @IPL,@KDIR
+       MOV  @KARN,R2
+       SLA  R2,2
+       BL   @IZERO
+       CLR  @KANUM
+       MOV  @VN,R8             VERBTAB: VN + 1 words
+       INC  R8
+       BL   @KADIR
+       CLR  R7
+KA1    C    R7,R8
+       JHE  KA2
+       LI   R0,VTBPG
+       BL   @EMAP
+       MOV  R7,R1
+       SLA  R1,1
+       MOV  @>E000(R1),R0
+       BL   @IWORD
+       INC  R7
+       JMP  KA1
+KA2    MOV  @GRN,R8            GRAMTAB: numbers, and routines (filters)
+       BL   @KADIR
+       CLR  R7
+KA3    C    R7,R8
+       JHE  KA5
+       MOV  R7,R0
+       MOV  R0,R1
+       ANDI R1,1023
+       SLA  R1,2
+       SRL  R0,10
+       AI   R0,GRMPG
+       BL   @EMAP
+       MOV  @>E000(R1),R0      kind: 1 number, 4 routine
+       MOV  @>E002(R1),R5
+       CI   R0,4
+       JNE  KA4
+       LI   R4,1
+       BL   @LFIX
+       JMP  KA4A
+KA4    MOV  R5,R0
+       BL   @IWORD
+KA4A   INC  R7
+       JMP  KA3
+KA5    MOV  @ACN,R8            ACTSUB: each action's routine, or one 0
+       JNE  KA6
+       LI   R8,1
+       BL   @KADIR
+       CLR  R0
+       BL   @IWORD
+       JMP  KA8
+KA6    BL   @KADIR
+       CLR  R7
+KA7    C    R7,R8
+       JHE  KA8
+       MOV  R7,R0              (overlay 4's ACTAT: 56 a page, 72 bytes)
+       MOV  R0,R1
+       CLR  R0
+       DIV  @D56K,R0
+       MPY  @D72K,R1
+       MOV  R2,R1
+       AI   R1,>D000
+       AI   R0,ACTPG
+       BL   @DMAP
+       MOV  @66(R1),R5
+       LI   R4,1
+       BL   @LFIX
+       INC  R7
+       JMP  KA7
+KA8    MOV  @DN,R8             DICTVERB: DN + 1 words
+       INC  R8
+       BL   @KADIR
+       CLR  R7
+KA9    C    R7,R8
+       JHE  KA10
+       LI   R0,DVTPG
+       BL   @EMAP
+       MOV  R7,R1
+       SLA  R1,1
+       MOV  @>E000(R1),R0
+       BL   @IWORD
+       INC  R7
+       JMP  KA9
+KA10   CLR  R3                 each ARRAY kept, in declaration order
+KA11   C    R3,@DXN
+       JL   KA11A
+       B    @KA20
+KA11A  BL   @DXINF
+       MOV  R5,R5
+       JLT  KA19
+       CI   R4,NT.ARR
+       JNE  KA19
+       .push R3
+       BL   @DXSEEK
+       BL   @XSKIP             (its name)
+       BL   @XB                its size: None, or a number
+       MOV  R0,R0
+       JEQ  KA12
+       BL   @XW
+       MOV  R0,R8
+       JMP  KA13
+KA12   CLR  R8
+KA13   BL   @XB                its values: None (size zeros), or a list
+       MOV  R0,R0
+       JNE  KA15
+       BL   @KADIR
+       MOV  R8,R2
+       SLA  R2,1
+       BL   @IZERO
+       JMP  KA18
+KA15   BL   @XW
+       MOV  R0,R8
+       BL   @KADIR
+KA16   MOV  R8,R8
+       JEQ  KA18
+       DEC  R8
+       .push R8
+       BL   @PVAL6
+       CI   R4,2               a string, a routine: a fixup
+       JEQ  KA17
+       CI   R4,4
+       JEQ  KA17A
+       MOV  R5,R0
+       BL   @IWORD
+       JMP  KA17B
+KA17   LI   R4,2
+       BL   @LFIX
+       JMP  KA17B
+KA17A  LI   R4,1
+       BL   @LFIX
+KA17B  .pop R8
+       JMP  KA16
+KA18   .pop R3
+KA19   INC  R3
+       B    @KA11
+KA20   LI   R2,1               the end of the dynamic area
+       BL   @IALIGN
+       MOV  @IPH,R0
+       JNE  KA21
+       MOV  @IPL,R0
+       CI   R0,16384
+       JLE  KA22
+KA21   CLR  R1                 ("<program>", line 0)
+       LI   R2,255
+       LI   R0,SE.DYN
+       B    @SERR
+KA22   LI   R0,H.DYNAMIC_LEN
+       MOV  @IPL,R2
+       BL   @HDRW
+       .leave
+       RT
+* KADIR - array KANUM's directory entry: here, and R8 words; then the
+* next array.  Uses R0-R3.
+KADIR  MOV  R11,@K2
+       MOV  @KANUM,R3
+       SLA  R3,2
+       A    @KDIR,R3
+       MOV  @IPL,R0
+       CLR  R2
+       BL   @IPUTW
+       INCT R3
+       MOV  R8,R0
+       CLR  R2
+       BL   @IPUTW
+       INC  @KANUM
+       MOV  @K2,R11
+       RT
+D56K   DATA 56
+D72K   DATA 72
+
+* ---- values: sema.py's prop_value, fold, and the strings' numbers ------------------
+* PVAL6 - the starting value at the reader (read past it) as R4 = kind
+* (1 number, 2 string: R5 its number, 3 object, 4 routine: R5 its
+* symbol), R5 the value.  Errors at the node, in EFILE (sema.py's
+* prop_value, which link() calls for globals and arrays).
+PVAL6  .enter
+       .push R7
+       .push R8
+       MOV  @XPG,R7
+       MOV  @XOF,R8
+       BL   @XB
+       BL   @XB
+       MOV  R0,R4
+       BL   @XW
+       MOV  R0,@ELINE
+       CI   R4,NT.STR
+       JNE  PQ2
+       BL   @SFIND6            a string: its number
+       MOV  R0,R5
+       LI   R4,2
+       JMP  PQ99
+PQ2    CI   R4,NT.NAM
+       JNE  PQ5
+       BL   @KEYRD
+       BL   @SLOOKK
+       MOV  R0,R0
+       JNE  PQ3
+       LI   R0,SE.UNK
+       B    @SERRE
+PQ3    MOV  R0,R6
+       CI   R1,K.OBJ
+       JNE  PQ3A
+       LI   R4,3
+       JMP  PQ3N
+PQ3A   CI   R1,K.ROU
+       JNE  PQ3B
+       LI   R4,4
+       MOV  R6,R5
+       JMP  PQ99
+PQ3B   CI   R1,K.PIC
+       JL   PQ3C
+       LI   R4,1
+PQ3N   MOV  R6,R0
+       BL   @SYMAT
+       MOV  @4(R1),R5
+       JMP  PQ99
+PQ3C   CI   R1,K.CON
+       JNE  PQ9
+       MOV  R6,R0              a constant: its value (known by now)
+       BL   @SYMAT
+       MOV  @4(R1),R5
+       LI   R4,1
+       JMP  PQ99
+PQ5    CI   R4,NT.CST
+       JNE  PQ6
+       BL   @OPRD
+       LI   R1,QSELF6
+       BL   @OPIS
+       MOV  R0,R0
+       JEQ  PQ6
+       LI   R0,SE.SLV
+       B    @SERRE
+PQ6    MOV  R7,R0              anything else: folded, from the node's start
+       MOV  R8,R1
+       BL   @XSET
+       .push @ELINE
+       BL   @FOLD6
+       .pop @ELINE
+       MOV  R1,R1
+       JEQ  PQ9
+       MOV  R0,R5
+       LI   R4,1
+       JMP  PQ99
+PQ9    LI   R0,SE.PVL
+       B    @SERRE
+PQ99   .pop R8
+       .pop R7
+       .leave
+       RT
+QSELF6 BYTE 4
+       TEXT 'SELF'
+       EVEN
+
+* SFIND6 - R0 = the number of the string at the reader (its >04 next;
+* read past it): the one the code generator met with the same text.
+* Uses R0-R7.
+SFIND6 .enter
+       MOV  @XPG,@KGPG
+       MOV  @XOF,@KGOF
+       BL   @XB
+       BL   @XW
+       MOV  R0,@KGLEN
+       MOV  R0,R3              its hash: as overlay 5's SADDS
+       CLR  R4
+SF1    MOV  R3,R3
+       JEQ  SF2
+       BL   @XB
+       SRC  R4,13
+       XOR  R0,R4
+       DEC  R3
+       JMP  SF1
+SF2    ANDI R4,255
+       SLA  R4,1
+       LI   R0,STRPG
+       BL   @DMAP
+       MOV  @>D000(R4),R5
+SF3    MOV  R5,R5
+       JEQ  SF8
+       DEC  R5
+       MOV  R5,R1
+       SLA  R1,3
+       AI   R1,>D200
+       LI   R0,STRPG
+       BL   @DMAP
+       C    @6(R1),@KGLEN
+       JNE  SF5
+       MOV  @2(R1),R6
+       MOV  @4(R1),R7
+       BL   @TSEQ6
+       MOV  R0,R0
+       JEQ  SF5A
+       MOV  R5,R0
+       .leave
+       RT
+SF5A   MOV  R5,R1
+       SLA  R1,3
+       AI   R1,>D200
+       LI   R0,STRPG
+       BL   @DMAP
+SF5    MOV  *R1,R5
+       JMP  SF3
+SF8    CLR  R0                 (cannot happen: every string was met)
+       .leave
+       RT
+* TSEQ6 - as overlay 5's TSEQ, with KGPG, KGOF, KGLEN: R0 = 1 if the
+* strings at KGPG:KGOF and R6:R7 have the same bytes.  The reader ends
+* past the first.  Uses R0-R4, R6, R7.
+TSEQ6  .enter
+       MOV  @KGPG,R2
+       MOV  @KGOF,R3
+       AI   R3,3
+       AI   R7,3
+       MOV  @KGLEN,R4
+TQ61   MOV  R4,R4
+       JEQ  TQ68
+       CI   R3,4096
+       JL   TQ62
+       AI   R3,-4096
+       INC  R2
+TQ62   CI   R7,4096
+       JL   TQ63
+       AI   R7,-4096
+       INC  R6
+TQ63   MOV  R2,R0
+       MOV  R3,R1
+       BL   @XSET
+       BL   @XB
+       .push R0
+       MOV  R6,R0
+       MOV  R7,R1
+       BL   @XSET
+       BL   @XB
+       .pop R1
+       C    R0,R1
+       JNE  TQ67
+       INC  R3
+       INC  R7
+       DEC  R4
+       JMP  TQ61
+TQ67   CLR  R0
+       JMP  TQ69
+TQ68   LI   R0,1
+TQ69   .push R0
+       MOV  @KGPG,R0
+       MOV  @KGOF,R1
+       BL   @XSET
+       BL   @XSKIP
+       .pop R0
+       .leave
+       RT
+* ---- folding -------------------------------------------------------------------
+* FOLD6 - sema.py's fold, for the code: the expression at the reader
+* (read past it): R0 = its value and R1 = 1 if it is a constant one,
+* else R1 = 0.  Every constant's value is known by now.  Errors at the
+* node's line, in EFILE.
+FOLD6  .enter
+       .push R9
+       .push R8
+       .push R7
+       BL   @XB
+       CI   R0,7
+       JEQ  FQ1
+       BL   @XBACK
+       BL   @XSKIP
+       B    @FQNO
+FQ1    BL   @XB
+       MOV  R0,R9
+       BL   @XW
+       MOV  R0,R8
+       CI   R9,NT.NUM
+       JNE  FQ2
+       BL   @XB
+       BL   @XW
+       B    @FQOK
+FQ2    CI   R9,NT.CST
+       JNE  FQ3
+       BL   @OPRD
+       LI   R1,QTRU6
+       BL   @OPIS
+       MOV  R0,R0
+       JEQ  $+6
+       B    @FQOK
+       LI   R1,QFAL6
+       BL   @OPIS
+       MOV  R0,R0
+       JNE  FQZ
+       LI   R1,QNOT6
+       BL   @OPIS
+       MOV  R0,R0
+       JNE  FQZ
+       B    @FQNO
+FQZ    CLR  R0
+       B    @FQOK
+FQ3    CI   R9,NT.NAM
+       JNE  FQ4
+       BL   @KEYRD
+       BL   @SLOOKK
+       CI   R1,K.CON
+       JNE  FQNO
+       BL   @SYMAT
+       MOV  @4(R1),R0
+       JMP  FQOK
+FQ4    CI   R9,NT.UNA
+       JNE  FQ5
+       BL   @OPRD
+       LI   R1,QMIN6
+       BL   @OPIS
+       MOV  R0,R0
+       JNE  FQ4A
+       BL   @XSKIP
+       JMP  FQNO
+FQ4A   BL   @FOLD6
+       MOV  R1,R1
+       JEQ  FQNO
+       NEG  R0
+       JMP  FQOK
+FQ5    CI   R9,NT.BIN
+       JEQ  FQ6
+       MOVB @NFLD-1(R9),R0
+       SRL  R0,8
+       BL   @XFLDS
+       JMP  FQNO
+FQ6    BL   @OPRD
+       LI   R7,BINMP6          + - * / MOD are its first five
+       CLR  R6
+FQ6A   INC  R6
+       CI   R6,5
+       JH   FQ6C
+       MOV  R7,R1
+       BL   @OPIS
+       MOV  R0,R0
+       JNE  FQ6D
+       MOVB *R7,R0
+       SRL  R0,8
+       A    R0,R7
+       AI   R7,3
+       JMP  FQ6A
+FQ6C   BL   @XSKIP
+       BL   @XSKIP
+       JMP  FQNO
+FQ6D   MOV  R6,R7
+       BL   @FOLD6
+       .push R0
+       .push R1
+       BL   @FOLD6
+       MOV  R0,R5
+       MOV  R1,R6
+       .pop R1
+       .pop R4
+       MOV  R1,R1
+       JEQ  FQNO
+       MOV  R6,R6
+       JEQ  FQNO
+       CI   R7,4
+       JL   FQ7
+       MOV  R5,R5
+       JNE  FQ7
+       MOV  R8,R1
+       MOV  @EFILE,R2
+       LI   R0,SE.DIV
+       B    @SERR
+FQ7    CI   R7,1
+       JNE  FQ7A
+       A    R5,R4
+       JMP  FQ7X
+FQ7A   CI   R7,2
+       JNE  FQ7B
+       S    R5,R4
+       JMP  FQ7X
+FQ7B   CI   R7,3
+       JNE  FQ7C
+       MPY  R5,R4
+       MOV  R5,R4
+       JMP  FQ7X
+FQ7C   MOV  R4,R0
+       MOV  R5,R1
+       BL   @SDIV6
+       CI   R7,4
+       JNE  FQ7D
+       MOV  R0,R4
+       JMP  FQ7X
+FQ7D   MPY  R5,R0
+       S    R1,R4
+FQ7X   MOV  R4,R0
+FQOK   LI   R1,1
+       JMP  FQ99
+FQNO   CLR  R0
+       CLR  R1
+FQ99   .pop R7
+       .pop R8
+       .pop R9
+       .leave
+       RT
+* SDIV6 - R0 = R0 / R1, signed, truncated towards zero.  Uses R0-R3.
+SDIV6  MOV  R0,R2
+       XOR  R1,R2
+       ABS  R0
+       ABS  R1
+       MOV  R1,R3
+       MOV  R0,R1
+       CLR  R0
+       DIV  R3,R0
+       MOV  R2,R2
+       JLT  SD6A
+       RT
+SD6A   NEG  R0
+       RT
+QTRU6  BYTE 4
+       TEXT 'TRUE'
+QFAL6  BYTE 5
+       TEXT 'FALSE'
+QNOT6  BYTE 7
+       TEXT 'NOTHING'
+       EVEN
+
+* operators: name, opcode, then 1 if NOT follows
+BINMP6 BYTE 1
+       TEXT '+'
+       BYTE OP.ADD,0,1
+       TEXT '-'
+       BYTE OP.SUB,0,1
+       TEXT '*'
+       BYTE OP.MUL,0,1
+       TEXT '/'
+       BYTE OP.DIV,0,3
+       TEXT 'MOD'
+       BYTE OP.MOD,0,1
+       TEXT '='
+       BYTE OP.EQ,0,2
+       TEXT '<>'
+       BYTE OP.NE,0,1
+       TEXT '<'
+       BYTE OP.LT,0,1
+       TEXT '>'
+       BYTE OP.GT,0,2
+       TEXT '<='
+       BYTE OP.LE,0,2
+       TEXT '>='
+       BYTE OP.GE,0,2
+       TEXT 'IN'
+       BYTE OP.IN,0,5
+       TEXT 'NOTIN'
+       BYTE OP.IN,1,0
+       EVEN
+QMIN6  BYTE 1
+       TEXT '-'
+       EVEN
+

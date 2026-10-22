@@ -580,3 +580,123 @@ XBACK  MOV  @XOF,R0
 XBK1   DEC  R0
        MOV  R0,@XOF
        RT
+
+* ---- the story image (M5 part 6), shared by the linker's two overlays ---------
+* The image is built in SAMS from IMGPG (the page after the trees) up to
+* IMGEND; IPH:IPL is the next byte's place (32 bits: an image may pass 64K).
+* All through window D, which these remap as they need.
+* IPAGE - window D onto the image byte at IPH:IPL; R1 = its address.
+* Uses R0, R1.
+IPAGE  MOV  R11,@IRET2
+       MOV  @IPL,R1
+       SRL  R1,12
+       MOV  @IPH,R0
+       SLA  R0,4
+       A    R0,R1
+       A    @IMGPG,R1
+       CI   R1,IMGEND
+       JL   IPG1
+       LI   R0,SE.ROOM         (no more SAMS for the image: a workbench limit)
+       CLR  R1
+       LI   R2,255
+       B    @SERR
+IPG1   MOV  R1,R0
+       BL   @DMAP
+       MOV  @IPL,R1
+       ANDI R1,>0FFF
+       AI   R1,>D000
+       MOV  @IRET2,R11
+       RT
+* IBYTE - byte R0 (low byte) onto the image.  Uses R0, R1.
+IBYTE  MOV  R11,@IRET
+       MOV  R0,@ITMP
+       BL   @IPAGE
+       MOVB @ITMP+1,*R1
+       INC  @IPL
+       JNC  IB1
+       INC  @IPH
+IB1    MOV  @IRET,R11
+       RT
+* IWORD - word R0 onto the image, high byte first.  Uses R0, R1.
+IWORD  MOV  R11,@IRET3
+       MOV  R0,@ITMP2
+       SWPB R0
+       BL   @IBYTE
+       MOV  @ITMP2,R0
+       BL   @IBYTE
+       MOV  @IRET3,R11
+       RT
+* IZERO - R2 zero bytes.  IALIGN - zero bytes until IPL is a multiple of
+* R2 + 1 (R2 = 1 or 3).  Use R0-R2.
+IZERO  MOV  R11,@IRET3
+IZ1    MOV  R2,R2
+       JEQ  IZ9
+       CLR  R0
+       BL   @IBYTE
+       DEC  R2
+       JMP  IZ1
+IALIGN MOV  R11,@IRET3
+IAL1   MOV  @IPL,R0
+       CZC  R2,R0              (IPL AND R2 zero: aligned)
+       JEQ  IZ9
+       CLR  R0
+       BL   @IBYTE
+       JMP  IAL1
+IZ9    MOV  @IRET3,R11
+       RT
+* IPUTW - word R0 at image place R2:R3 (the next byte's place kept).
+* Uses R0-R3.
+IPUTW  MOV  R11,@IRET4
+       MOV  @IPH,@ISVH
+       MOV  @IPL,@ISVL
+       MOV  R2,@IPH
+       MOV  R3,@IPL
+       BL   @IWORD
+       MOV  @ISVH,@IPH
+       MOV  @ISVL,@IPL
+       MOV  @IRET4,R11
+       RT
+* IGETB - R0 = the image byte at R2:R3.  Uses R0-R3.
+IGETB  MOV  R11,@IRET4
+       MOV  @IPH,@ISVH
+       MOV  @IPL,@ISVL
+       MOV  R2,@IPH
+       MOV  R3,@IPL
+       BL   @IPAGE
+       CLR  R0
+       MOVB *R1,R0
+       SRL  R0,8
+       MOV  @ISVH,@IPH
+       MOV  @ISVL,@IPL
+       MOV  @IRET4,R11
+       RT
+* LFIX - a fixup at the next byte (kind R4: 1 a routine by its symbol,
+* 2 a string by its number, 3 a routine by its place in RDIRPG; key R5),
+* then a zero word there.  LFIXAT - a fixup at image place R2:R3, no
+* word written.  Use R0-R3.
+LFIX   MOV  R11,@IRET5
+       MOV  @IPH,R2
+       MOV  @IPL,R3
+       BL   @LFIXAT
+       CLR  R0
+       BL   @IWORD
+       MOV  @IRET5,R11
+       RT
+LFIXAT MOV  R11,@IRET4
+       MOV  @LFN,R0
+       CI   R0,LFXMAX
+       JL   LFA1
+       LI   R0,SE.MNY
+       B    @SERRE
+LFA1   INC  @LFN
+       SLA  R0,3
+       MOV  R0,R1
+       AI   R1,>D000
+       LI   R0,LFXPG
+       BL   @DMAP
+       MOV  R2,*R1+
+       MOV  R3,*R1+
+       MOV  R4,*R1+
+       MOV  R5,*R1
+       MOV  @IRET4,R11
+       RT
