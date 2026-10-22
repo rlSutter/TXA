@@ -11,9 +11,13 @@ INV = {'JEQ': 'JNE', 'JNE': 'JEQ', 'JL': 'JHE', 'JHE': 'JL', 'JH': 'JLE', 'JLE':
 src = os.path.join(ROOT, 'src')
 OWN = re.compile(r'^w\w*\.a99$')              # the workbench's own sources (wbench, wload, wsym, ...)
 for _ in range(20):
-    r = subprocess.run([sys.executable, os.path.join(ROOT, '../xdt99/xas99.py'), '-R', '-i', '-o', '/tmp/fj', 'wbench.a99'],
-                       cwd=src, capture_output=True, text=True)
-    out = r.stdout + r.stderr
+    out = ''
+    for top in ('wbench.a99', 'wovl.a99'):       # (wovl.a99 needs gen/wres.a99: run tools/build.py once first)
+        if top == 'wovl.a99' and not os.path.exists(os.path.join(src, 'gen/wres.a99')):
+            continue
+        r = subprocess.run([sys.executable, os.path.join(ROOT, '../xdt99/xas99.py'), '-R', '-i', '-o', '/tmp/fj', top],
+                           cwd=src, capture_output=True, text=True)
+        out += r.stdout + r.stderr
     hits = re.findall(r'> (\w+\.a99) <\d> (\d{4}) - .*\n\*\*\*\*\* Error: Out of range', out)
     if not hits:
         print('no jumps out of range'); break

@@ -20,14 +20,16 @@ wrapped files:
            and the warnings (dump.warnings)
   code     the code generator (M5 part 5): every routine's bytecode, in
            output order, with its fixups, and the strings (dump.code)
+  link     the linker (M5 part 6): the whole story image, byte for byte,
+           and the 4K PROGRAM files it is written to (dump: the bytes)
   errors   malformed programs give the same first error, on the same
            line of the same file, one for each of sema.py's errors (but
            'more than 1000 objects'); and the warnings
 
-  python3 tests/m5_sema_test.py [decls|meaning|code|errors|all] [quick]
+  python3 tests/m5_sema_test.py [decls|meaning|code|link|errors|all] [quick]
 
 (meaning checks symbols, objects and tables together, from one run each.)"""
-import os, sys, tempfile, glob, re
+import os, sys, tempfile, glob, re, datetime
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.join(ROOT, 'tools'))
 src = open(os.path.join(ROOT, 'tests/m2_engine_test.py')).read()
@@ -38,7 +40,7 @@ from txa_wrap import wrap_text
 from txc.sema import Sema
 from txc.lexer import TxaError
 from txc import dump
-from txc.codegen import Gen
+from txc.codegen import Gen, link
 fails = 0
 def check(name, ok, detail=''):
     global fails
@@ -64,13 +66,20 @@ def stage(main_text, main_name, libdir, extra=()):
         open(os.path.join(d, 'DSK1', name.upper()), 'w', encoding='latin-1').write(w)
     return d, os.path.join(d, main_name.lower() + '.txa')
 
+DATE = datetime.date(2026, 10, 22)              # the build date both compilers use
+
 def run_ti(d, main_name, max_steps=2_000_000_000):
     m = S.Machine(cart, f18a=True, pages=128); cpu = S.CPU(m); m.disk_dir = d
     cpu.pc = m.rw(m.rw(0x6006) + 2)
     queue = list(keys_for('dsk1.' + main_name.lower()))
     steps = hold = free = 0
+    dated = False
     while steps < max_steps:
         pc = cpu.pc
+        if pc == sy['WK1'] and not dated:            # (the TI has no clock: WDATE, yymmdd)
+            for i, c in enumerate(DATE.strftime('%y%m%d').encode()):
+                m.wb(sy['WDATE'] + i, c)
+            dated = True
         if pc == sy['WK1'] and not hold and steps >= free:
             if not queue:
                 break
@@ -296,7 +305,8 @@ CODES = [('is a built-in function', 41), ('is already declared', 42), ('more tha
          ('an array element takes one index', 75), ('and has no value here', 76), ('needs an attribute name after it', 77),
          ('unknown property', 78), ('the second argument of', 80), (' argument', 79),
          ('cannot be called', 82), ('cannot find the file', 40), ('there is no ROUTINE Main', 83),
-         ('rule cases need the library', 84), ('cannot compile Case', 85)]
+         ('rule cases need the library', 84), ('cannot compile Case', 85), ('a property holds at most 255', 87),
+         ('the dynamic area is', 88), ('the tables before the routines pass 64K', 89), ('the story is', 90)]
 def code_of(msg):
     for k, c in CODES:
         if k in msg:
@@ -356,6 +366,11 @@ ERRS = [
     ('rule cases without the global "action"', 'ROUTINE Main\nEND\nROUTINE TakeSub\nEND\nPROPERTY BEFORE\n'
      'VERB "take"\n  noun -> Take\nEND\nOBJECT O "o"\n  BEFORE\n    Take: RETURN TRUE\n  END\nEND\n'),
     ('division by zero in a routine', 'ROUTINE Main\n  RETURN 3 / (1 - 1)\nEND\n'),
+    ('a global starting with an unknown name', 'ROUTINE Main\nEND\nGLOBAL g = nowhere\n'),
+    ('a global starting with SELF', 'ROUTINE Main\nEND\nGLOBAL g = SELF\n'),
+    ('a global starting with another global', 'ROUTINE Main\nEND\nGLOBAL h\nGLOBAL g = h\n'),
+    ('an array value that is not known', 'ROUTINE Main\nEND\nARRAY a = 1, nowhere\n'),
+    ('an array value divided by zero', 'ROUTINE Main\nEND\nARRAY a = 1, 2 / 0\n'),
     ('an error in an included file', 'GLOBAL g\nINCLUDE "DSK1.MORE"\n', [('MORE', 'GLOBAL h\nGLOBAL H\n')]),
     ('a bad token in lines EXTENDed from another file', 'ROUTINE ZapSub\nEND\nVERB "zap"\n  noun -> Zap\nEND\nINCLUDE "DSK1.MORE"\n',
      [('MORE', 'EXTEND "zap"\n  thing -> Zap\nEND\n')]),
@@ -382,13 +397,40 @@ if which in ('code', 'all'):
         check(f'{rel}: code identical ({len(g.codes)} routines, {sum(len(c.b) for c in g.codes)} bytes, {len(g.strings)} strings; '
               f'{steps / 1e6:.0f}M instructions in all, ~{steps / 3e5:.0f} s on a TI)', got == want, first_diff(want, got) if done >= 4 else why)
 
+if which in ('link', 'all'):
+    for rel, libdir in corpus(quick):
+        path = os.path.join(ROOT, rel)
+        name = os.path.splitext(os.path.basename(path))[0].replace('_', '')   # (the harness cannot type _)
+        d, ppath = stage(open(path).read(), name, libdir)
+        p = py_meaning(ppath)
+        g = Gen(p)
+        try:
+            g.generate()
+        except TxaError:
+            continue                           # (no Main: the code stage checks its error)
+        img, _ = link(p, g, name.upper(), 1, DATE)
+        m, steps = run_ti(d, name)
+        done = m.rw(sy['WBDONE'])
+        why = f'not done: done={done} stage={m.rw(sy["WBSTAG"])} error={m.rw(sy["WBERR"])} line={m.rw(sy["WBERRL"])}'
+        base = m.rw(sy['IMGPG']) * 4096
+        ti = bytes(m.ams[base: base + len(img)]) if done >= 4 else b''
+        diff = next((i for i in range(min(len(img), len(ti))) if img[i] != ti[i]), None)
+        check(f'{rel}: story image identical ({len(img)} bytes; {steps / 1e6:.0f}M instructions in all, ~{steps / 3e5:.0f} s on a TI)',
+              ti == img, why if done < 4 else f'first difference at {diff}: python {img[diff]:02X} ti {ti[diff]:02X}' if diff is not None else 'lengths differ')
+        prefix = name.upper()[:6]
+        files = sorted(glob.glob(os.path.join(d, 'DSK1', prefix + 'S[0-9][0-9]')))
+        joined = b''.join(open(f, 'rb').read() for f in files)
+        want = [f'{prefix}S{i + 1:02d}' for i in range((len(img) + 4095) // 4096)]
+        check(f'{rel}: written as {len(files)} PROGRAM files, {prefix}S01.., together the image',
+              joined == img and [os.path.basename(f) for f in files] == want, f'files {[os.path.basename(f) for f in files]}, {len(joined)} bytes')
+
 if which in ('errors', 'all'):
     cases = [('missing include', 'INCLUDE "DSK1.NOSUCH"\nROUTINE Main\nEND\n')] + ERRS
     for case in cases:
         label, text = case[0], case[1]
         d, ppath = stage(text, 'GAME', None, case[2] if len(case) > 2 else ())
         try:
-            Gen(Sema([d]).run(ppath)).generate(); pe = None
+            pp_ = Sema([d]).run(ppath); gg = Gen(pp_); gg.generate(); link(pp_, gg, 'GAME', 1, DATE); pe = None
         except TxaError as e:
             pe = e
         m, _ = run_ti(d, 'GAME')

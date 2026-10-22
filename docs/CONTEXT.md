@@ -11,10 +11,11 @@ keep it current when the language changes.  The six manuals still to
 write are stubbed in the Claude Doc
 https://claude.ai/artifact/VqqmmXaB3E5RBxdTcfBtU2 (one tab each).
 
-**State (22 October 2026, checkpoint-m5d):** M5 parts 1-5 done: the
-workbench loads every file, lexes, parses, does sema.py's whole meaning
-stage and codegen.py's code generation, identical to Python on the
-corpus.  Next: part 6, linking.  The M5 design Claude Doc (below) ends
+**State (22 October 2026):** M5 is done: the workbench loads every
+file, lexes, parses, checks the meaning, generates the code and links
+the story image, identical to Python byte for byte on the corpus, and
+writes it to disk as 4K PROGRAM files.  Next: M6, after two open
+questions in plan.md (the build date; a playable game from the TI alone).  The M5 design Claude Doc (below) ends
 with "Where it stands": what was built and how it departed from the design.
 Earlier: **(checkpoint-m4):** M0-M4 complete (engine 1.0
 beta: save, restore, undo, scrollback, pictures, sound and music, stories
@@ -77,7 +78,9 @@ owns it; Claude builds it. The engine comes first; the story later.
 | `src/wsymdef.a99`, `src/wsym.a99` | the meaning stage's constants, variables, error codes; and its shared routines (symbols, dictionary, heap, errors, warnings, built-ins), in the kernel window |
 | `src/wsema.a99`, `src/wsema2.a99` | overlays 3 and 4: the meaning stage's two halves |
 | `src/wcode.a99` | overlay 5: the code generator (src/gen/opcodes.a99 and bops.a99 are generated from opcodes.py and sema.py) |
-| `tests/m5_sema_test.py` | the meaning stage and code generator against sema.py and codegen.py (decls, meaning, code, errors) |
+| `src/wlink.a99`, `src/wlink2.a99` | overlays 6 and 7: the linker's two halves, and the story files |
+| `src/wovl.a99` | overlays 5 on, assembled apart with wbench.a99's symbols (src/gen/wres.a99) |
+| `tests/m5_sema_test.py` | the workbench against sema.py and codegen.py: decls, meaning, code, link (the whole image), errors |
 | `tools/fixjumps.py` | rewrites jumps xas99 reports out of range as branches |
 | `src/wlex.a99` | the workbench's lexer: SAMS source to SAMS tokens, identical to lexer.py |
 | `tests/m5_lex_test.py` | the TI lexer against the Python lexer on the corpus (args: lib, samples, tests, errors) |

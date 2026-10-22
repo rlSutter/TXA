@@ -787,16 +787,63 @@ M5 part 5 (22 October 2026): the code generator on the TI.
   call reuses; PATCHW wrote a word low byte first; CALLV was missing.
 - Lamplight compiles this far in about 29M instructions (97 s on a TI).
 
+M5 part 6 (22 October 2026): the linker on the TI.  M5 is done.
+- Overlay 6 (src/wlink.a99): choose_abbrevs (every token of every
+  string counted in a hash on the pages after the trees, the 128 best by
+  score and bytes kept in a sorted list at >3000, into ABBPG), then the
+  header's room, the object table, the property tables (properties in
+  number order: routine, one string, one routine name, or the words),
+  the 240 globals with their starting values (sema.py's prop_value: its
+  errors surface here, at link time), the arrays (the generated four,
+  then each ARRAY), to the end of the dynamic area.
+- Overlay 7 (src/wlink2.a99): the dictionary (12 letters, the noun /
+  verb / preposition flags, the VERB's number), the empty grammar table,
+  the actions, the substitution table, the routines and the strings (4-
+  byte boundaries, strings encoded with the substitutions), every fixup
+  (the code's and the tables'), the header (date from WDATE, title the
+  main file's name, the proper and plural attributes) and its checksum;
+  then the image saved as 4K PROGRAM files named as the game writer
+  names a story's: the main file's first 6 letters, S, 01 ... on its
+  device.  The screen says the story's size and how many files.
+- The image is built in SAMS from the page after the trees (IMGPG) to
+  page 111: about 100K free after Lamplight's trees.  A bigger game
+  needs a 1M card (SE.ROOM says so).
+- Overlays 5 on are assembled apart (src/wovl.a99), with wbench.a99's
+  symbols (src/gen/wres.a99, generated), staged from >0000: overlays 1-6
+  had outgrown the >4000->9FFF staging room and spilled into the
+  resident part (the cartridge hung at boot).  The resident part enters
+  them at OVENT (>B000).  build/wbench.equ holds both assemblies'
+  symbols.  The header's offsets are generated from opcodes.py too.
+- tests/m5_sema_test.py link: every corpus program's image identical to
+  link()'s and its files joined equal to it; the errors stage runs
+  link() too, with five link-time errors (a global or array starting
+  with an unknown name, SELF, another global, a division by zero).
+- Bugs found: LINK6 cleared the code generator's results (now in GLOBRM);
+  BETTER clobbered the insertion place in the full-list case; JATTR's
+  place lost across SLOOKK; tools/fixjumps.py rewrote a jump in the
+  shared kernel's keys.a99 during a label clash (restored; it now only
+  touches w*.a99 files).
+- Lamplight: source to story files in about 37M instructions (some two
+  minutes on a TI).
+
+Open, for Rebecca: (1) the build date: the TI has no clock, so the front
+end could ask for it, keep the last one given, or write zeros; tests set
+WDATE.  (2) A playable game from the TI alone: the engine takes the
+story's length and its picture and sound pages from gen/storysrc.a99 at
+build time, and the pictures and sounds are made on the PC from PNG and
+MML files.  So the TI's story files equal the game writer's before the
+pictures and sounds; to play a game compiled on the TI without the PC,
+the engine would read the length from the story's header, and pictures
+and sounds would come from files of their own (or a later picture
+editor).  An M6 question.
+
 ## Next
 
-1. M5 part 6: linking and output (codegen.py's link): the object table,
-   property tables, globals, arrays, dictionary, actions, the text
-   substitution table (choose_abbrevs: a count of every token of every
-   string, sorted), the routines and the packed strings, the fixups,
-   the header and checksum; the image written to disk.  It must equal
-   Python's byte for byte.
-   Reference while writing the output (the workbench's first disk
-   writes): libre99's clean-room TI disk controller DSR and its notes,
+1. M6, the workbench tools (test-play, debug verbs, a list of several
+   errors), after the open questions above.
+
+The reference used for part 6's disk writes:
+   (part 6) libre99's clean-room TI disk controller DSR and its notes,
    https://github.com/joelodom/libre99/tree/main/original-content/system-roms/disk-dsr
    (README, RECON.md, SURFACE-MAP.md: what the real DSR accepts for each
    PAB operation and mode, its errors, the on-disk file format).  Read

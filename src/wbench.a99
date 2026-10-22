@@ -313,8 +313,47 @@ WL4    LI   R0,4               "Read n files, m lines."
        LI   R1,SOBJS
        CLR  R2
        BL   @TXSTR
+       LI   R0,7               "Story: n bytes in m files, PREFIXS01..."
+       LI   R1,1
+       BL   @TXAT
+       LI   R1,SSTORY
+       CLR  R2
+       BL   @TXSTR
+       MOV  @IPH,R0            (the image's length: IPH:IPL; K past 64K)
+       JEQ  WL4B
+       MOV  @IPL,R1            (R0:R1 / 1024)
+       SRL  R1,10
+       SLA  R0,6
+       SOC  R1,R0
+       CLR  R1
+       CLR  R2
+       BL   @TXDEC
+       LI   R1,SKB
+       JMP  WL4C
+WL4B   MOV  @IPL,R0
+       CLR  R1
+       CLR  R2
+       BL   @TXDEC
+       LI   R1,SBYTES
+WL4C   CLR  R2
+       BL   @TXSTR
+       MOV  @IPL,R0            the files: the length / 4096, rounded up
+       AI   R0,4095
+       MOV  R0,R1
+       SRL  R1,12
+       MOV  @IPH,R0
+       JNC  WL4D
+       INC  R0                 (the carry out of the low word)
+WL4D   SLA  R0,4
+       SOC  R1,R0
+       CLR  R1
+       CLR  R2
+       BL   @TXDEC
+       LI   R1,SFILES2
+       CLR  R2
+       BL   @TXSTR
        LI   R0,4
-       MOV  R0,@WBDONE         (4: every file loaded, the index made)
+       MOV  R0,@WBDONE         (4: compiled, the story written)
        B    @WL9
 * WLERR - an error, with its stage, code, line and file.
 WLERR  LI   R0,6
@@ -649,6 +688,18 @@ SSYMSX
 SOBJS  BYTE SOBJSX-SOBJS-1
        TEXT ' objects.'
 SOBJSX
+SSTORY BYTE SSTORX-SSTORY-1
+       TEXT 'Story: '
+SSTORX
+SBYTES BYTE SBYTSX-SBYTES-1
+       TEXT ' bytes in '
+SBYTSX
+SKB    BYTE SKBX-SKB-1
+       TEXT 'K in '
+SKBX
+SFILES2 BYTE SFIL2X-SFILES2-1
+       TEXT ' files on disk.'
+SFIL2X
 SERROR BYTE SERRX-SERROR-1
        TEXT ' error '
 SERRX
