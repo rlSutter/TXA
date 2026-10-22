@@ -795,6 +795,25 @@ M5 part 5 (22 October 2026): the code generator on the TI.
    string, sorted), the routines and the packed strings, the fixups,
    the header and checksum; the image written to disk.  It must equal
    Python's byte for byte.
+   Reference while writing the output (the workbench's first disk
+   writes): libre99's clean-room TI disk controller DSR and its notes,
+   https://github.com/joelodom/libre99/tree/main/original-content/system-roms/disk-dsr
+   (README, RECON.md, SURFACE-MAP.md: what the real DSR accepts for each
+   PAB operation and mode, its errors, the on-disk file format).  Read
+   them only: libre99 is under a Modified MIT License with the Commons
+   Clause, so none of its code or binaries go into this repository.
+
+## Later: a more faithful disk test (candidate)
+
+tools/sim9900.py fakes DSK1 with a trap that does each PAB operation on
+host files, which is forgiving where a real controller is not (a PAB the
+DSR rejects, a VDP buffer the DSR overwrites, sector-level file layout).
+A candidate for M6 or after: model the FD1771 and sector-level .dsk
+images in the simulator and run a real DSR on them, such as libre99's
+clean-room one (verified against the genuine TI DSR in 24 differential
+tests; libre99 itself emulates neither the F18A nor SAMS, so it cannot
+run TXA).  The DSR would be fetched at test time, as xdt99 is, never
+committed: its licence (Commons Clause) differs from TXA's.
 
 ## (was) M5 (waiting on D1-D4): the native compiler (the workbench cartridge: source loading,
    three passes, the precompiled library, error list; done when the TI
