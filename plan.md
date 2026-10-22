@@ -876,6 +876,39 @@ The reference used for part 6's disk writes:
    - The controller keeps its buffers from >37D8 up (it lowers >8370 to
      >37D7); our PAB at >37A0 sits below them, as it must.
 
+## Later: a stock-TI engine (candidate, to be decided once M6 is done)
+
+Rebecca's idea (22 October 2026): the workbench compiling a small story
+to something that runs on a TI-99/4A with only the 32K expansion, no
+F18A and no SAMS.  Feasible with a second, smaller engine, in the way
+Infocom's interpreters ran on the stock TI; the story format and the
+compiler need no change.
+- The image already splits as such an engine needs: the dynamic area
+  first (at most 16K; Lamplight's is about 7K), which stays in RAM, then
+  the routines and strings, read-only, which can be paged from disk
+  through a cache in spare RAM and in VRAM (the 9918A's 16K, of which
+  40-column text mode uses 1-2K).
+- Memory: 8K at >2000 and 24K at >A000.  Today's engine is about 17K,
+  much of it F18A, SAMS, the bitmap layer and scrollback; a stripped VM
+  with 40-column text, keyboard, disk and sound might be 6-8K (an
+  estimate, not measured).  A very small story could fit whole without
+  paging, but the standard library alone makes images of about 24-26K,
+  so most real games would page.
+- What a stock machine loses: 80 columns (the 9918A's text mode is 40:
+  check whether the library, the status line say, assumes 80);
+  pictures as they work now (the F18A's bitmap layer under the text; a
+  full-screen 9918A picture between screens of text could come later);
+  scrollback, and probably undo (RAM).  Sound and music carry over:
+  they use the console's own sound chip.
+- The workbench itself still needs the F18A and SAMS, but its output
+  could target either engine: the cartridge could carry the stock engine
+  and write it to disk as E/A 5 files beside the story.  It builds on
+  M6's decision (2): an engine that reads the story's length from the
+  story header is what a separately distributed engine needs.
+- The work: the stripped engine with disk paging and a cache, and
+  40-column output; tested in the simulator with the F18A off and on
+  js99er / Classic99 without an F18A or SAMS.  A milestone of its own.
+
 ## Later: a more faithful disk test (candidate)
 
 tools/sim9900.py fakes DSK1 with a trap that does each PAB operation on
