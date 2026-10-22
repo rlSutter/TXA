@@ -225,6 +225,11 @@ def ti_code(m):
         out.append(f'S{i} ' + dump.esc(ti_tree_str(m, amw(m, a + 2), amw(m, a + 4))))
     return '\n'.join(out) + '\n'
 
+def meaning_done(m):
+    """The meaning stage finished: everything did, or only the code
+    generator found an error (83 on: a program without Main)."""
+    return m.rw(sy['WBDONE']) >= 4 or m.rw(sy['WBERR']) >= 83
+
 def first_diff(a, b):
     al, bl = a.split('\n'), b.split('\n')
     for i, (x, y) in enumerate(zip(al, bl)):
@@ -251,7 +256,7 @@ if which in ('decls', 'all'):
         d, ppath = stage(open(path).read(), name, libdir)
         want = py_decls(ppath, libdir)
         m, steps = run_ti(d, name)
-        done, err = m.rw(sy['WBDONE']), m.rw(sy['WBERR'])
+        done, err = (4 if meaning_done(m) else m.rw(sy['WBDONE'])), m.rw(sy['WBERR'])
         got = ti_decls(m) if done >= 4 else []
         detail = f'not loaded: done={done} stage={m.rw(sy["WBSTAG"])} error={err} line={m.rw(sy["WBERRL"])}' if done < 4 else \
             next((f'decl {i}: py {a} ti {b}' for i, (a, b) in enumerate(zip(want, got)) if a != b), f'counts {len(want)} / {len(got)}')
@@ -265,7 +270,7 @@ if which in ('meaning', 'all'):
         d, ppath = stage(open(path).read(), name, libdir)
         p = py_meaning(ppath)
         m, steps = run_ti(d, name)
-        done = m.rw(sy['WBDONE'])
+        done = 4 if meaning_done(m) else m.rw(sy['WBDONE'])
         why = f'not done: done={done} stage={m.rw(sy["WBSTAG"])} error={m.rw(sy["WBERR"])} line={m.rw(sy["WBERRL"])}'
         want, got = dump.symbols(p), (ti_symbols(m) if done >= 4 else '')
         check(f'{rel}: symbols identical ({len(p.symbols)}; {steps / 1e6:.0f}M instructions in all)', got == want, first_diff(want, got) if done >= 4 else why)
@@ -290,7 +295,8 @@ CODES = [('is a built-in function', 41), ('is already declared', 42), ('more tha
          ('it cannot be assigned to', 73), ('only an array element can be assigned to', 74),
          ('an array element takes one index', 75), ('and has no value here', 76), ('needs an attribute name after it', 77),
          ('unknown property', 78), ('the second argument of', 80), (' argument', 79),
-         ('cannot be called', 82), ('cannot find the file', 40)]
+         ('cannot be called', 82), ('cannot find the file', 40), ('there is no ROUTINE Main', 83),
+         ('rule cases need the library', 84), ('cannot compile Case', 85)]
 def code_of(msg):
     for k, c in CODES:
         if k in msg:
@@ -346,6 +352,10 @@ ERRS = [
     ('calling a global', 'GLOBAL g\nROUTINE F\n  g(1)\nEND\n'),
     ('an unknown name in a routine', 'ROUTINE F\n  RETURN nowhere\nEND\n'),
     ('a GIVE of an unknown attribute', 'OBJECT O "o"\nEND\nROUTINE F\n  GIVE O shiny\nEND\n'),
+    ('no ROUTINE Main', 'ROUTINE Start\nEND\n'),
+    ('rule cases without the global "action"', 'ROUTINE Main\nEND\nROUTINE TakeSub\nEND\nPROPERTY BEFORE\n'
+     'VERB "take"\n  noun -> Take\nEND\nOBJECT O "o"\n  BEFORE\n    Take: RETURN TRUE\n  END\nEND\n'),
+    ('division by zero in a routine', 'ROUTINE Main\n  RETURN 3 / (1 - 1)\nEND\n'),
     ('an error in an included file', 'GLOBAL g\nINCLUDE "DSK1.MORE"\n', [('MORE', 'GLOBAL h\nGLOBAL H\n')]),
     ('a bad token in lines EXTENDed from another file', 'ROUTINE ZapSub\nEND\nVERB "zap"\n  noun -> Zap\nEND\nINCLUDE "DSK1.MORE"\n',
      [('MORE', 'EXTEND "zap"\n  thing -> Zap\nEND\n')]),
@@ -356,7 +366,15 @@ if which in ('code', 'all'):
         name = os.path.splitext(os.path.basename(path))[0].replace('_', '')   # (the harness cannot type _)
         d, ppath = stage(open(path).read(), name, libdir)
         p = py_meaning(ppath)
-        g = Gen(p); g.generate()
+        g = Gen(p)
+        try:
+            g.generate()
+        except TxaError as e:                  # (spec_cellar has no Main: the same error)
+            m, steps = run_ti(d, name)
+            check(f'{rel}: code generation fails as in Python: {e.msg}',
+                  (m.rw(sy['WBERR']), m.rw(sy['WBERRL'])) == (code_of(e.msg), e.line),
+                  f'ti error {m.rw(sy["WBERR"])} line {m.rw(sy["WBERRL"])}')
+            continue
         m, steps = run_ti(d, name)
         done = m.rw(sy['WBDONE'])
         why = f'not done: done={done} stage={m.rw(sy["WBSTAG"])} error={m.rw(sy["WBERR"])} line={m.rw(sy["WBERRL"])}'
@@ -370,13 +388,14 @@ if which in ('errors', 'all'):
         label, text = case[0], case[1]
         d, ppath = stage(text, 'GAME', None, case[2] if len(case) > 2 else ())
         try:
-            Sema([d]).run(ppath); pe = None
+            Gen(Sema([d]).run(ppath)).generate(); pe = None
         except TxaError as e:
             pe = e
         m, _ = run_ti(d, 'GAME')
-        files = ti_files(m) + ['?'] * 16
-        got = (m.rw(sy['WBERR']), files[m.rw(sy['WBERRF'])], m.rw(sy['WBERRL']))
-        want = (code_of(pe.msg), os.path.splitext(pe.file)[0].upper(), pe.line) if pe else (0, '?', 0)
+        files, f = ti_files(m), m.rw(sy['WBERRF'])
+        got = (m.rw(sy['WBERR']), files[f] if f < len(files) else '?', m.rw(sy['WBERRL']))   # (255: the whole program)
+        pfile = '?' if pe and pe.file == '<program>' else os.path.splitext(pe.file)[0].upper() if pe else '?'
+        want = (code_of(pe.msg), pfile, pe.line) if pe else (0, '?', 0)
         check(f'error: {label}: {pe.msg if pe else "(none)"}', got == want, f'ti {got}, expected {want}')
     text = 'ROUTINE F\n  RETURN SELF\nEND\nOBJECT O "o"\n  NAME "extraordinarily"\nEND\nOBJECT Q "q"\nEND\nROOM R "r"\nEND\n'
     d, ppath = stage(text, 'GAME', None)

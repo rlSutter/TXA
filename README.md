@@ -9,7 +9,14 @@ built with Claude.
 The specification is a Claude Doc:
 https://claude.ai/code/artifact/43a54522-f42d-42ed-b2c7-bf348e97a95d
 
-**Status: M0, the hardware probe.** See `plan.md`.
+**Status (22 October 2026):** the engine is 1.0 beta (M0-M4: the VM,
+the parser, the world model and library, saving, pictures, sound,
+scrollback), with the sample game Lamplight. M5, the native compiler on
+the TI (the workbench cartridge), parts 1-5 are done: it reads a
+program's files from disk following its INCLUDEs, lexes, parses, checks
+its meaning and generates its code, every step identical to the Python
+compiler (tools/txc) on the whole test corpus. Next: part 6, linking the
+story image. See `plan.md`.
 
 ## Building and testing
 
@@ -19,6 +26,15 @@ https://claude.ai/code/artifact/43a54522-f42d-42ed-b2c7-bf348e97a95d
 
 Outputs: `build/txaprobe8.bin` (FinalGROM cartridge), `build/txaprobe.dsk`
 (disk image with the E/A option 5 files `TXAP1`, `TXAP2`).
+
+The workbench cartridge and a source disk for it:
+
+    python3 -c "import sys; sys.path.insert(0,'tools'); import build; open('build/txa-workbench8.bin','wb').write(build.workbench_cart()[0])"
+    python3 tools/txa_srcdisk.py samples/lamplight.txa -o build/lamplight-src.dsk
+
+The test suites are listed in `docs/CONTEXT.md`; the workbench's are
+`tests/m5_load_test.py`, `m5_lex_test.py`, `m5_parse_test.py` and
+`m5_sema_test.py` (decls, meaning, code, errors).
 
 ## Licence
 

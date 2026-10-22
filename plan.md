@@ -761,13 +761,40 @@ M5 part 4 done (22 October 2026): meaning on the TI.
 - Speed: Lamplight's whole compile so far, about 23M instructions (77 s
   on a TI).
 
+M5 part 5 (22 October 2026): the code generator on the TI.
+- Overlay 5 (src/wcode.a99): codegen.py's Gen.  Every ROUTINE kept, then
+  each object's property routines (rule blocks: case_body), then the
+  strings the tables need (globals, then arrays, then each object's short
+  name and string values).  Expressions are folded first, as expr()
+  does (FOLD5: every constant is known by now); statements, AND/OR short
+  circuits, HAS, the built-ins (their opcodes generated from sema.py's
+  BUILTINS into src/gen/bops.a99), arrays, CALL, CALLV, RUNPROP,
+  CALLPROP; labels and jumps resolved per routine; routines' and
+  strings' packed addresses left as fixups for the linker.
+- src/gen/opcodes.a99: OP.name equates generated from opcodes.py
+  (tools/build.py, gen_workbench_tables), so opcodes.py stays the one
+  definition.
+- Its output goes in SAMS pages no window maps by default (0, 1, 4-9) and
+  the REPLACE page: code 16K (pages 0, 1, 4, 5), 1024 fixups, 448
+  strings, 512 routines, 511 labels and 768 jumps a routine.  Lamplight
+  needs 13K, 576, 321, 169, 74 and 90.  A bigger game will want a 1M
+  card; part 6 has to find room for the image too.
+- dump.code; tests/m5_sema_test.py code (each routine's bytes with its
+  fixups, and the strings) and three more error cases (no ROUTINE Main,
+  rule cases without the global "action", division by zero in a body).
+- Bugs found: PROPLEN's property argument is a Name node, not a bare
+  string; FIXUP and PUSHN kept their returns in temporaries what they
+  call reuses; PATCHW wrote a word low byte first; CALLV was missing.
+- Lamplight compiles this far in about 29M instructions (97 s on a TI).
+
 ## Next
 
-1. M5 part 5: code (codegen.py): routines to bytecode, constant folding
-   (FOLD exists), property tables, the object table; each routine's
-   bytecode identical.  It will need overlays of its own, and FOLD moved
-   where both can use it.
-2. M5 part 6 as in the design doc.
+1. M5 part 6: linking and output (codegen.py's link): the object table,
+   property tables, globals, arrays, dictionary, actions, the text
+   substitution table (choose_abbrevs: a count of every token of every
+   string, sorted), the routines and the packed strings, the fixups,
+   the header and checksum; the image written to disk.  It must equal
+   Python's byte for byte.
 
 ## (was) M5 (waiting on D1-D4): the native compiler (the workbench cartridge: source loading,
    three passes, the precompiled library, error list; done when the TI
