@@ -11,10 +11,11 @@ keep it current when the language changes.  The six manuals still to
 write are stubbed in the Claude Doc
 https://claude.ai/artifact/VqqmmXaB3E5RBxdTcfBtU2 (one tab each).
 
-**State (22 October 2026, after checkpoint-m5c):** M5 parts 1-5 done:
-the workbench loads every file, lexes, parses, does sema.py's whole
-meaning stage and codegen.py's code generation, identical to Python on
-the corpus.  Next: part 6, linking.
+**State (22 October 2026, checkpoint-m5d):** M5 parts 1-5 done: the
+workbench loads every file, lexes, parses, does sema.py's whole meaning
+stage and codegen.py's code generation, identical to Python on the
+corpus.  Next: part 6, linking.  The M5 design Claude Doc (below) ends
+with "Where it stands": what was built and how it departed from the design.
 Earlier: **(checkpoint-m4):** M0-M4 complete (engine 1.0
 beta: save, restore, undo, scrollback, pictures, sound and music, stories
 on disk and the game writer, title page, end screen).  Next: M5, the
