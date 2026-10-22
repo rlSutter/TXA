@@ -188,6 +188,7 @@ WDATE  EQU  GLOBRM+>38         6 bytes: the build date, yymmdd, as given at
 *                              the prompt (the TI has no clock; zeros until then)
 WDLEN  EQU  GLOBRM+>48         the date being typed: its length ...
 WDBUF  EQU  GLOBRM+>4A         ... and its 6 digits
+WDRET  EQU  GLOBRM+>50         WDOK's return
 SE.ROOM EQU 86                 not enough SAMS for the story image (the workbench's limit)
 SE.P255 EQU 87                 a property holds at most 255 words
 SE.DYN EQU  88                 the dynamic area is ... bytes; the limit is 16384

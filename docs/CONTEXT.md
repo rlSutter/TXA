@@ -14,8 +14,9 @@ https://claude.ai/artifact/VqqmmXaB3E5RBxdTcfBtU2 (one tab each).
 **State (22 October 2026):** M5 is done: the workbench loads every
 file, lexes, parses, checks the meaning, generates the code and links
 the story image, identical to Python byte for byte on the corpus, and
-writes it to disk as 4K PROGRAM files.  Next: M6, after two open
-questions in plan.md (the build date; a playable game from the TI alone).  The M5 design Claude Doc (below) ends
+writes it to disk as 4K PROGRAM files (asking for the build date: the
+TI has no clock).  Next: M6, starting with a playable game from the TI
+alone (plan.md, decision 2).  The M5 design Claude Doc (below) ends
 with "Where it stands": what was built and how it departed from the design.
 Earlier: **(checkpoint-m4):** M0-M4 complete (engine 1.0
 beta: save, restore, undo, scrollback, pictures, sound and music, stories
@@ -228,6 +229,9 @@ owns it; Claude builds it. The engine comes first; the story later.
   assembler accepts it, but the other overlay is not mapped in.  Shared
   code goes in wload.a99 (resident) or wsym.a99 (kernel window, nearly
   full: about 200 bytes left).
+- The workbench's resident part (>A000->AFFF) is nearly full (about
+  160 bytes left): new front-end code goes in an overlay, as the date
+  prompt does (wdate.a99 in overlay 1).
 - EQUs cannot refer forward in xas99: the meaning stage's are in
   wsymdef.a99, COPYed at the top of wbench.a99.
 - The meaning stage's routines document which registers they use;

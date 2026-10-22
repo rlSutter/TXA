@@ -449,13 +449,17 @@ if which in ('date', 'all'):
             if hold and steps >= hold:
                 m.held = None; hold = 0; free = steps + 12_000
             cpu.step(); steps += 1
+        m.waiting = steps < max_steps            # (stopped at a key wait, not still running)
         return m, R.screen(m).splitlines()
+    def cpu_waits(m):
+        return getattr(m, 'waiting', False)
     path = os.path.join(ROOT, 'tests/txa/run1.txa')
     d, ppath = stage(open(path).read(), 'run1', TLIB)
     # no date yet: ENTER alone, then month 13, are refused; a rub-out; then a date
     m, scr = run_keys(d, ['dsk1.run1', '', '261322'])
     check('date: the prompt asks for the build date', 'Build date (yymmdd):' in scr[3], scr[3])
-    check('date: ENTER without a date, or month 13, compiles nothing', m.rw(sy['WBDONE']) < 4 and '261322' in scr[3], scr[3])
+    check('date: ENTER without a date, or month 13, compiles nothing (and the prompt still takes keys)',
+          m.rw(sy['WBDONE']) < 4 and '261322' in scr[3] and cpu_waits(m), scr[3])
     m, scr = run_keys(d, ['dsk1.run1', '', '261322', '261023\b2'])
     base = m.rw(sy['IMGPG']) * 4096
     check('date: a date (with a rub-out) compiles, and the header has it',

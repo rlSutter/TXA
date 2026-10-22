@@ -826,21 +826,25 @@ M5 part 6 (22 October 2026): the linker on the TI.  M5 is done.
 - Lamplight: source to story files in about 37M instructions (some two
   minutes on a TI).
 
-Open, for Rebecca: (1) the build date: the TI has no clock, so the front
-end could ask for it, keep the last one given, or write zeros; tests set
-WDATE.  (2) A playable game from the TI alone: the engine takes the
-story's length and its picture and sound pages from gen/storysrc.a99 at
-build time, and the pictures and sounds are made on the PC from PNG and
-MML files.  So the TI's story files equal the game writer's before the
-pictures and sounds; to play a game compiled on the TI without the PC,
-the engine would read the length from the story's header, and pictures
-and sounds would come from files of their own (or a later picture
-editor).  An M6 question.
+Decided (Rebecca, 22 October 2026):
+(1) The build date: the TI has no clock, so the workbench asks for it.
+    After the source file, "Build date (yymmdd):" offers the last date
+    given; a digit typed replaces it (and the first after a refused
+    ENTER), FCTN S rubs out, ENTER takes six digits making a month 01-12
+    and a day 01-31 (src/wdate.a99, in overlay 1: the resident part is
+    nearly full, about 160 bytes left).  Tests: m5_sema_test.py date.
+(2) A playable game from the TI alone, in M6: the engine reads the
+    story's length from the story header (not from gen/storysrc.a99 at
+    build time), and pictures and sounds come from files of their own
+    (and later from the picture editor), so a story the workbench
+    writes plays without the PC.  Until then the TI's story files equal
+    the game writer's before the pictures and sounds are added.
 
 ## Next
 
-1. M6, the workbench tools (test-play, debug verbs, a list of several
-   errors), after the open questions above.
+1. M6, the workbench tools: decision (2) above first (the engine reading
+   the story's length from its header; pictures and sounds as files),
+   then test-play, debug verbs, a list of several errors.
 
 The reference used for part 6's disk writes:
    (part 6) libre99's clean-room TI disk controller DSR and its notes,

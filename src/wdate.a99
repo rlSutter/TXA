@@ -72,7 +72,8 @@ WDP7   MOV  @WDLEN,R1
        INC  @WDLEN
        JMP  WDP2
 * WDOK - R0 = 1 if WDBUF is a date: six digits, month 01-12, day 01-31.
-WDOK   MOV  @WDLEN,R0
+WDOK   MOV  R11,@WDRET         (it calls WD2)
+       MOV  @WDLEN,R0
        CI   R0,6
        JNE  WDK8
        LI   R1,2               the month: digits 2, 3
@@ -88,8 +89,10 @@ WDOK   MOV  @WDLEN,R0
        CI   R0,31
        JH   WDK8
        LI   R0,1
+       MOV  @WDRET,R11
        RT
 WDK8   CLR  R0
+       MOV  @WDRET,R11
        RT
 * WD2 - R0 = the two digits of WDBUF at R1.  Uses R0-R2.
 WD2    MOVB @WDBUF(R1),R0
