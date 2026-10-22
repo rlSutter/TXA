@@ -62,11 +62,13 @@ ERET   EQU  SV0+50
 HERE   EQU  SV0+52             the first declaration kept (sema.py's "here")
 OPL    EQU  SV0+54             OPRD: the length
 OLDR10 EQU  SV0+56             R10 before the overlay's own stack
+ACN    EQU  SV0+58             actions (overlay 4 makes them; later stages use them)
+GRN    EQU  SV0+60             GRAMTAB's length
 MSTKT  EQU  >3800              the meaning stage's return stack: 2K down from
 *                              here, over the lexer's and parser's buffers
 *                              (free by now): its checks recurse deeply
 OPB    EQU  ULIT+96            8 bytes: OPRD's string (an operator, a Const's word)
-* (the overlays' own variables start at SV0+64)
+* (the overlays' own variables start at SV0+66)
 KEYB   EQU  IBUF               64 bytes: a name in capitals
 NAMB   EQU  IBUF+64            64 bytes: the name as written
 DWB    EQU  IBUF+128           16 bytes: a dictionary word, lower case
@@ -132,3 +134,19 @@ SE.UPX EQU  78                 unknown property ... (after a dot)
 SE.ARG EQU  79                 ... takes n arguments, not m
 SE.PAR EQU  80                 the second argument of ... must be a property name
 SE.NCA EQU  82                 ... is a ... and cannot be called
+
+* the code generator (wcode.a99, overlay 5): pages no window maps by
+* default (0, 1, 4-9) and the REPLACE page, free by then
+FIXPG  EQU  6                  2 pages: 1024 fixups
+FIXMAX EQU  1024
+STRPG  EQU  8                  448 strings
+STRMAX EQU  448
+RDIRPG EQU  9                  512 routines
+RDMAX  EQU  512
+LABPG  EQU  62                 a routine's labels (511) and jumps (768)
+LABMAX EQU  511
+JMPMAX EQU  768
+CODMAX EQU  16384              the code: pages 0, 1, 4, 5 (CODAT)
+SE.MAIN EQU 83                 there is no ROUTINE Main: the game starts there
+SE.ACT EQU  84                 rule cases need the library's global "action"
+SE.CNC EQU  85                 cannot compile Case (a case outside a rule block)

@@ -160,3 +160,22 @@ def warnings(p):
         code = next((c for k, c in WARNINGS if k in m.group(3)), 0)
         out.append(f'{code} {m.group(1).rsplit(".", 1)[0].upper()} {m.group(2)}')
     return '\n'.join(out) + '\n'
+
+def code(gen):
+    """The code generator's output (codegen.py's Gen, before linking): each
+    routine in output order, its name and its bytes in hex, a fixup's two
+    bytes written R:routine or S:string number; then the strings in
+    first-use order."""
+    idx = {s: i for i, s in enumerate(gen.strings)}
+    out = []
+    for c in gen.codes:
+        fx, parts, i = dict(c.fixups), [], 0
+        while i < len(c.b):
+            if i in fx:
+                kind, key = fx[i]
+                parts.append(f'R:{key}' if kind == 'routine' else f'S:{idx[key]}'); i += 2
+            else:
+                parts.append(f'{c.b[i]:02X}'); i += 1
+        out.append(f'{c.name} ' + ' '.join(parts))
+    out += [f'S{i} {esc(s)}' for i, s in enumerate(gen.strings)]
+    return '\n'.join(out) + '\n'

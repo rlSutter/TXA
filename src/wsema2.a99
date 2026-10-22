@@ -21,14 +21,12 @@
 * The pages and the error codes are in wsymdef.a99.
 *======================================================================
 * variables (SV0+64 on: this overlay's own)
-ACN    EQU  SV0+64             actions
 LCN    EQU  SV0+66             parameters and locals of the routine checked
 INOBJ  EQU  SV0+68             nonzero: checking a property routine
 OWNL   EQU  SV0+70             the routine being checked: its line, file
 OWNF   EQU  SV0+72
 BDPG   EQU  SV0+74             its body's place
 BDOF   EQU  SV0+76
-GRN    EQU  SV0+78             GRAMTAB's length
 CURV   EQU  SV0+80             the verb
 NSLOT  EQU  SV0+82             a grammar line's slots
 GLHERE EQU  SV0+84             where the grammar line starts in GRAMTAB
@@ -50,7 +48,7 @@ WBUF2  EQU  ULIT+16            16 bytes: another
 SEMA2  MOV  R10,@OLDR10         its own stack (see MSTKT)
        LI   R10,MSTKT
        .enter
-       LI   R0,SV0+64          this overlay's variables (the shared ones stay)
+       LI   R0,SV0+66          this overlay's variables (the shared ones stay)
 SM2A   CLR  *R0+
        CI   R0,SV0+120
        JL   SM2A

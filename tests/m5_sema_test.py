@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
-"""m5_sema_test.py - the workbench's meaning stage against tools/txc/sema.py.
+"""m5_sema_test.py - the workbench's meaning stage and code generator against
+tools/txc/sema.py and codegen.py.
 
 Each program of the corpus and its library, wrapped to 80 columns, goes
 in the simulator's DSK1 as DIS/VAR 80 files (the main file under its own
@@ -17,11 +18,13 @@ wrapped files:
   tables   after the whole pass: actions, the sorted dictionary with each
            word's VERB, VERBTAB, GRAMTAB, ACTSUB, DICTVERB (dump.tables),
            and the warnings (dump.warnings)
+  code     the code generator (M5 part 5): every routine's bytecode, in
+           output order, with its fixups, and the strings (dump.code)
   errors   malformed programs give the same first error, on the same
            line of the same file, one for each of sema.py's errors (but
            'more than 1000 objects'); and the warnings
 
-  python3 tests/m5_sema_test.py [decls|meaning|errors|all] [quick]
+  python3 tests/m5_sema_test.py [decls|meaning|code|errors|all] [quick]
 
 (meaning checks symbols, objects and tables together, from one run each.)"""
 import os, sys, tempfile, glob, re
@@ -35,6 +38,7 @@ from txa_wrap import wrap_text
 from txc.sema import Sema
 from txc.lexer import TxaError
 from txc import dump
+from txc.codegen import Gen
 fails = 0
 def check(name, ok, detail=''):
     global fails
@@ -185,6 +189,42 @@ def ti_warnings(m):
         a = sy['WRNPG'] * 4096 + i * 6
         out.append(f'{amw(m, a)} {files[amw(m, a + 2)]} {amw(m, a + 4)}')
     return '\n'.join(out) + '\n'
+def ti_code(m):
+    """The TI's code, decoded as dump.code writes Python's."""
+    props = {}
+    for i in range(1, m.rw(sy['SN']) + 1):
+        r = sy['SYMPG'] * 4096 + i * 32
+        if m.ams[r + 2] == 5:
+            props[amw(m, r + 4)] = ti_symname(m, i)
+    def cbyte(a):
+        blk = a >> 12
+        return m.ams[(blk if blk < 2 else blk + 2) * 4096 + (a & 0xFFF)]
+    fixes = {}
+    for f in range(m.rw(sy['FXN'])):
+        a = sy['FIXPG'] * 4096 + f * 8
+        fixes.setdefault(amw(m, a), {})[amw(m, a + 2)] = (amw(m, a + 4), amw(m, a + 6))
+    out = []
+    for r in range(m.rw(sy['RN'])):
+        a = sy['RDIRPG'] * 4096 + r * 8
+        kind, prop, key, start, n = m.ams[a], m.ams[a + 1], amw(m, a + 2), amw(m, a + 4), amw(m, a + 6)
+        if kind == 1:
+            name = ti_symname(m, key)
+        else:
+            o = sy['OBJPG'] * 4096 + key * 32
+            name = ti_symname(m, amw(m, o)) + '.' + props.get(prop, f'?{prop}')
+        fx, parts, i = fixes.get(r, {}), [], 0
+        while i < n:
+            if i in fx:
+                k, v = fx[i]
+                parts.append(f'R:{ti_symname(m, v)}' if k == 1 else f'S:{v}'); i += 2
+            else:
+                parts.append(f'{cbyte(start + i):02X}'); i += 1
+        out.append(f'{name} ' + ' '.join(parts))
+    for i in range(m.rw(sy['STRN'])):
+        a = sy['STRPG'] * 4096 + 512 + i * 8
+        out.append(f'S{i} ' + dump.esc(ti_tree_str(m, amw(m, a + 2), amw(m, a + 4))))
+    return '\n'.join(out) + '\n'
+
 def first_diff(a, b):
     al, bl = a.split('\n'), b.split('\n')
     for i, (x, y) in enumerate(zip(al, bl)):
@@ -310,6 +350,20 @@ ERRS = [
     ('a bad token in lines EXTENDed from another file', 'ROUTINE ZapSub\nEND\nVERB "zap"\n  noun -> Zap\nEND\nINCLUDE "DSK1.MORE"\n',
      [('MORE', 'EXTEND "zap"\n  thing -> Zap\nEND\n')]),
 ]
+if which in ('code', 'all'):
+    for rel, libdir in corpus(quick):
+        path = os.path.join(ROOT, rel)
+        name = os.path.splitext(os.path.basename(path))[0].replace('_', '')   # (the harness cannot type _)
+        d, ppath = stage(open(path).read(), name, libdir)
+        p = py_meaning(ppath)
+        g = Gen(p); g.generate()
+        m, steps = run_ti(d, name)
+        done = m.rw(sy['WBDONE'])
+        why = f'not done: done={done} stage={m.rw(sy["WBSTAG"])} error={m.rw(sy["WBERR"])} line={m.rw(sy["WBERRL"])}'
+        want, got = dump.code(g), (ti_code(m) if done >= 4 else '')
+        check(f'{rel}: code identical ({len(g.codes)} routines, {sum(len(c.b) for c in g.codes)} bytes, {len(g.strings)} strings; '
+              f'{steps / 1e6:.0f}M instructions in all, ~{steps / 3e5:.0f} s on a TI)', got == want, first_diff(want, got) if done >= 4 else why)
+
 if which in ('errors', 'all'):
     cases = [('missing include', 'INCLUDE "DSK1.NOSUCH"\nROUTINE Main\nEND\n')] + ERRS
     for case in cases:

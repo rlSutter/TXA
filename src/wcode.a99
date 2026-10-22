@@ -1,0 +1,1980 @@
+*======================================================================
+* wcode.a99 - the code generator (M5 part 5), overlay 5: tools/txc/
+* codegen.py's Gen on the TI.  Every ROUTINE kept (in order), then every
+* object's property routines (object by object, in the order their
+* properties were given), compiled to the story VM's bytecode; then the
+* strings the tables will need.  Jumps are resolved here; packed
+* addresses of routines and strings are left as fixups for the linker
+* (part 6).  Errors as codegen.py's.
+*
+* Its tables (SAMS pages no window maps by default, and the REPLACE page,
+* free by now; the numbers are in wsymdef.a99):
+*   code    the bytecode, routine after routine, from 0 (16K): SAMS
+*           pages 0, 1, 4, 5 (CODAT)
+*   FIXPG   fixups, 8 bytes: +0 routine, +2 place in it, +4 kind (1 a
+*           routine: +6 its symbol; 2 a string: +6 its number)
+*   STRPG   strings, in first-use order (numbered from 0): 512 bytes of
+*           hash (256 chains), then 8-byte records: +0 the next in the
+*           chain, +2 page, +4 offset of its >04 in the tree, +6 length
+*   RDIRPG  routines, in output order, 8 bytes: +0 kind (byte: 1 a
+*           ROUTINE, 2 a property routine), +1 the property (byte), +2
+*           its symbol (or object), +4 its start in the code, +6 length
+*   LABPG   the routine being compiled: label places (words, from label
+*           1), and at +1024 its jumps (4 bytes: place, label)
+*   LOCPG   its parameters and locals (as overlay 4)
+*======================================================================
+* variables (SV0+66 on: this overlay's own)
+CTOP   EQU  SV0+66             the code's length
+CSTART EQU  SV0+68             where this routine starts
+RN     EQU  SV0+70             routines
+FXN    EQU  SV0+72             fixups
+STRN   EQU  SV0+74             strings
+NLAB   EQU  SV0+76             this routine's labels
+NJMP   EQU  SV0+78             its jumps
+LCN5   EQU  SV0+80             its parameters and locals
+ACTVAR EQU  SV0+82             the global "action": its variable (0: none)
+CUROB  EQU  SV0+84
+G1     EQU  SV0+86             temporaries
+G2     EQU  SV0+88
+G3     EQU  SV0+90
+G4     EQU  SV0+92
+GHASH  EQU  SV0+94             SADDS: the string's hash, length, place
+GLEN   EQU  SV0+96
+GPG    EQU  SV0+98
+GOF    EQU  SV0+100
+GENDPG EQU  SV0+102            a Call: where it ends
+GENDOF EQU  SV0+104
+
+* GEN5 - the code generator.  R0 = 0, or an error.
+GEN5   MOV  R10,R9             its own stack (see MSTKT)
+       LI   R10,MSTKT
+       .enter
+       LI   R0,SV0+66
+GN1    CLR  *R0+
+       CI   R0,SV0+120
+       JL   GN1
+       MOV  R9,@OLDR10
+       MOV  R10,@SSTK
+       CLR  @EFPG
+       CLR  @DFPG
+       CLR  @XFPG
+       LI   R0,STRPG           the string hash
+       BL   @PGCLR
+       LI   R1,QMAIN           ROUTINE Main must exist
+       BL   @KEYSET
+       BL   @SLOOKK
+       CI   R1,K.ROU
+       JEQ  GN2
+       CLR  R1
+       LI   R2,255             ("<program>", line 0)
+       LI   R0,SE.MAIN
+       B    @SERR
+GN2    LI   R1,QACTN           the global "action" (rule cases need it)
+       BL   @KEYSET
+       BL   @SLOOKK
+       CI   R1,K.GLO
+       JNE  GN3
+       BL   @SYMAT
+       MOV  @4(R1),R0
+       AI   R0,16
+       MOV  R0,@ACTVAR
+       JMP  GN4
+GN3    SETO @ACTVAR
+GN4    CLR  R3                 each ROUTINE kept
+GN5    C    R3,@DXN
+       JHE  GN8
+       BL   @DXINF
+       MOV  R5,R5
+       JLT  GN7
+       CI   R4,NT.ROU
+       JNE  GN7
+       .push R3
+       BL   @DXSEEK
+       BL   @KEYRD             its name: its symbol
+       BL   @SLOOK
+       MOV  R0,R5
+       LI   R4,1
+       CLR  R6
+       BL   @RBEGIN
+       BL   @SCOPE             parameters and locals
+       BL   @GSTMTS
+       LI   R0,OP.RTRUE        (running off the end: TRUE)
+       BL   @RENDS
+       .pop R3
+GN7    INC  R3
+       JMP  GN5
+GN8    CLR  @CUROB             the property routines
+GN9    INC  @CUROB
+       C    @CUROB,@ON
+       JH   GN20
+       MOV  @CUROB,R0
+       BL   @OBJAT
+       MOV  @10(R1),R7
+GN10   MOV  R7,R7
+       JEQ  GN9
+       MOV  R7,R0
+       BL   @HCELL
+       MOV  *R1,R7
+       MOV  @4(R1),R0
+       CI   R0,2
+       JNE  GN10
+       .push R7
+       MOV  @2(R1),R6          its property
+       MOV  @6(R1),@EFILE
+       MOV  @10(R1),R2
+       MOV  @8(R1),R0
+       MOV  R2,R1
+       BL   @XSET
+       BL   @XB
+       BL   @XB
+       BL   @XW
+       BL   @XSKIP             (its name)
+       LI   R4,2
+       MOV  @CUROB,R5
+       BL   @RBEGIN
+       CLR  @LCN5              no parameters
+       BL   @SCOPE2
+       BL   @CASES
+       LI   R0,OP.RFALSE       (running off the end: FALSE, carry on)
+       BL   @RENDS
+       .pop R7
+       JMP  GN10
+GN20   BL   @TSTRS             the strings the tables need
+       CLR  R0
+       .leave
+       MOV  @OLDR10,R10
+       RT
+QMAIN  BYTE 4
+       TEXT 'MAIN'
+QACTN  BYTE 6
+       TEXT 'ACTION'
+       EVEN
+
+* ---- routines, bytes, labels ------------------------------------------------------
+* RBEGIN - a new routine: kind R4 (1, 2), symbol or object R5, property
+* R6, into the directory; its code starts at CTOP.
+RBEGIN MOV  R11,@G1
+       MOV  @RN,R0
+       CI   R0,RDMAX
+       JL   RB1
+       LI   R0,SE.MNY
+       B    @SERRE
+RB1    SLA  R0,3
+       MOV  R0,R1
+       AI   R1,>D000
+       LI   R0,RDIRPG
+       BL   @DMAP
+       SWPB R4
+       MOVB R4,*R1
+       SWPB R6
+       MOVB R6,@1(R1)
+       MOV  R5,@2(R1)
+       MOV  @CTOP,@4(R1)
+       MOV  @CTOP,@CSTART
+       CLR  @NLAB
+       CLR  @NJMP
+       MOV  @G1,R11
+       RT
+* RENDS - opcode R0, then the routine's jumps resolved, its length into
+* the directory, its local count into its first byte.
+RENDS  .enter
+       BL   @EMIT
+       CLR  R7                 each jump: offset = label - (place + 2)
+RE5A   C    R7,@NJMP
+       JHE  RE5C
+       MOV  R7,R1
+       SLA  R1,2
+       AI   R1,>D400
+       LI   R0,LABPG
+       BL   @DMAP
+       MOV  *R1+,R5            the place
+       MOV  *R1,R1             the label
+       SLA  R1,1
+       MOV  @>D000(R1),R4
+       S    R5,R4
+       DECT R4
+       MOV  R5,R0
+       BL   @PATCHW
+       INC  R7
+       JMP  RE5A
+RE5C   MOV  @RN,R0             its length
+       SLA  R0,3
+       MOV  R0,R1
+       AI   R1,>D000
+       LI   R0,RDIRPG
+       BL   @DMAP
+       MOV  @CTOP,R0
+       S    @CSTART,R0
+       MOV  R0,@6(R1)
+       INC  @RN
+       .leave
+       RT
+* EMIT - byte R0 (low byte) onto the code.  Uses R0, R1.
+EMIT   MOV  R11,@G2
+       MOV  @CTOP,R1
+       CI   R1,CODMAX
+       JL   EM1
+       LI   R0,SE.MNY
+       B    @SERRE
+EM1    .push R0
+       BL   @CODAT
+       .pop R0
+       SWPB R0
+       MOVB R0,*R1
+       INC  @CTOP
+       MOV  @G2,R11
+       RT
+* EMITW - word R0 (high byte first).  Uses R0, R1.
+EMITW  MOV  R11,@G3
+       .push R0
+       SWPB R0
+       BL   @EMIT
+       .pop R0
+       BL   @EMIT
+       MOV  @G3,R11
+       RT
+* CODAT - R1 = window D's address of code byte R1 (mapped).  Uses R0, R1.
+CODAT  MOV  R11,@G4
+       MOV  R1,R0              its page: 0, 1, 4, 5 for its 4K blocks
+       SRL  R0,12
+       CI   R0,2
+       JL   CDA1
+       INCT R0
+CDA1   BL   @DMAP
+       ANDI R1,>0FFF
+       AI   R1,>D000
+       MOV  @G4,R11
+       RT
+* PATCHW - word R4 at place R0 of this routine.  Uses R0, R1.
+PATCHW MOV  R11,@G3
+       A    @CSTART,R0
+       .push R0
+       MOV  R0,R1
+       BL   @CODAT
+       MOVB R4,*R1             the high byte ...
+       .pop R1
+       INC  R1
+       BL   @CODAT
+       SWPB R4
+       MOVB R4,*R1             ... then the low
+       SWPB R4
+       MOV  @G3,R11
+       RT
+* OP1 - opcode R0.  OPB1 - opcode R0, byte R2.  OPW - opcode R0, word R2.
+OP1    B    @EMIT
+OPB1   MOV  R11,@G1
+       BL   @EMIT
+       MOV  R2,R0
+       BL   @EMIT
+       MOV  @G1,R11
+       RT
+OPW    MOV  R11,@G1
+       BL   @EMIT
+       MOV  R2,R0
+       BL   @EMITW
+       MOV  @G1,R11
+       RT
+* LABEL - R0 = a new label.  LHERE - label R0 is here.  Uses R0, R1.
+LABEL  MOV  @NLAB,R0
+       CI   R0,LABMAX
+       JL   LAB1
+       LI   R0,SE.MNY
+       B    @SERRE
+LAB1   INC  @NLAB
+       MOV  @NLAB,R0
+       RT
+LHERE  MOV  R11,@G1
+       .push R0
+       LI   R0,LABPG
+       BL   @DMAP
+       .pop R1
+       SLA  R1,1
+       MOV  @CTOP,R0
+       S    @CSTART,R0
+       MOV  R0,@>D000(R1)
+       MOV  @G1,R11
+       RT
+* OPJ - jump opcode R0 to label R2.  Uses R0-R2.
+OPJ    MOV  R11,@G1
+       BL   @EMIT
+       MOV  @NJMP,R0
+       CI   R0,JMPMAX
+       JL   OPJ1
+       LI   R0,SE.MNY
+       B    @SERRE
+OPJ1   SLA  R0,2
+       MOV  R0,R1
+       AI   R1,>D400
+       LI   R0,LABPG
+       BL   @DMAP
+       MOV  @CTOP,R0
+       S    @CSTART,R0
+       MOV  R0,*R1+
+       MOV  R2,*R1
+       INC  @NJMP
+       CLR  R0
+       BL   @EMITW
+       MOV  @G1,R11
+       RT
+* FIXUP - a 2-byte hole for kind R4 (1 routine, 2 string), key R5, with
+* opcode R0 before it (or none if R0 < 0).  Uses R0-R3.
+FIXUP  .enter
+       MOV  R0,R0
+       JLT  FX1
+       BL   @EMIT
+FX1    MOV  @FXN,R0
+       CI   R0,FIXMAX
+       JL   FX2
+       LI   R0,SE.MNY
+       B    @SERRE
+FX2    MOV  R0,R1              its record: page FIXPG + n / 512
+       ANDI R1,511
+       SLA  R1,3
+       AI   R1,>D000
+       SRL  R0,9
+       AI   R0,FIXPG
+       BL   @DMAP
+       MOV  @RN,*R1+
+       MOV  @CTOP,R0
+       S    @CSTART,R0
+       MOV  R0,*R1+
+       MOV  R4,*R1+
+       MOV  R5,*R1
+       INC  @FXN
+       CLR  R0
+       BL   @EMITW
+       .leave
+       RT
+* PUSHN - push the number R0 (PUSH0, PUSH1, PUSHB or PUSHW).  Uses R0-R2.
+* (On the stack: what it calls uses the G temporaries.)
+PUSHN  .enter
+       MOV  R0,R2
+       JNE  PN1
+       LI   R0,OP.PUSH0
+       JMP  PN9
+PN1    CI   R2,1
+       JNE  PN2
+       LI   R0,OP.PUSH1
+       JMP  PN9
+PN2    CI   R2,-128
+       JLT  PN3
+       CI   R2,127
+       JGT  PN3
+       LI   R0,OP.PUSHB
+       BL   @OPB1
+       JMP  PN10
+PN3    LI   R0,OP.PUSHW
+       BL   @OPW
+       JMP  PN10
+PN9    BL   @EMIT
+PN10   .leave
+       RT
+
+* ---- scope ------------------------------------------------------------------------
+* SCOPE - with the reader at a ROUTINE's parameters: them, then the
+* LOCALs of its body (sema.py's order: every block, statement order),
+* into LOCPG; the first code byte, their count.  The reader ends at the
+* body.  SCOPE2: no parameters, the reader at the body.
+SCOPE  .enter
+       CLR  @LCN5
+       BL   @XB
+       BL   @XW
+       MOV  R0,R9
+SC1    MOV  R9,R9
+       JEQ  SC2
+       DEC  R9
+       BL   @KEYRD
+       BL   @LADD5
+       JMP  SC1
+SCOPE2 .enter
+SC2    .push @XPG
+       .push @XOF
+       BL   @COLL5
+       .pop @XOF
+       .pop @XPG
+       MOV  @LCN5,R0           the routine's first byte
+       BL   @EMIT
+       .leave
+       RT
+* COLL5 - the LOCAL names in the statements at the reader, and in their
+* blocks (as overlay 4's COLECT; the checks are done).
+COLL5  .enter
+       .push R9
+       BL   @XB
+       BL   @XW
+       MOV  R0,R9
+CO5A   MOV  R9,R9
+       JNE  CO5B
+       .pop R9
+       .leave
+       RT
+CO5B   DEC  R9
+       BL   @XB
+       BL   @XB
+       MOV  R0,R4
+       BL   @XW
+       CI   R4,NT.LOC
+       JNE  CO5D
+       BL   @XB
+       BL   @XW
+       MOV  R0,R8
+CO5C   MOV  R8,R8
+       JEQ  CO5A
+       DEC  R8
+       BL   @KEYRD
+       BL   @LADD5
+       JMP  CO5C
+CO5D   CI   R4,NT.IF
+       JNE  CO5F
+       BL   @XB
+       BL   @XW
+       MOV  R0,R8
+CO5E   MOV  R8,R8
+       JEQ  CO5E2
+       DEC  R8
+       BL   @XB
+       BL   @XB
+       BL   @XSKIP
+       .push R8
+       BL   @COLL5
+       .pop R8
+       JMP  CO5E
+CO5E2  BL   @XB
+       MOV  R0,R0
+       JEQ  CO5A
+       BL   @XBACK
+       BL   @COLL5
+       JMP  CO5A
+CO5F   CI   R4,NT.WHL
+       JNE  CO5G
+       BL   @XSKIP
+       JMP  CO5I
+CO5G   CI   R4,NT.FOR
+       JNE  CO5H
+       BL   @XSKIP
+       BL   @XSKIP
+       JMP  CO5I
+CO5H   CI   R4,NT.CAS
+       JNE  CO5J
+       BL   @XSKIP
+CO5I   BL   @COLL5
+       JMP  CO5A
+CO5J   MOV  R4,R1
+       MOVB @NFLD-1(R1),R0
+       SRL  R0,8
+       BL   @XFLDS
+       B    @CO5A
+* LADD5 - KEYB onto the locals.  LFND5 - R0 = its place, or -1.
+* Use R0-R3.
+LADD5  MOV  R11,@G1
+       MOV  @LCN5,R0
+       CI   R0,LOCMAX
+       JL   LA5A
+       LI   R0,SE.MNY
+       B    @SERRE
+LA5A   INC  @LCN5
+       MPY  @D72G,R0
+       AI   R1,>D000
+       LI   R0,LOCPG
+       BL   @DMAP
+       MOV  @KEYL,*R1+
+       LI   R2,KEYB
+       MOV  @KEYL,R3
+       JEQ  LA5C
+LA5B   MOVB *R2+,*R1+
+       DEC  R3
+       JNE  LA5B
+LA5C   MOV  @G1,R11
+       RT
+LFND5  MOV  R11,@G1
+       CLR  R3
+LF5A   C    R3,@LCN5
+       JHE  LF5X
+       MOV  R3,R0
+       MPY  @D72G,R0
+       AI   R1,>D000
+       LI   R0,LOCPG
+       BL   @DMAP
+       C    *R1+,@KEYL
+       JNE  LF5D
+       LI   R2,KEYB
+       MOV  @KEYL,R0
+       JEQ  LF5Y
+LF5B   CB   *R1+,*R2+
+       JNE  LF5D
+       DEC  R0
+       JNE  LF5B
+       JMP  LF5Y
+LF5D   INC  R3
+       JMP  LF5A
+LF5X   SETO R3
+LF5Y   MOV  R3,R0
+       MOV  @G1,R11
+       RT
+D72G   DATA 72
+* VARNUM - R0 = KEYB's variable: its local place, else 16 + its global
+* number.  Uses R0-R7.
+VARNUM MOV  R11,@G3
+       BL   @LFND5
+       MOV  R0,R0
+       JLT  VN1
+       MOV  @G3,R11
+       RT
+VN1    BL   @SLOOK
+       BL   @SYMAT
+       MOV  @4(R1),R0
+       AI   R0,16
+       MOV  @G3,R11
+       RT
+
+* ---- statements ------------------------------------------------------------------
+* CASES - a rule block (codegen.py's case_body): statements before a case
+* run every time; each case tests the action against its actions.
+CASES  .enter
+       MOV  @XPG,R7            any case at all? then "action" must be a global
+       MOV  @XOF,R8
+       BL   @XB
+       BL   @XW
+       MOV  R0,R9
+       CLR  R6                 (the first item's line)
+       CLR  R5
+CS1    MOV  R9,R9
+       JEQ  CS3
+       DEC  R9
+       BL   @XB
+       BL   @XB
+       MOV  R0,R4
+       BL   @XW
+       MOV  R6,R6
+       JNE  CS2
+       MOV  R0,R6
+       INC  R6                 (+1: 0 means none yet)
+CS2    CI   R4,NT.CAS
+       JNE  CS2A
+       SETO R5
+CS2A   MOV  R4,R1
+       MOVB @NFLD-1(R1),R0
+       SRL  R0,8
+       BL   @XFLDS
+       JMP  CS1
+CS3    MOV  R5,R5
+       JEQ  CS4
+       MOV  @ACTVAR,R0
+       JGT  CS4
+       DEC  R6
+       MOV  R6,@ELINE
+       LI   R0,SE.ACT
+       B    @SERRE
+CS4    MOV  R7,R0              the items again
+       MOV  R8,R1
+       BL   @XSET
+       BL   @XB
+       BL   @XW
+       MOV  R0,R9
+CS5    MOV  R9,R9
+       JNE  CS5A
+       .leave
+       RT
+CS5A   DEC  R9
+       MOV  @XPG,@G1
+       MOV  @XOF,@G2
+       BL   @XB
+       BL   @XB
+       CI   R0,NT.CAS
+       JEQ  CS6
+       MOV  @G1,R0             not a case: a statement
+       MOV  @G2,R1
+       BL   @XSET
+       BL   @GSTMT
+       JMP  CS5
+CS6    BL   @XW                a case: next, hit
+       BL   @LABEL
+       MOV  R0,R7              next
+       BL   @LABEL
+       MOV  R0,R8              hit
+       BL   @XB                its actions
+       BL   @XW
+       MOV  R0,R6
+CS7    MOV  R6,R6
+       JEQ  CS9
+       DEC  R6
+       .push R6
+       .push R7
+       .push R8
+       BL   @KEYRD
+       BL   @AFND5             R0 = its number
+       MOV  R0,R5
+       MOV  @ACTVAR,R2         LOAD action, push n, EQ
+       LI   R0,OP.LOAD
+       BL   @OPB1
+       MOV  R5,R0
+       BL   @PUSHN
+       LI   R0,OP.EQ
+       BL   @EMIT
+       .pop R8
+       .pop R7
+       .pop R6
+       MOV  R6,R6
+       JEQ  CS8
+       LI   R0,OP.JNZ          not the last: on to hit
+       MOV  R8,R2
+       BL   @OPJ
+       JMP  CS7
+CS8    LI   R0,OP.JZ           the last: else to next
+       MOV  R7,R2
+       BL   @OPJ
+       JMP  CS7
+CS9    MOV  R8,R0
+       .push R7
+       BL   @LHERE
+       BL   @GSTMTS
+       LI   R0,OP.RFALSE
+       BL   @EMIT
+       .pop R0
+       BL   @LHERE
+       B    @CS5
+* AFND5 - R0 = the action named KEYB (from 0; it exists).  Uses R0-R7.
+AFND5  MOV  R11,@G3
+       CLR  R6
+AF5A   MOV  R6,R0
+       CLR  R1                 (as overlay 4's ACTAT: 56 a page, 72 bytes)
+       MOV  R0,R1
+       CLR  R0
+       DIV  @D56G,R0
+       MPY  @D72G,R1
+       MOV  R2,R1
+       AI   R1,>D000
+       AI   R0,ACTPG
+       BL   @DMAP
+       C    *R1+,@KEYL
+       JNE  AF5C
+       LI   R2,KEYB
+       MOV  @KEYL,R7
+       JEQ  AF5D
+AF5B   CB   *R1+,*R2+
+       JNE  AF5C
+       DEC  R7
+       JNE  AF5B
+       JMP  AF5D
+AF5C   INC  R6
+       C    R6,@ACN
+       JL   AF5A
+AF5D   MOV  R6,R0
+       MOV  @G3,R11
+       RT
+D56G   DATA 56
+
+* GSTMTS - the statements of the list at the reader.
+GSTMTS .enter
+       .push R9
+       BL   @XB
+       BL   @XW
+       MOV  R0,R9
+GSS1   MOV  R9,R9
+       JNE  GSS2
+       .pop R9
+       .leave
+       RT
+GSS2   DEC  R9
+       BL   @GSTMT
+       JMP  GSS1
+* GSTMT - the statement at the reader (codegen.py's stmt).
+GSTMT  .enter
+       .push R8
+       BL   @XB
+       BL   @XB
+       MOV  R0,R4
+       BL   @XW
+       MOV  R0,R8              its line
+       MOV  R0,@ELINE
+       MOV  R4,R1
+       CI   R1,NT.IF
+       JL   GSX
+       CI   R1,NT.EST
+       JH   GSX
+       AI   R1,-NT.IF
+       SLA  R1,1
+       MOV  @GSTAB(R1),R0
+       B    *R0
+GSX    LI   R0,SE.CNC          (a case where only a rule block allows one)
+       B    @SERRE
+GS99   .pop R8
+       .leave
+       RT
+GSTAB  DATA GSIF,GSWHL,GSFOR,GSLOC,GSPRN,GSX,GSMOV,GSREM,GSGIV,GSRET,GSPIC,GSASG,GSEST
+GSLOC  BL   @XSKIP             LOCAL: nothing to do
+       JMP  GS99
+GSIF   BL   @LABEL             IF: end; each arm: cond, JZ next, block, JMP end
+       .push R0
+       BL   @XB
+       BL   @XW
+       MOV  R0,R5
+GSI1   MOV  R5,R5
+       JEQ  GSI2
+       DEC  R5
+       BL   @XB
+       BL   @XB
+       .push R5
+       BL   @LABEL
+       .push R0
+       BL   @GEXPR
+       LI   R0,OP.JZ
+       MOV  *R10,R2            (next: on the stack)
+       BL   @OPJ
+       BL   @GSTMTS
+       MOV  @4(R10),R2         (end: under next and the count)
+       LI   R0,OP.JMP
+       BL   @OPJ
+       .pop R0
+       BL   @LHERE
+       .pop R5
+       JMP  GSI1
+GSI2   BL   @XB                ELSE
+       MOV  R0,R0
+       JEQ  GSI3
+       BL   @XBACK
+       BL   @GSTMTS
+GSI3   .pop R0
+       BL   @LHERE
+       JMP  GS99
+GSWHL  BL   @LABEL             WHILE: top: cond, JZ end, block, JMP top; end
+       .push R0
+       BL   @LABEL
+       .push R0
+       MOV  @2(R10),R0
+       BL   @LHERE
+       BL   @GEXPR
+       LI   R0,OP.JZ
+       MOV  *R10,R2
+       BL   @OPJ
+       BL   @GSTMTS
+       LI   R0,OP.JMP
+       MOV  @2(R10),R2
+       BL   @OPJ
+       .pop R0
+       BL   @LHERE
+       .pop R0
+       JMP  GS99
+GSFOR  BL   @KEYRD             FOR EACH v IN parent
+       BL   @VARNUM
+       .push R0                v
+       BL   @LABEL
+       .push R0                top
+       BL   @LABEL
+       .push R0                end
+       BL   @GEXPR
+       LI   R0,OP.CHILD
+       BL   @EMIT
+       LI   R0,OP.STORE
+       MOV  @4(R10),R2
+       BL   @OPB1
+       MOV  @2(R10),R0
+       BL   @LHERE
+       LI   R0,OP.LOAD
+       MOV  @4(R10),R2
+       BL   @OPB1
+       LI   R0,OP.JZ
+       MOV  *R10,R2
+       BL   @OPJ
+       BL   @GSTMTS
+       LI   R0,OP.LOAD
+       MOV  @4(R10),R2
+       BL   @OPB1
+       LI   R0,OP.SIBLING
+       BL   @EMIT
+       LI   R0,OP.STORE
+       MOV  @4(R10),R2
+       BL   @OPB1
+       LI   R0,OP.JMP
+       MOV  @2(R10),R2
+       BL   @OPJ
+       .pop R0
+       BL   @LHERE
+       .pop R0
+       .pop R0
+       B    @GS99
+GSPRN  BL   @XB                PRINT: each item, then NEWLINE
+       BL   @XW
+       MOV  R0,R5
+GSP1   MOV  R5,R5
+       JNE  GSP2
+       BL   @XB                newline: True (1)?
+       CI   R0,1
+       JNE  GSP1A
+       LI   R0,OP.NEWLINE
+       BL   @EMIT
+GSP1A  B    @GS99
+GSP2   DEC  R5
+       .push R5
+       BL   @XB                a PItem: form, expression
+       BL   @XB
+       BL   @XW
+       BL   @XB                its form: None, or a string
+       MOV  R0,R0
+       JNE  GSP4
+       MOV  @XPG,@G1           no form: a string literal is PRINTS
+       MOV  @XOF,@G2
+       BL   @XB
+       BL   @XB
+       CI   R0,NT.STR
+       JNE  GSP3
+       BL   @XW
+       BL   @SADDS             (the string: its number)
+       MOV  R0,R5
+       LI   R4,2
+       LI   R0,OP.PRINTS
+       BL   @FIXUP
+       JMP  GSP9
+GSP3   MOV  @G1,R0             anything else: a number
+       MOV  @G2,R1
+       BL   @XSET
+       BL   @GEXPR
+       LI   R0,OP.PRINTN
+       BL   @EMIT
+       JMP  GSP9
+GSP4   BL   @XBACK
+       BL   @OPRD
+       LI   R7,PFORMS           the form: its opcode and operand
+GSP5   MOVB *R7,R0
+       JEQ  GSP3B              (a form not listed: a number)
+       MOV  R7,R1
+       BL   @OPIS
+       MOV  R0,R0
+       JNE  GSP6
+       MOVB *R7,R0
+       SRL  R0,8
+       A    R0,R7
+       AI   R7,3
+       JMP  GSP5
+GSP3B  BL   @GEXPR
+       LI   R0,OP.PRINTN
+       BL   @EMIT
+       JMP  GSP9
+GSP6   MOVB *R7,R0             found: past the name, its opcode and operand
+       SRL  R0,8
+       A    R0,R7
+       INC  R7
+       .push R7
+       BL   @GEXPR
+       .pop R7
+       MOVB *R7+,R0
+       SRL  R0,8
+       MOVB *R7,R2
+       SRL  R2,8
+       CI   R0,OP.PRINTA
+       JNE  GSP7
+       BL   @OPB1
+       JMP  GSP9
+GSP7   BL   @EMIT
+GSP9   .pop R5
+       JMP  GSP1
+* PRINT forms: name, then opcode and its byte (PRINTA's article)
+PFORMS  BYTE 3
+       TEXT 'the'
+       BYTE OP.PRINTA,0,3
+       TEXT 'The'
+       BYTE OP.PRINTA,1,1
+       TEXT 'a'
+       BYTE OP.PRINTA,2,2
+       TEXT 'an'
+       BYTE OP.PRINTA,2,1
+       TEXT 'A'
+       BYTE OP.PRINTA,3,2
+       TEXT 'An'
+       BYTE OP.PRINTA,3,4
+       TEXT 'name'
+       BYTE OP.PRINTO,0,4
+       TEXT 'char'
+       BYTE OP.PRINTC,0,6
+       TEXT 'string'
+       BYTE OP.PRINTV,0,0
+       EVEN
+GSMOV  BL   @GEXPR             MOVE obj TO dest
+       BL   @GEXPR
+       LI   R0,OP.MOVE
+       BL   @EMIT
+       B    @GS99
+GSREM  BL   @GEXPR             REMOVE obj
+       LI   R0,OP.REMOVE
+       BL   @EMIT
+       B    @GS99
+GSPIC  BL   @GEXPR             PICTURE n
+       LI   R0,OP.PICTURE
+       BL   @EMIT
+       B    @GS99
+GSGIV  BL   @GEXPR             GIVE obj attr, ~attr ...: DUP between
+       BL   @XB
+       BL   @XW
+       MOV  R0,R5
+GSG1   MOV  R5,R5
+       JNE  GSG2
+       B    @GS99
+GSG2   DEC  R5
+       .push R5
+       BL   @XB                (name, on)
+       BL   @XB
+       BL   @KEYRD
+       BL   @SLOOK
+       BL   @SYMAT
+       MOV  @4(R1),R6          its number
+       BL   @XB
+       MOV  R0,R7
+       .pop R5
+       MOV  R5,R5
+       JEQ  GSG3
+       LI   R0,OP.DUP
+       BL   @EMIT
+GSG3   LI   R0,OP.SETATTR
+       CI   R7,1
+       JEQ  GSG4
+       LI   R0,OP.CLRATTR
+GSG4   MOV  R6,R2
+       BL   @OPB1
+       JMP  GSG1
+GSRET  BL   @XB                RETURN: none or 1: RTRUE; 0: RFALSE
+       MOV  R0,R0
+       JNE  GSR1
+       LI   R0,OP.RTRUE
+       BL   @EMIT
+       B    @GS99
+GSR1   BL   @XBACK
+       MOV  @XPG,@G1
+       MOV  @XOF,@G2
+       .push @G1
+       .push @G2
+       BL   @FOLD5
+       MOV  R1,R1
+       JEQ  GSR3
+       CI   R0,1
+       JNE  GSR2
+       .pop R0
+       .pop R0
+       LI   R0,OP.RTRUE
+       BL   @EMIT
+       B    @GS99
+GSR2   MOV  R0,R0
+       JNE  GSR3
+       .pop R0
+       .pop R0
+       LI   R0,OP.RFALSE
+       BL   @EMIT
+       B    @GS99
+GSR3   .pop R1                 else: the value, RET
+       .pop R0
+       .push @XPG
+       .push @XOF
+       BL   @XSET
+       BL   @GEXPR
+       .pop @XOF
+       .pop @XPG
+       LI   R0,OP.RET
+       BL   @EMIT
+       B    @GS99
+GSEST  MOV  @XPG,@G1           an expression statement: the value, POP
+       MOV  @XOF,@G2
+       BL   @XB
+       BL   @XB
+       CI   R0,NT.NAM
+       JEQ  GSE1
+       MOV  @G1,R0
+       MOV  @G2,R1
+       BL   @XSET
+       BL   @GEXPR
+       JMP  GSE2
+GSE1   BL   @XW                a name on its own: a call with no arguments
+       BL   @KEYRD             (sema.py made it one)
+       BL   @CALLN0
+GSE2   LI   R0,OP.POP
+       BL   @EMIT
+       B    @GS99
+GSASG  MOV  @XPG,@G1           target = value
+       MOV  @XOF,@G2
+       BL   @XB
+       BL   @XB
+       MOV  R0,R4
+       BL   @XW
+       CI   R4,NT.NAM
+       JNE  GSA2
+       BL   @KEYRD             a name: the value, STORE v
+       BL   @VARNUM
+       .push R0
+       BL   @GEXPR
+       .pop R2
+       LI   R0,OP.STORE
+       BL   @OPB1
+       B    @GS99
+GSA2   CI   R4,NT.PRF
+       JNE  GSA3
+       BL   @GEXPR             obj.prop = value: obj, value, PUTPROP p kind
+       BL   @KEYRD
+       BL   @SLOOK
+       BL   @SYMAT
+       .push @4(R1)
+       BL   @VKIND
+       .push R0
+       BL   @GEXPR
+       .pop R3                 kind
+       .pop R2                 property
+       LI   R0,OP.PUTPROP
+       BL   @OPB1
+       MOV  R3,R0
+       BL   @EMIT
+       B    @GS99
+GSA3   BL   @XB                a(i) = value: i, value, ASTORE a
+       BL   @XB
+       BL   @XW
+       BL   @KEYRD
+       BL   @SLOOK
+       BL   @SYMAT
+       .push @4(R1)
+       BL   @XB                (its arguments: one)
+       BL   @XW
+       BL   @GEXPR
+       BL   @GEXPR
+       .pop R2
+       LI   R0,OP.ASTORE
+       BL   @OPB1
+       B    @GS99
+* VKIND - R0 = the property kind the value at the reader gets when
+* assigned (codegen.py's value_kind): a string literal PK.STR, the name
+* of a routine (not a local) PK.ROUT, else PK.VALS.  The reader stays.
+VKIND  .enter
+       .push @XPG
+       .push @XOF
+       BL   @XB
+       BL   @XB
+       MOV  R0,R4
+       LI   R5,PK.STR
+       CI   R4,NT.STR
+       JEQ  VK9
+       LI   R5,PK.VALS
+       CI   R4,NT.NAM
+       JNE  VK9
+       BL   @XW
+       BL   @KEYRD
+       BL   @LFND5
+       MOV  R0,R0
+       JGT  VK9
+       JEQ  VK9
+       BL   @SLOOKK
+       LI   R5,PK.VALS
+       CI   R1,K.ROU
+       JNE  VK9
+       LI   R5,PK.ROUT
+VK9    .pop @XOF
+       .pop @XPG
+       MOV  R5,R0
+       .leave
+       RT
+
+* ---- expressions -----------------------------------------------------------------
+* GEXPR - the expression at the reader (codegen.py's expr): folded to a
+* number if it is a constant one, else compiled.
+GEXPR  .enter
+       .push R8
+       .push R9
+       .push @XPG              its place
+       .push @XOF
+       BL   @FOLD5
+       MOV  R1,R1
+       JEQ  GE1
+       .pop R1                 (a constant: the reader is past it)
+       .pop R1
+       BL   @PUSHN
+       B    @GE99
+GE1    .pop R1                 back to the node
+       .pop R0
+       BL   @XSET
+       BL   @XB
+       BL   @XB
+       MOV  R0,R4
+       BL   @XW
+       MOV  R0,R8              its line
+       MOV  R0,@ELINE
+       CI   R4,NT.ACT
+       JNE  GE2
+       BL   @KEYRD             ##Action: its number
+       BL   @AFND5
+       BL   @PUSHN
+       B    @GE99
+GE2    CI   R4,NT.DIC
+       JNE  GE3
+       BL   @DWNUM             'word': its place in the dictionary
+       BL   @PUSHN
+       B    @GE99
+GE3    CI   R4,NT.STR
+       JNE  GE4
+       BL   @SADDS             a string: PUSHW (its address)
+       MOV  R0,R5
+       LI   R4,2
+       LI   R0,OP.PUSHW
+       BL   @FIXUP
+       B    @GE99
+GE4    CI   R4,NT.CST
+       JNE  GE5
+       BL   @XSKIP             SELF (the rest were folded)
+       LI   R0,OP.LOADSELF
+       BL   @EMIT
+       B    @GE99
+GE5    CI   R4,NT.NAM
+       JNE  GE6
+       BL   @KEYRD
+       BL   @GNAME
+       B    @GE99
+GE6    CI   R4,NT.UNA
+       JNE  GE7
+       BL   @OPRD              - (NEG) or NOT
+       LI   R1,QMIN5
+       BL   @OPIS
+       .push R0
+       BL   @GEXPR
+       .pop R1
+       LI   R0,OP.NEG          (LI sets the status: test after it)
+       MOV  R1,R1
+       JNE  GE6A
+       LI   R0,OP.NOT
+GE6A   BL   @EMIT
+       B    @GE99
+GE7    CI   R4,NT.BIN
+       JNE  GE8
+       BL   @GBIN
+       B    @GE99
+GE8    CI   R4,NT.PRF
+       JNE  GE9
+       BL   @GEXPR             obj.prop: GETPROP p
+       BL   @PROPN
+       MOV  R0,R2
+       LI   R0,OP.GETPROP
+       BL   @OPB1
+       B    @GE99
+GE9    CI   R4,NT.CAL
+       JNE  GE10
+       BL   @GCALL
+       B    @GE99
+GE10   LI   R0,SE.NVL          (nothing else can be here)
+       B    @SERRE
+GE99   .pop R9
+       .pop R8
+       .leave
+       RT
+QMIN5  BYTE 1
+       TEXT '-'
+       EVEN
+* PROPN - R0 = the number of the property named by the string at the
+* reader.  Uses R0-R7.
+PROPN  MOV  R11,@G4
+       BL   @KEYRD
+       BL   @SLOOK
+       BL   @SYMAT
+       MOV  @4(R1),R0
+       MOV  @G4,R11
+       RT
+* GNAME - the name in KEYB as a value: a local, a global, an object (and
+* pictures, arrays, music, sound: their numbers), a routine's address.
+GNAME  .enter
+       BL   @LFND5
+       MOV  R0,R0
+       JLT  GN5A
+       MOV  R0,R2
+       LI   R0,OP.LOAD
+       BL   @OPB1
+       JMP  GN5Z
+GN5A   BL   @SLOOKK
+       MOV  R0,R5
+       CI   R1,K.GLO
+       JNE  GN5B
+       BL   @SYMAT
+       MOV  @4(R1),R2
+       AI   R2,16
+       LI   R0,OP.LOAD
+       BL   @OPB1
+       JMP  GN5Z
+GN5B   CI   R1,K.ROU
+       JNE  GN5C
+       LI   R4,1               PUSHW (the routine's address)
+       LI   R0,OP.PUSHW
+       BL   @FIXUP
+       JMP  GN5Z
+GN5C   CI   R1,K.OBJ
+       JEQ  GN5D
+       CI   R1,K.ARR
+       JEQ  GN5D
+       CI   R1,K.PIC
+       JHE  GN5D
+       LI   R0,SE.NVL
+       B    @SERRE
+GN5D   MOV  R5,R0
+       BL   @SYMAT
+       MOV  @4(R1),R0
+       BL   @PUSHN
+GN5Z   .leave
+       RT
+* DWNUM - R0 = the dictionary place of the word string at the reader
+* (lower case, 12 letters at most).  Uses R0-R7.
+DWNUM  MOV  R11,@G4
+       BL   @XB
+       BL   @XW
+       MOV  R0,R3
+       CLR  R4
+DWN1   MOV  R3,R3
+       JEQ  DWN3
+       BL   @XB
+       CI   R4,12
+       JHE  DWN2
+       SWPB R0
+       CB   R0,@BUPA
+       JL   DWN1A
+       CB   R0,@BUPZ
+       JH   DWN1A
+       AI   R0,>2000
+DWN1A  MOVB R0,@DWB(R4)
+       INC  R4
+DWN2   DEC  R3
+       JMP  DWN1
+DWN3   MOV  R4,R0
+       BL   @DADD
+       MOV  R0,R1
+       SLA  R1,1
+       LI   R0,DNPG
+       BL   @EMAP
+       MOV  @>E000(R1),R0
+       MOV  @G4,R11
+       RT
+
+* GBIN - the rest of a Binary node: AND, OR (short circuits), HAS, HASNT,
+* else both sides and the operator.
+GBIN   .enter
+       BL   @OPRD
+       LI   R1,QAND
+       BL   @OPIS
+       MOV  R0,R7              R7: 1 AND
+       LI   R1,QOR
+       BL   @OPIS
+       SLA  R0,1
+       SOC  R0,R7              2 OR
+       MOV  R7,R7
+       JEQ  GB5
+       BL   @LABEL             done
+       .push R0
+       BL   @LABEL             short
+       .push R0
+       .push R7
+       BL   @GEXPR
+       BL   @GBJ
+       BL   @GEXPR
+       BL   @GBJ
+       MOV  *R10,R7
+       LI   R0,OP.PUSH1        AND: 1, JMP done, short: 0
+       CI   R7,1
+       JEQ  GB1
+       LI   R0,OP.PUSH0        OR: 0, JMP done, short: 1
+GB1    BL   @EMIT
+       LI   R0,OP.JMP
+       MOV  @4(R10),R2
+       BL   @OPJ
+       MOV  @2(R10),R0
+       BL   @LHERE
+       MOV  *R10,R7
+       LI   R0,OP.PUSH0
+       CI   R7,1
+       JEQ  GB2
+       LI   R0,OP.PUSH1
+GB2    BL   @EMIT
+       .pop R7
+       .pop R0
+       .pop R0
+       BL   @LHERE
+       .leave
+       RT
+GB5    LI   R1,QHAS5           HAS, HASNT: HASATTR a (NOT)
+       BL   @OPIS
+       MOV  R0,R7
+       LI   R1,QHASN5
+       BL   @OPIS
+       SLA  R0,1
+       SOC  R0,R7
+       MOV  R7,R7
+       JEQ  GB8
+       .push R7
+       BL   @GEXPR
+       BL   @XB                the attribute's name
+       BL   @XB
+       BL   @XW
+       BL   @KEYRD
+       BL   @SLOOK
+       BL   @SYMAT
+       MOV  @4(R1),R2
+       LI   R0,OP.HASATTR
+       BL   @OPB1
+       .pop R7
+       CI   R7,2
+       JNE  GB7
+       LI   R0,OP.NOT
+       BL   @EMIT
+GB7    .leave
+       RT
+GB8    LI   R7,BINMAP          the rest: its opcode (R7 the entry)
+GB9    MOVB *R7,R0
+       JNE  GB9A
+       LI   R0,SE.NVL          (no other operator)
+       B    @SERRE
+GB9A   MOV  R7,R1
+       BL   @OPIS
+       MOV  R0,R0
+       JNE  GB10
+       MOVB *R7,R0
+       SRL  R0,8
+       A    R0,R7
+       AI   R7,3
+       JMP  GB9
+GB10   MOVB *R7,R0
+       SRL  R0,8
+       A    R0,R7
+       INC  R7
+       .push R7
+       BL   @GEXPR
+       BL   @GEXPR
+       .pop R7
+       MOVB *R7+,R0
+       SRL  R0,8
+       .push R7
+       BL   @EMIT
+       .pop R7
+       MOVB *R7,R0             then NOT? (NOTIN)
+       JEQ  GB11
+       LI   R0,OP.NOT
+       BL   @EMIT
+GB11   .leave
+       RT
+* GBJ - AND: JZ short; OR: JNZ short (the kind and labels on the stack:
+* *R10+2 the kind, then short, then done, under GBJ's own return).
+GBJ    MOV  *R10,R7
+       LI   R0,OP.JZ
+       CI   R7,1
+       JEQ  GBJ1
+       LI   R0,OP.JNZ
+GBJ1   MOV  @2(R10),R2
+       B    @OPJ
+QAND   BYTE 3
+       TEXT 'AND'
+QOR    BYTE 2
+       TEXT 'OR'
+QHAS5  BYTE 3
+       TEXT 'HAS'
+QHASN5 BYTE 5
+       TEXT 'HASNT'
+* operators: name, opcode, then 1 if NOT follows
+BINMAP BYTE 1
+       TEXT '+'
+       BYTE OP.ADD,0,1
+       TEXT '-'
+       BYTE OP.SUB,0,1
+       TEXT '*'
+       BYTE OP.MUL,0,1
+       TEXT '/'
+       BYTE OP.DIV,0,3
+       TEXT 'MOD'
+       BYTE OP.MOD,0,1
+       TEXT '='
+       BYTE OP.EQ,0,2
+       TEXT '<>'
+       BYTE OP.NE,0,1
+       TEXT '<'
+       BYTE OP.LT,0,1
+       TEXT '>'
+       BYTE OP.GT,0,2
+       TEXT '<='
+       BYTE OP.LE,0,2
+       TEXT '>='
+       BYTE OP.GE,0,2
+       TEXT 'IN'
+       BYTE OP.IN,0,5
+       TEXT 'NOTIN'
+       BYTE OP.IN,1,0
+       EVEN
+
+* GCALL - the rest of a Call node: obj.prop(args) (RUNPROP, CALLPROP); a
+* built-in function; an array's element; a routine (CALL); a routine
+* held in a variable (CALLV).
+GCALL  .enter
+       MOV  @XPG,@G1           the function's place
+       MOV  @XOF,@G2
+       .push @G1
+       .push @G2
+       BL   @XB
+       BL   @XB
+       MOV  R0,R4
+       BL   @XW
+       CI   R4,NT.PRF
+       JNE  GC5
+       .pop R0                 obj.prop(...)
+       .pop R0
+       BL   @GEXPR
+       BL   @PROPN
+       .push R0
+       BL   @XB                the arguments
+       BL   @XW
+       MOV  R0,R9
+       JNE  GC2
+       .pop R2                 none: RUNPROP p
+       LI   R0,OP.RUNPROP
+       BL   @OPB1
+       B    @GC99
+GC2    .push R9
+GC3    MOV  R9,R9
+       JEQ  GC4
+       DEC  R9
+       BL   @GEXPR
+       JMP  GC3
+GC4    .pop R3                 CALLPROP p n
+       .pop R2
+       LI   R0,OP.CALLPROP
+       BL   @OPB1
+       MOV  R3,R0
+       BL   @EMIT
+       B    @GC99
+GC5    BL   @KEYRD             a name
+       BL   @LFND5
+       MOV  R0,R0
+       JLT  GC6
+       B    @GC20              a local: a routine in a variable
+GC6    BL   @BLOOK
+       MOV  R0,R0
+       JNE  GC6A
+       B    @GC15
+GC6A   .pop R1                 a built-in function
+       .pop R1
+       MOV  R0,R6              its place in BUILTN (from 1)
+       MOV  R2,R7              1 if it gives a value
+       BL   @XB                its arguments
+       BL   @XW
+       MOV  R0,R9
+       CI   R6,BPROPL          PROPLEN, PROPWORD: the second is a property
+       JL   GC9
+       .push R6
+       BL   @GEXPR
+       BL   @XB                (the property: a Name node, not a bare string)
+       BL   @XB
+       BL   @XW
+       BL   @PROPN
+       .pop R6
+       .push R0
+       DECT R9
+GC7    MOV  R9,R9
+       JEQ  GC8
+       DEC  R9
+       .push R6
+       BL   @GEXPR
+       .pop R6
+       JMP  GC7
+GC8    .pop R2
+       MOVB @BOPS-1(R6),R0
+       SRL  R0,8
+       BL   @OPB1
+       B    @GC99
+GC9    .push R6
+       .push R7
+GC10   MOV  R9,R9
+       JEQ  GC11
+       DEC  R9
+       BL   @GEXPR
+       JMP  GC10
+GC11   .pop R7
+       .pop R6
+       MOVB @BOPS-1(R6),R0
+       SRL  R0,8
+       BL   @EMIT
+       MOV  R7,R7
+       JNE  GC99
+       LI   R0,OP.PUSH0        (it gives none: 0)
+       BL   @EMIT
+       JMP  GC99
+GC15   BL   @SLOOKK            an array, or a routine
+       CI   R1,K.ARR
+       JNE  GC16
+       .pop R2
+       .pop R2
+       BL   @SYMAT
+       .push @4(R1)
+       BL   @XB                its one argument
+       BL   @XW
+       BL   @GEXPR
+       .pop R2
+       LI   R0,OP.ALOAD
+       BL   @OPB1
+       JMP  GC99
+GC16   CI   R1,K.ROU
+       JNE  GC20
+       .pop R2
+       .pop R2
+       .push R0                its symbol
+       BL   @XB
+       BL   @XW
+       MOV  R0,R9
+       .push R9
+GC17   MOV  R9,R9
+       JEQ  GC18
+       DEC  R9
+       BL   @GEXPR
+       JMP  GC17
+GC18   .pop R9                 CALL (its address) n
+       .pop R5
+       LI   R4,1
+       LI   R0,OP.CALL
+       BL   @FIXUP
+       MOV  R9,R0
+       BL   @EMIT
+       JMP  GC99
+GC20   BL   @XB                a routine in a variable: the arguments,
+       BL   @XW                the variable's value, CALLV n
+       MOV  R0,R9
+       .push R9
+GC21   MOV  R9,R9
+       JEQ  GC22
+       DEC  R9
+       BL   @GEXPR
+       JMP  GC21
+GC22   MOV  @XPG,@GENDPG       (where the Call ends)
+       MOV  @XOF,@GENDOF
+       .pop R9
+       .pop R1                 the function again
+       .pop R0
+       .push R9
+       .push @GENDPG
+       .push @GENDOF
+       BL   @XSET
+       BL   @GEXPR
+       .pop R1
+       .pop R0
+       BL   @XSET
+       .pop R2                 CALLV n
+       LI   R0,OP.CALLV
+       BL   @OPB1
+       JMP  GC99
+GC99   .leave
+       RT
+* CALLN0 - the name in KEYB on its own as a statement: a built-in
+* function with no arguments, or a routine called with none.
+CALLN0 .enter
+       BL   @LFND5
+       MOV  R0,R0
+       JGT  CN5
+       JEQ  CN5
+       BL   @BLOOK
+       MOV  R0,R0
+       JEQ  CN5
+       MOV  R2,R7
+       MOV  R0,R1              (R0 cannot index)
+       MOVB @BOPS-1(R1),R0
+       JMP  CN2
+CN5    BL   @SLOOK             a routine: CALL (address) 0
+       MOV  R0,R5
+       LI   R4,1
+       LI   R0,OP.CALL
+       BL   @FIXUP
+       CLR  R0
+       BL   @EMIT
+       .leave
+       RT
+CN2    SRL  R0,8
+       BL   @EMIT
+       MOV  R7,R7
+       JNE  CN9
+       LI   R0,OP.PUSH0
+       BL   @EMIT
+CN9    .leave
+       RT
+
+* ---- folding -------------------------------------------------------------------
+* FOLD5 - sema.py's fold, for the code: the expression at the reader
+* (read past it): R0 = its value and R1 = 1 if it is a constant one,
+* else R1 = 0.  Every constant's value is known by now.  Errors at the
+* node's line, in EFILE.
+FOLD5  .enter
+       .push R9
+       .push R8
+       .push R7
+       BL   @XB
+       CI   R0,7
+       JEQ  FL1
+       BL   @XBACK
+       BL   @XSKIP
+       B    @FLNO
+FL1    BL   @XB
+       MOV  R0,R9
+       BL   @XW
+       MOV  R0,R8
+       CI   R9,NT.NUM
+       JNE  FL2
+       BL   @XB
+       BL   @XW
+       B    @FLOK
+FL2    CI   R9,NT.CST
+       JNE  FL3
+       BL   @OPRD
+       LI   R1,QTRU5
+       BL   @OPIS
+       MOV  R0,R0
+       JEQ  $+6
+       B    @FLOK
+       LI   R1,QFAL5
+       BL   @OPIS
+       MOV  R0,R0
+       JNE  FLZ
+       LI   R1,QNOT5
+       BL   @OPIS
+       MOV  R0,R0
+       JNE  FLZ
+       B    @FLNO
+FLZ    CLR  R0
+       B    @FLOK
+FL3    CI   R9,NT.NAM
+       JNE  FL4
+       BL   @KEYRD
+       BL   @SLOOKK
+       CI   R1,K.CON
+       JNE  FLNO
+       BL   @SYMAT
+       MOV  @4(R1),R0
+       JMP  FLOK
+FL4    CI   R9,NT.UNA
+       JNE  FL5
+       BL   @OPRD
+       LI   R1,QMIN5
+       BL   @OPIS
+       MOV  R0,R0
+       JNE  FL4A
+       BL   @XSKIP
+       JMP  FLNO
+FL4A   BL   @FOLD5
+       MOV  R1,R1
+       JEQ  FLNO
+       NEG  R0
+       JMP  FLOK
+FL5    CI   R9,NT.BIN
+       JEQ  FL6
+       MOVB @NFLD-1(R9),R0
+       SRL  R0,8
+       BL   @XFLDS
+       JMP  FLNO
+FL6    BL   @OPRD
+       LI   R7,BINMAP          + - * / MOD are its first five
+       CLR  R6
+FL6A   INC  R6
+       CI   R6,5
+       JH   FL6C
+       MOV  R7,R1
+       BL   @OPIS
+       MOV  R0,R0
+       JNE  FL6D
+       MOVB *R7,R0
+       SRL  R0,8
+       A    R0,R7
+       AI   R7,3
+       JMP  FL6A
+FL6C   BL   @XSKIP
+       BL   @XSKIP
+       JMP  FLNO
+FL6D   MOV  R6,R7
+       BL   @FOLD5
+       .push R0
+       .push R1
+       BL   @FOLD5
+       MOV  R0,R5
+       MOV  R1,R6
+       .pop R1
+       .pop R4
+       MOV  R1,R1
+       JEQ  FLNO
+       MOV  R6,R6
+       JEQ  FLNO
+       CI   R7,4
+       JL   FL7
+       MOV  R5,R5
+       JNE  FL7
+       MOV  R8,R1
+       MOV  @EFILE,R2
+       LI   R0,SE.DIV
+       B    @SERR
+FL7    CI   R7,1
+       JNE  FL7A
+       A    R5,R4
+       JMP  FL7X
+FL7A   CI   R7,2
+       JNE  FL7B
+       S    R5,R4
+       JMP  FL7X
+FL7B   CI   R7,3
+       JNE  FL7C
+       MPY  R5,R4
+       MOV  R5,R4
+       JMP  FL7X
+FL7C   MOV  R4,R0
+       MOV  R5,R1
+       BL   @SDIV5
+       CI   R7,4
+       JNE  FL7D
+       MOV  R0,R4
+       JMP  FL7X
+FL7D   MPY  R5,R0
+       S    R1,R4
+FL7X   MOV  R4,R0
+FLOK   LI   R1,1
+       JMP  FL99
+FLNO   CLR  R0
+       CLR  R1
+FL99   .pop R7
+       .pop R8
+       .pop R9
+       .leave
+       RT
+* SDIV5 - R0 = R0 / R1, signed, truncated towards zero.  Uses R0-R3.
+SDIV5  MOV  R0,R2
+       XOR  R1,R2
+       ABS  R0
+       ABS  R1
+       MOV  R1,R3
+       MOV  R0,R1
+       CLR  R0
+       DIV  R3,R0
+       MOV  R2,R2
+       JLT  SD5A
+       RT
+SD5A   NEG  R0
+       RT
+QTRU5  BYTE 4
+       TEXT 'TRUE'
+QFAL5  BYTE 5
+       TEXT 'FALSE'
+QNOT5  BYTE 7
+       TEXT 'NOTHING'
+       EVEN
+
+* ---- strings -------------------------------------------------------------------
+* SADDS - R0 = the number of the string at the reader (its >04 next; read
+* past it), a new one if no string of the same text was met before.
+* Uses R0-R7.
+SADDS  .enter
+       MOV  @XPG,@GPG
+       MOV  @XOF,@GOF
+       BL   @XB
+       BL   @XW
+       MOV  R0,@GLEN
+       MOV  R0,R3              its hash: as names', over every byte
+       CLR  R4
+SS1    MOV  R3,R3
+       JEQ  SS2
+       BL   @XB
+       SRC  R4,13
+       XOR  R0,R4
+       DEC  R3
+       JMP  SS1
+SS2    ANDI R4,255
+       SLA  R4,1
+       MOV  R4,@GHASH
+       LI   R0,STRPG
+       BL   @DMAP
+       MOV  @>D000(R4),R5      the chain
+SS3    MOV  R5,R5
+       JEQ  SS6
+       DEC  R5                 (chains hold number + 1)
+       MOV  R5,R0
+       BL   @STRAT
+       C    @6(R1),@GLEN
+       JNE  SS5
+       MOV  @2(R1),R6
+       MOV  @4(R1),R7
+       BL   @TSEQ              the same text?
+       MOV  R0,R0
+       JEQ  SS5A
+       MOV  R5,R0              yes: that one
+       .leave
+       RT
+SS5A   MOV  R5,R0
+       BL   @STRAT
+SS5    MOV  *R1,R5
+       JMP  SS3
+SS6    MOV  @STRN,R5           no: a new one
+       CI   R5,STRMAX
+       JL   SS7
+       LI   R0,SE.MNY
+       B    @SERRE
+SS7    MOV  R5,R0
+       BL   @STRAT
+       MOV  @GHASH,R2
+       MOV  @>D000(R2),*R1     (the chain's old first, then this one first)
+       MOV  @GPG,@2(R1)
+       MOV  @GOF,@4(R1)
+       MOV  @GLEN,@6(R1)
+       MOV  R5,R0
+       INC  R0
+       MOV  R0,@>D000(R2)
+       INC  @STRN
+       MOV  R5,R0
+       .leave
+       RT
+* STRAT - R1 = window D's address of string R0's record.  Uses R0, R1.
+STRAT  MOV  R11,@G4
+       MOV  R0,R1
+       SLA  R1,3
+       AI   R1,>D200
+       LI   R0,STRPG
+       BL   @DMAP
+       MOV  @G4,R11
+       RT
+* TSEQ - R0 = 1 if the GLEN bytes of the strings at GPG:GOF and R6:R7 (both
+* at their >04) are the same.  Byte by byte through window F, the first
+* string's place kept in R2:R3, the second's in R6:R7.  Uses R0-R4,
+* R6, R7.  The reader is lost (callers have read past the string).
+TSEQ   .enter
+       MOV  @GPG,R2
+       MOV  @GOF,R3
+       AI   R3,3               past >04 and the length
+       AI   R7,3
+       MOV  @GLEN,R4
+TQ1    MOV  R4,R4
+       JEQ  TQ8
+       CI   R3,4096
+       JL   TQ2
+       AI   R3,-4096
+       INC  R2
+TQ2    CI   R7,4096
+       JL   TQ3
+       AI   R7,-4096
+       INC  R6
+TQ3    MOV  R2,R0
+       MOV  R3,R1
+       BL   @XSET
+       BL   @XB
+       .push R0
+       MOV  R6,R0
+       MOV  R7,R1
+       BL   @XSET
+       BL   @XB
+       .pop R1
+       C    R0,R1
+       JNE  TQ7
+       INC  R3
+       INC  R7
+       DEC  R4
+       JMP  TQ1
+TQ7    CLR  R0
+       JMP  TQ9
+TQ8    LI   R0,1
+TQ9    .push R0
+       MOV  @GPG,R0            the reader past the first string again
+       MOV  @GOF,R1
+       BL   @XSET
+       BL   @XSKIP
+       .pop R0
+       .leave
+       RT
+
+* TSTRS - the strings the tables need, after the code (codegen.py's
+* generate): each global's starting string, each array's (not the
+* generated four), each object's short name and string values.
+TSTRS  .enter
+       CLR  R3                 every GLOBAL's starting value
+TS1    C    R3,@DXN
+       JHE  TS2A
+       BL   @DXINF
+       MOV  R5,R5
+       JLT  TS1A
+       CI   R4,NT.GLO
+       JNE  TS1A
+       BL   @DXSEEK            GLOBAL name = value
+       BL   @XSKIP
+       BL   @TSTRV
+TS1A   INC  R3
+       JMP  TS1
+TS2A   CLR  R3                 then every ARRAY's values
+TS2    C    R3,@DXN
+       JHE  TS5
+       BL   @DXINF
+       MOV  R5,R5
+       JLT  TS4
+       CI   R4,NT.ARR
+       JNE  TS4
+       BL   @DXSEEK            ARRAY name size values
+       BL   @XSKIP
+       BL   @XSKIP
+       BL   @XB                the values: None, or a list
+       MOV  R0,R0
+       JEQ  TS4
+       BL   @XW
+       MOV  R0,R8
+TS3    MOV  R8,R8
+       JEQ  TS4
+       DEC  R8
+       BL   @TSTRV
+       JMP  TS3
+TS4    INC  R3
+       JMP  TS2
+TS5    CLR  R8                 objects: the short name, string values
+TS6    INC  R8
+       C    R8,@ON
+       JH   TS9
+       MOV  R8,R0
+       BL   @OBJAT
+       MOV  @18(R1),R0
+       JEQ  TS7
+       MOV  @20(R1),R1
+       BL   @XSET
+       BL   @SADDS
+TS7    MOV  R8,R0
+       BL   @OBJAT
+       MOV  @10(R1),R7
+TS8    MOV  R7,R7
+       JEQ  TS6
+       MOV  R7,R0
+       BL   @HCELL
+       MOV  *R1,R7
+       MOV  @4(R1),R0
+       CI   R0,1
+       JNE  TS8
+       MOV  @6(R1),R6          values: each string
+       MOV  @8(R1),R5
+TS8A   MOV  R6,R6
+       JEQ  TS8
+       DEC  R6
+       MOV  R5,R0
+       BL   @HCELL
+       MOV  *R1,R0
+       CI   R0,2
+       JNE  TS8B
+       MOV  @4(R1),R2
+       MOV  @2(R1),R0
+       MOV  R2,R1
+       BL   @XSET
+       .push R5
+       .push R6
+       .push R7
+       BL   @SADDS
+       .pop R7
+       .pop R6
+       .pop R5
+TS8B   INCT R5
+       JMP  TS8A
+TS9    .leave
+       RT
+* TSTRV - the value at the reader (read past it): a string literal is
+* added to the strings.  Keeps R3, R8.
+TSTRV  .enter
+       .push R3
+       .push R8
+       BL   @XB
+       MOV  R0,R0
+       JEQ  TV9                (None)
+       BL   @XB
+       CI   R0,NT.STR
+       JEQ  TV2
+       BL   @XBACK             not a string: past it
+       BL   @XBACK
+       BL   @XSKIP
+       JMP  TV9
+TV2    BL   @XW
+       BL   @SADDS
+TV9    .pop R8
+       .pop R3
+       .leave
+       RT
