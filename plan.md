@@ -866,7 +866,8 @@ M6 design (23 October 2026): https://claude.ai/artifact/2c1ubphLesnAHeFRezzUAc
 (doc id 0cfcbac1-18ef-4833-8238-a9b4cb6bfa91).  The spec's M6: test-play,
 debug verbs, RECORD/REPLAY, TI Artist import with preview, statistics,
 the game writer; done when Lamplight is edited, compiled, played and
-built entirely on the TI.  Decisions D1-D6 await Rebecca: a generic
+built entirely on the TI.  Decisions D1-D7, approved by Rebecca as
+recommended (23 October 2026): a generic
 engine (length from the header, prefix patched in); pictures and music
 as files of their own; 4K chunks kept; test-play from SAMS with FCTN 9
 back; debug verbs in the library, live only when the header's flags
