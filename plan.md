@@ -919,11 +919,34 @@ M6 part 2 done (23 October 2026): the main menu.
   story files take the main file's first six letters until Build, part
   3, needs a prefix of the author's choosing).
 
+M6 part 3 done (23 October 2026): Build.
+- The project gains the game's prefix (row 3, beside the date): P asks
+  for it after the date; a new source file brings its default (the base
+  name's first six letters and digits).  The story files take it.
+- The engine's E/A 5 chain is cut into files of at most 4K of code
+  (build.generic_engine_files), never inside the story-name field: the
+  workbench writes files through the disk buffer in VRAM (>2000 to the
+  PAB at >37A0, about 6K), so the old 8K file could not be saved.
+  Lamplight's engine is five files now (LAMP1-5).
+- The workbench cartridge carries the generic engine in the banks after
+  the overlays; tools/build.py fills overlay 9's ENGTAB (the files, their
+  first bank, their lengths, which file holds the name field and where).
+- B (overlay 9, src/wbuild.a99): compiles as C does, then (if it worked)
+  copies each engine file from the cartridge to VRAM, patches the story
+  name (device and prefix) into the right one, and saves it as PREFIX1,
+  PREFIX2 ...; row 8 says "The game is built: load DSK1.PREFIX1".
+- tests/m6_build_test.py: the TI's engine files equal the PC game
+  writer's byte for byte; its story files equal the PC compiler's image;
+  the game the TI built plays (with the PC's picture and music files) the
+  start of Lamplight's walkthrough as the Python VM does; another prefix
+  names every file.
+- Still from the PC: the picture and music files (part 9 imports
+  pictures on the TI); the output device is the source's.
+
 ## Next
 
-1. M6 part 3: Build (B): the workbench carries the generic engine and
-   writes a whole game, engine files patched with the prefix; the project
-   gains the output device and prefix.
+1. M6 part 4: Run (R, D7): the finished game run from its own files on
+   disk, E/A 5 style, as a player's loader would.
 
 The reference used for part 6's disk writes:
    (part 6) libre99's clean-room TI disk controller DSR and its notes,

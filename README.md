@@ -16,7 +16,9 @@ the TI (the workbench cartridge), is done: it reads a program's files
 from disk following its INCLUDEs, lexes, parses, checks its meaning,
 generates its code and links the story image, every step identical to
 the Python compiler (tools/txc) on the whole test corpus, and writes the
-story to disk. Next: M6, the workbench tools. See `plan.md`.
+story to disk. M6, the workbench tools, is under way: one engine now
+serves every game, the workbench has a main menu, and its Build key
+writes a whole game (engine and story) that plays. See `plan.md`.
 
 ## Building and testing
 

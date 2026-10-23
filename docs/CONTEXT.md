@@ -11,8 +11,8 @@ keep it current when the language changes.  The six manuals still to
 write are stubbed in the Claude Doc
 https://claude.ai/artifact/VqqmmXaB3E5RBxdTcfBtU2 (one tab each).
 
-**State (23 October 2026):** M6 parts 1 (the generic engine) and 2 (the
-main menu; overlays in the cartridge) done.  M5 is done: the workbench loads every
+**State (23 October 2026):** M6 parts 1 (the generic engine), 2 (the
+main menu; overlays in the cartridge) and 3 (Build) done.  M5 is done: the workbench loads every
 file, lexes, parses, checks the meaning, generates the code and links
 the story image, identical to Python byte for byte on the corpus, and
 writes it to disk as 4K PROGRAM files (asking for the build date: the
@@ -87,7 +87,9 @@ owns it; Claude builds it. The engine comes first; the story later.
 | `src/wcode.a99` | overlay 5: the code generator (src/gen/opcodes.a99 and bops.a99 are generated from opcodes.py and sema.py) |
 | `src/wlink.a99`, `src/wlink2.a99` | overlays 6 and 7: the linker's two halves, and the story files |
 | `src/wovl.a99` | overlays 5 on, assembled apart with wbench.a99's symbols (src/gen/wres.a99) |
-| `src/wfront.a99` | overlay 8: the main menu, the project (source file, build date) |
+| `src/wfront.a99` | overlay 8: the main menu, the project (source file, build date, game prefix) |
+| `src/wbuild.a99` | overlay 9: Build, the engine's files written from the cartridge (ENGTAB filled by the build) |
+| `tests/m6_build_test.py` | Build: the TI's engine files equal the PC's; the game it built plays |
 | `tests/m5_sema_test.py` | the workbench against sema.py and codegen.py: decls, meaning, code, link (the whole image), errors |
 | `tools/fixjumps.py` | rewrites jumps xas99 reports out of range as branches |
 | `src/wlex.a99` | the workbench's lexer: SAMS source to SAMS tokens, identical to lexer.py |
