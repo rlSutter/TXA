@@ -1579,13 +1579,24 @@ PARSE  .enter
        MOV  R0,@TCPG
        CLR  @TCOF
        BL   @TLOAD
+       MOV  @TKPAGE,R0         (the token stream's length: for the progress line)
+       AI   R0,-TOKPG
+       SLA  R0,12
+       A    @TKOFF,R0
+       MOV  R0,@PTOT
        MOV  @TRNPG,R0          the tree from where the last file's ended
        MOV  R0,@TKPAGE
        MOV  @TRNOF,@TKOFF
        LI   R1,>F
        BL   @MAPPG
        BL   @LBEG              file := decl*
-PAR1   LI   R1,TK.EOF
+PAR1   MOV  @RDPG,R0           (the progress line: tokens read of all)
+       AI   R0,-TOKPG
+       SLA  R0,12
+       A    @RDOF,R0
+       MOV  @PTOT,R1
+       BL   @PSTEP
+       LI   R1,TK.EOF
        BL   @ATK
        MOV  R0,R0
        JNE  PAR9

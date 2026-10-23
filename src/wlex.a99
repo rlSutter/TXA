@@ -246,7 +246,10 @@ LEXALL .enter
        CLR  @TKOFF
        LI   R1,>F
        BL   @MAPPG
-LXA1   BL   @LXLINE            each line
+LXA1   MOV  @SRDONE,R0         (the progress line: bytes lexed of all)
+       MOV  @SRTOT,R1
+       BL   @PSTEP
+       BL   @LXLINE            each line
        MOV  R0,R0
        JNE  LXA9
        CLR  @LXLTOK

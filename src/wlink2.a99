@@ -333,12 +333,18 @@ JB9    .leave
 * JROUTS - each routine on a 4-byte boundary, its code copied; where it
 * went (packed) by its place, and by its symbol for a ROUTINE.
 JROUTS .enter
+       LI   R1,QLROU           (the progress line)
+       CLR  R2
+       BL   @PSTAGE
        CLR  @JR
 JR1    C    @JR,@RN
        JL   JR1A
        .leave
        RT
-JR1A   LI   R2,3
+JR1A   MOV  @JR,R0             (the progress line)
+       MOV  @RN,R1
+       BL   @PSTEP
+       LI   R2,3
        BL   @IALIGN
        BL   @JPACK             R0 = the packed address here
        MOV  R0,R5
@@ -397,12 +403,18 @@ JPACK  MOV  @IPL,R0
 * in the substitution table as >80 + its place, any other byte as itself
 * (a line feed 10; outside 32-126 a question mark), then 0.
 JSTRS  .enter
+       LI   R1,QLSTR           (the progress line)
+       CLR  R2
+       BL   @PSTAGE
        CLR  @JN
 JS1    C    @JN,@STRN
        JL   JS1A
        .leave
        RT
-JS1A   LI   R2,3
+JS1A   MOV  @JN,R0             (the progress line)
+       MOV  @STRN,R1
+       BL   @PSTEP
+       LI   R2,3
        BL   @IALIGN
        BL   @JPACK
        MOV  R0,R5
@@ -782,6 +794,9 @@ JWR2A  MOV  R4,R4
 JWR2B  LI   R3,4096
 JWR3   MOV  R3,@J1
        BL   @JNAME             FNBUF: the device, prefix, S, 2 digits
+       LI   R1,QWRIT           (the progress line: "Writing DSK1.NAMES01")
+       LI   R2,FNBUF
+       BL   @PSTAGE
        MOV  @JFILES,R0         its bytes to VRAM: FBUF
        A    @IMGPG,R0
        BL   @DMAP
@@ -852,6 +867,12 @@ JNM7   MOVB @JLETS,*R4+        S, then the number
        MOVB R0,@FNBUF
        MOV  @J2,R11
        RT
+QLROU  BYTE 17
+       TEXT 'Linking: routines'
+QLSTR  BYTE 16
+       TEXT 'Linking: strings'
+QWRIT  BYTE 8
+       TEXT 'Writing '
 JDOT   BYTE '.'
 JLETS  BYTE 'S'
 D10J   DATA 10

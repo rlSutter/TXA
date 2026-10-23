@@ -76,6 +76,9 @@ SM1    CLR  *R0+
        BL   @PGCLR
        LI   R0,DHPG
        BL   @PGCLR
+       LI   R1,QMDECL          (the progress line)
+       CLR  R2
+       BL   @PSTAGE
        BL   @REPEXT
        BL   @DECLAL
        BL   @CONSTS
@@ -372,7 +375,10 @@ DCA2   LI   R0,>2C00           "," and "."
        LI   R0,1
        BL   @DADD
        CLR  R3                 each declaration kept
-DL1    C    R3,@DXN
+DL1    MOV  R3,R0              (the progress line)
+       MOV  @DXN,R1
+       BL   @PSTEP
+       C    R3,@DXN
        JL   DL1A
        B    @DL90
 DL1A   MOV  R3,@DCUR
@@ -567,6 +573,10 @@ DE2    MOV  @STMP,R2
        MOV  @DCUR,R3
        MOV  @SRET2,R11
        RT
+QMDECL BYTE 21
+       TEXT 'Meaning: declarations'
+QMOBJ  BYTE 16
+       TEXT 'Meaning: objects'
 QNAME  BYTE 4
        TEXT 'NAME'
 GENARR BYTE 7
@@ -843,12 +853,18 @@ BINOPS BYTE 1
 * classes first, then its own body; its parent; a ROOM's twelve exits;
 * then the children in declaration order; no object inside itself.
 OBJS   .enter
+       LI   R1,QMOBJ           (the progress line)
+       CLR  R2
+       BL   @PSTAGE
        CLR  @CURO
 OB1    INC  @CURO
        C    @CURO,@ON
        JLE  OB1A
        B    @OB20
-OB1A   MOV  @CURO,R0
+OB1A   MOV  @CURO,R0           (the progress line)
+       MOV  @ON,R1
+       BL   @PSTEP
+       MOV  @CURO,R0
        BL   @OBJAT
        MOV  @30(R1),R3
        MOV  R3,@CURD

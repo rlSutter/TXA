@@ -190,7 +190,10 @@ LOADF  .enter
        LI   R0,SE.MNY
        MOV  R0,@WBERR
        B    @LF99
-LF0    BL   @DVOPEN
+LF0    LI   R1,QREAD           "Reading DSK1.NAME"
+       LI   R2,FNBUF
+       BL   @PSTAGE
+       BL   @DVOPEN
        MOV  R0,R0
        JEQ  LF1
        SETO R0
@@ -248,6 +251,9 @@ LF8    MOV  @TRNPG,@16(R4)
        MOV  R0,@WBDONE
        MOV  R0,@WBSTAG         the tokens (overlay 1)
        BL   @OVSEL
+       LI   R1,QLEX
+       LI   R2,FNBUF
+       BL   @PSTAGE
        BL   @LEXALL
        MOV  R0,R0
        JNE  LF99
@@ -255,6 +261,9 @@ LF8    MOV  @TRNPG,@16(R4)
        MOV  R0,@WBDONE
        MOV  R0,@WBSTAG         the tree (overlay 2)
        BL   @OVSEL
+       LI   R1,QPARS
+       LI   R2,FNBUF
+       BL   @PSTAGE
        BL   @PARSE
        MOV  R0,R0
        JNE  LF99
@@ -268,6 +277,16 @@ LF8    MOV  @TRNPG,@16(R4)
 LF99   .leave
        RT
 DFTSIZ DATA FTSIZ
+* PCLEAR - the progress line cleared (the results take the screen).
+PCLEAR LI   R0,PROW
+       B    @WCLR
+QREAD  BYTE 8
+       TEXT 'Reading '
+QLEX   BYTE 7
+       TEXT 'Lexing '
+QPARS  BYTE 8
+       TEXT 'Parsing '
+       EVEN
 
 * FBASE - R2 = the base name in FNBUF (after the last '.', then after the
 * last ':' in that), R3 = its length.  Uses R0-R3.

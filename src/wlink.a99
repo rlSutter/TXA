@@ -68,6 +68,9 @@ LK2    CLR  *R0+
        INC  R0
 LK3    MOV  R0,@IMGPG
        BL   @CHOOSE
+       LI   R1,QLTAB           (the progress line)
+       CLR  R2
+       BL   @PSTAGE
        LI   R2,H.SIZE          the header's room
        BL   @IZERO
        BL   @KOBJS
@@ -83,11 +86,17 @@ LK3    MOV  R0,@IMGPG
 * of every string, counted; score (length - 1) x count; the 128 best with
 * a score above 0, ties broken by the token's bytes; into ABBPG.
 CHOOSE .enter
+       LI   R1,QLSUB           (the progress line)
+       CLR  R2
+       BL   @PSTAGE
        MOV  @IMGPG,R0          the hash
        BL   @PGCLR
        CLR  @NTOK
        CLR  R8                 each string
-CH1    C    R8,@STRN
+CH1    MOV  R8,R0              (the progress line)
+       MOV  @STRN,R1
+       BL   @PSTEP
+       C    R8,@STRN
        JHE  CH5
        MOV  R8,R0
        SLA  R0,3
@@ -370,6 +379,11 @@ KREC   MOV  R11,@K2
 KRC1    BL   @DMAP
        MOV  @K2,R11
        RT
+QLSUB  BYTE 22
+       TEXT 'Linking: substitutions'
+QLTAB  BYTE 15
+       TEXT 'Linking: tables'
+       EVEN
 D341   DATA 341
 D12    DATA 12
 * TCMP - R0 = 1 if TOKB (TOKL bytes) is the text at tree page R2, offset

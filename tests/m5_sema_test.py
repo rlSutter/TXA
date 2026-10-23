@@ -425,6 +425,10 @@ if which in ('link', 'all'):
         diff = next((i for i in range(min(len(img), len(ti))) if img[i] != ti[i]), None)
         check(f'{rel}: story image identical ({len(img)} bytes; {steps / 1e6:.0f}M instructions in all, ~{steps / 3e5:.0f} s on a TI)',
               ti == img, why if done < 4 else f'first difference at {diff}: python {img[diff]:02X} ti {ti[diff]:02X}' if diff is not None else 'lengths differ')
+        nfiles = (len(img) + 4095) // 4096
+        scr = R.screen(m).splitlines()
+        check(f'{rel}: the screen says "Story: {len(img)} bytes in {nfiles} files on disk."',
+              f'Story: {len(img)} bytes in {nfiles} files on disk.' in scr[7] and not scr[5].strip(), f'{scr[5]!r} {scr[7]!r}')
         prefix = name.upper()[:6]
         files = sorted(glob.glob(os.path.join(d, 'DSK1', prefix + 'S[0-9][0-9]')))
         joined = b''.join(open(f, 'rb').read() for f in files)

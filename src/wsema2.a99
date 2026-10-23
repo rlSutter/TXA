@@ -73,12 +73,18 @@ SM2A   CLR  *R0+
 * checked and its action used; then every rule case's actions, object by
 * object, property by property.
 ACTS   .enter
+       LI   R1,QMGRM           (the progress line)
+       CLR  R2
+       BL   @PSTAGE
        CLR  @CURV
 AC1    INC  @CURV
        C    @CURV,@VN
        JLE  AC1A
        B    @AC20
-AC1A   MOV  @CURV,R0
+AC1A   MOV  @CURV,R0           (the progress line)
+       MOV  @VN,R1
+       BL   @PSTEP
+       MOV  @CURV,R0
        BL   @VRBAT
        MOV  *R1,R3
        MOV  @2(R1),R8          its first grammar line
@@ -246,6 +252,10 @@ SN5    A    R2,R1
        JMP  SN1
 SN8    CLR  R0
        RT
+QMGRM  BYTE 16
+       TEXT 'Meaning: grammar'
+QMROU  BYTE 17
+       TEXT 'Meaning: routines'
 SLOTS  BYTE 4
        TEXT 'NOUN'
        BYTE 4
@@ -379,8 +389,14 @@ DVBAT  MOV  R11,@SRET4
 * each object's property routines, in the order its properties were
 * given.
 CHECKS .enter
+       LI   R1,QMROU           (the progress line)
+       CLR  R2
+       BL   @PSTAGE
        CLR  R3
-CK1    C    R3,@DXN
+CK1    MOV  R3,R0              (the progress line)
+       MOV  @DXN,R1
+       BL   @PSTEP
+       C    R3,@DXN
        JHE  CK5
        BL   @DXINF
        MOV  R5,R5

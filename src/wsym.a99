@@ -557,3 +557,67 @@ BUILTN BYTE 6
        TEXT 'PROPWORD'
        BYTE 3,1,0
        EVEN
+
+* ---- the progress line (row PROW, while the workbench compiles) -------------------
+* PSTAGE - row PROW: the label at R1 (a length byte first), then the name
+* at R2 (a length byte first; 0 for none), and an empty bar (40 dots).  PSTEP - the
+* bar R0 / R1 full (R1 0: nothing).  Both keep every register: they are
+* called from inside the stages' loops.  The bar is redrawn only when a
+* cell fills.
+PSTAGE MOV  R11,@PSAV+10
+       BL   @PSAVE
+       MOV  R1,@PSAV+12        (the label, the name)
+       MOV  R2,@PSAV+14
+       LI   R0,PROW
+       BL   @WCLR
+       LI   R0,PROW
+       LI   R1,1
+       BL   @TXAT
+       MOV  @PSAV+12,R1
+       CLR  R2
+       BL   @TXSTR
+       MOV  @PSAV+14,R1
+       JEQ  PGS1
+       CLR  R2
+       BL   @TXSTR
+PGS1   LI   R0,PROW*COLS+PCOL  40 dots
+       LI   R1,'.'*256
+       LI   R2,PCELLS
+       BL   @VFILL
+       CLR  @PDONE
+       JMP  PRESTR
+PSTEP  MOV  R11,@PSAV+10
+       BL   @PSAVE
+       MOV  R1,R1
+       JEQ  PRESTR
+       MOV  R1,R2              cells: done x 40 / total (done <= total)
+       LI   R3,PCELLS
+       MPY  R0,R3              R3:R4 = done x 40
+       C    R3,R2
+       JHE  PRESTR             (more than full: leave it)
+       DIV  R2,R3              R3 = the cells
+       C    R3,@PDONE
+       JLE  PRESTR
+       MOV  R3,R2              draw the new ones
+       S    @PDONE,R2
+       MOV  @PDONE,R0
+       AI   R0,PROW*COLS+PCOL
+       MOV  R3,@PDONE
+       LI   R1,'#'*256
+       BL   @VFILL
+PRESTR MOV  @PSAV,R0            the registers back
+       MOV  @PSAV+2,R1
+       MOV  @PSAV+4,R2
+       MOV  @PSAV+6,R3
+       MOV  @PSAV+8,R4
+       MOV  @PSAV+16,R5
+       MOV  @PSAV+10,R11
+       RT
+* PSAVE - R0-R5 into PSAV (+0 .. +8, and +16; +10 is the caller's R11).
+PSAVE  MOV  R0,@PSAV
+       MOV  R1,@PSAV+2
+       MOV  R2,@PSAV+4
+       MOV  R3,@PSAV+6
+       MOV  R4,@PSAV+8
+       MOV  R5,@PSAV+16
+       RT

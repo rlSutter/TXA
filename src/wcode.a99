@@ -81,8 +81,14 @@ GN2    LI   R1,QACTN           the global "action" (rule cases need it)
        MOV  R0,@ACTVAR
        JMP  GN4
 GN3    SETO @ACTVAR
-GN4    CLR  R3                 each ROUTINE kept
-GN5    C    R3,@DXN
+GN4    LI   R1,QGENC           (the progress line)
+       CLR  R2
+       BL   @PSTAGE
+       CLR  R3                 each ROUTINE kept
+GN5    MOV  R3,R0              (the progress line)
+       MOV  @DXN,R1
+       BL   @PSTEP
+       C    R3,@DXN
        JHE  GN8
        BL   @DXINF
        MOV  R5,R5
@@ -145,6 +151,8 @@ GN20   BL   @TSTRS             the strings the tables need
        .leave
        MOV  @OLDR10,R10
        RT
+QGENC  BYTE 15
+       TEXT 'Generating code'
 QMAIN  BYTE 4
        TEXT 'MAIN'
 QACTN  BYTE 6

@@ -195,3 +195,11 @@ SE.DYN EQU  88                 the dynamic area is ... bytes; the limit is 16384
 SE.TAB EQU  89                 the tables before the routines pass 64K
 SE.IMG EQU  90                 the story is ... bytes; the limit is ...
 SE.DSK EQU  91                 a disk error writing the story (the DSR's code in WBERRL)
+
+* the progress line (wsym.a99: PSTAGE, PSTEP)
+PROW   EQU  5                  its row
+PCOL   EQU  37                 the bar's column: 40 cells, dots filling with #
+PCELLS EQU  40
+PDONE  EQU  GLOBRM+>52         cells drawn
+PSAV   EQU  GLOBRM+>54         18 bytes: registers kept (to GLOBRM+>65)
+PTOT   EQU  GLOBRM+>66         the parser's token stream: its length
