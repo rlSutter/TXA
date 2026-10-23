@@ -871,7 +871,10 @@ engine (length from the header, prefix patched in); pictures and music
 as files of their own; 4K chunks kept; test-play from SAMS with FCTN 9
 back; debug verbs in the library, live only when the header's flags
 mark a test-play run; errors in Python's own words, first error only.
-Nine parts, starting with the generic engine.  Overlays move to the
+D7 (added at Rebecca's request): a Run option (R) that executes the
+finished game from its own files on disk, E/A 5 style, as a player's
+loader would.  Ten parts, starting with the generic engine; Run follows
+Build.  Overlays move to the
 cartridge (copied into SAMS when used): RAM and the overlay pages are
 full.
 
