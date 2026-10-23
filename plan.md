@@ -896,10 +896,34 @@ M6 part 1 done (23 October 2026): the generic engine (D1, D2).
   files (the walkthrough's start as the Python VM plays it); without the
   picture files the game still plays.  m4_disk_test plays the new layout.
 
+M6 part 2 done (23 October 2026): the main menu.
+- Overlays live in the cartridge: overlay n in bank n (build:
+  cart_from_segments's `pre` banks, before the RAM image), and OVSEL
+  copies its 8K to >B000 when a stage needs it.  The workbench runs from
+  RAM, so it switches banks and reads the ROM directly; no SAMS pages, no
+  scratchpad routine, and no measurable cost (Lamplight still 37M
+  instructions).  SAMS pages 16-31 are free; overlays are limited only by
+  the cartridge.
+- Overlay 8 (src/wfront.a99), the front end: the main menu at start-up
+  and after every compile.  Row 2 the source file, row 3 the build date,
+  rows 4-8 the last compile's results, row 10 the keys, row 11 a message.
+  P edits the source file then the date; C compiles the project (asking
+  the date first if none is set); T R B E S I O say which part of M6
+  builds them.  The name prompt left the resident part and the date
+  prompt left overlay 1 (wdate.a99 is gone): the resident part has about
+  320 bytes free again.
+- Tests type the menu's keys: P, the name, ENTER for the date offered, C.
+  m5_load_test checks the menu: the project and keys on screen, C alone,
+  C twice, a key still to come.
+- Still to come in P: the output device and the game's prefix (the
+  story files take the main file's first six letters until Build, part
+  3, needs a prefix of the author's choosing).
+
 ## Next
 
-1. M6 part 2: the main menu (P C T R E I B S O), with the overlays moved
-   to the cartridge first (copied into SAMS when used).
+1. M6 part 3: Build (B): the workbench carries the generic engine and
+   writes a whole game, engine files patched with the prefix; the project
+   gains the output device and prefix.
 
 The reference used for part 6's disk writes:
    (part 6) libre99's clean-room TI disk controller DSR and its notes,

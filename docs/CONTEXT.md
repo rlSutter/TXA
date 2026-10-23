@@ -11,7 +11,8 @@ keep it current when the language changes.  The six manuals still to
 write are stubbed in the Claude Doc
 https://claude.ai/artifact/VqqmmXaB3E5RBxdTcfBtU2 (one tab each).
 
-**State (23 October 2026):** M6 part 1 (the generic engine) done.  M5 is done: the workbench loads every
+**State (23 October 2026):** M6 parts 1 (the generic engine) and 2 (the
+main menu; overlays in the cartridge) done.  M5 is done: the workbench loads every
 file, lexes, parses, checks the meaning, generates the code and links
 the story image, identical to Python byte for byte on the corpus, and
 writes it to disk as 4K PROGRAM files (asking for the build date: the
@@ -86,6 +87,7 @@ owns it; Claude builds it. The engine comes first; the story later.
 | `src/wcode.a99` | overlay 5: the code generator (src/gen/opcodes.a99 and bops.a99 are generated from opcodes.py and sema.py) |
 | `src/wlink.a99`, `src/wlink2.a99` | overlays 6 and 7: the linker's two halves, and the story files |
 | `src/wovl.a99` | overlays 5 on, assembled apart with wbench.a99's symbols (src/gen/wres.a99) |
+| `src/wfront.a99` | overlay 8: the main menu, the project (source file, build date) |
 | `tests/m5_sema_test.py` | the workbench against sema.py and codegen.py: decls, meaning, code, link (the whole image), errors |
 | `tools/fixjumps.py` | rewrites jumps xas99 reports out of range as branches |
 | `src/wlex.a99` | the workbench's lexer: SAMS source to SAMS tokens, identical to lexer.py |
@@ -234,10 +236,11 @@ owns it; Claude builds it. The engine comes first; the story later.
   assembler accepts it, but the other overlay is not mapped in.  Shared
   code goes in wload.a99 (resident) or wsym.a99 (kernel window, nearly
   full: about 200 bytes left).
-- The workbench's resident part (>A000->AFFF) is nearly full (about 70
-  bytes left) and so is the kernel window after the kernel (about 20
-  bytes left, to >2FFE): new front-end code goes in an overlay, as the
-  date prompt does (wdate.a99 in overlay 1).
+- The workbench's resident part (>A000->AFFF) has about 320 bytes left
+  and the kernel window after the kernel about 20 (to >2FFE): new code
+  goes in an overlay.  Overlays cost no SAMS any more (M6): overlay n is
+  cartridge bank n, copied to >B000 by OVSEL; add one in wovl.a99 with a
+  branch to its entry first, and enter it with OVSEL then OVENT.
 - The progress line (row 5 while compiling): PSTAGE (a label, a name)
   and PSTEP (done, total) in wsym.a99 keep every register, so a stage
   calls them from inside its loops; each stage's labels live in its own
