@@ -840,6 +840,21 @@ Decided (Rebecca, 22 October 2026):
     writes plays without the PC.  Until then the TI's story files equal
     the game writer's before the pictures and sounds are added.
 
+After M5 (23 October 2026): a progress line, at Rebecca's request.
+While the workbench compiles, row 5 says the step (Reading, Lexing,
+Parsing each file; Meaning: declarations, objects, grammar, routines;
+Generating code; Linking: substitutions, tables, routines, strings;
+Writing each story file) with a 40-cell bar filling where the step's
+total is known (bytes lexed, tokens parsed, declarations, objects,
+verbs, strings, routines).  It costs about 40 instructions an update,
+and the screen only changes when a cell fills.  The results line's file
+count was wrong (24 for 8: a carry tested after a shift) and is fixed;
+the link test now checks that line.  Running the code stage again
+found that overlay 7 had overwritten the code generator's routine
+directory with image places since part 6 (the code test read it back
+wrong; the image was right): a routine's place is 4 x its packed
+address, so the directory is left alone now.
+
 ## Next
 
 1. M6, the workbench tools: decision (2) above first (the engine reading

@@ -231,9 +231,14 @@ owns it; Claude builds it. The engine comes first; the story later.
   assembler accepts it, but the other overlay is not mapped in.  Shared
   code goes in wload.a99 (resident) or wsym.a99 (kernel window, nearly
   full: about 200 bytes left).
-- The workbench's resident part (>A000->AFFF) is nearly full (about
-  160 bytes left): new front-end code goes in an overlay, as the date
-  prompt does (wdate.a99 in overlay 1).
+- The workbench's resident part (>A000->AFFF) is nearly full (about 70
+  bytes left) and so is the kernel window after the kernel (about 20
+  bytes left, to >2FFE): new front-end code goes in an overlay, as the
+  date prompt does (wdate.a99 in overlay 1).
+- The progress line (row 5 while compiling): PSTAGE (a label, a name)
+  and PSTEP (done, total) in wsym.a99 keep every register, so a stage
+  calls them from inside its loops; each stage's labels live in its own
+  overlay.  The results clear the line (PCLEAR).
 - EQUs cannot refer forward in xas99: the meaning stage's are in
   wsymdef.a99, COPYed at the top of wbench.a99.
 - The meaning stage's routines document which registers they use;

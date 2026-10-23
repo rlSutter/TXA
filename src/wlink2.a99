@@ -10,7 +10,8 @@
 *
 * Where things went (WHRPG, packed addresses): routines by their place in
 * RDIRPG (+0), strings by number (+1024), routines by symbol (+2048).  A
-* routine's place in the image replaces its code place in RDIRPG (+4, +6).
+* routine starts at 4 x its packed address; RDIRPG stays as overlay 5 left
+* it (the tests read the code from it).
 *======================================================================
 * variables (SV0+66 on)
 JR     EQU  SV0+66             the routine, the string, the fixup being done
@@ -360,8 +361,6 @@ JR1A   MOV  @JR,R0             (the progress line)
        BL   @DMAP
        MOV  @4(R1),R7          its code: start, length
        MOV  @6(R1),R6
-       MOV  @IPH,@4(R1)        (now: its place in the image)
-       MOV  @IPL,@6(R1)
        MOVB *R1,R0
        SRL  R0,8
        CI   R0,1
@@ -589,13 +588,15 @@ JX1    C    R8,@FXN
        MOV  @2(R1),R3
        MOV  @4(R1),R4
        MOV  @6(R1),R5
-       MOV  R2,R1              the routine's place in the image
-       SLA  R1,3
-       AI   R1,>D000
-       LI   R0,RDIRPG
+       MOV  R2,R1              the routine's place in the image: 4 x its
+       SLA  R1,1               packed address (it starts on a 4-byte boundary)
+       LI   R0,WHRPG
        BL   @DMAP
-       MOV  @4(R1),R2
-       A    @6(R1),R3
+       MOV  @>D000(R1),R1
+       MOV  R1,R2              R2:R1 = 4 x the packed address
+       SRL  R2,14
+       SLA  R1,2
+       A    R1,R3              + its place in the routine
        JNC  JX2
        INC  R2
 JX2    BL   @JWHERE            R0 = the address
