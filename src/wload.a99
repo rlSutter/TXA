@@ -19,7 +19,7 @@
 MAXF   EQU  16                 files in a program, at most
 DXPG   EQU  112                SAMS page where the declaration index starts
 DXMAX  EQU  2048               declarations, at most (4 pages)
-* variables (the resident part's, from GLOBRM; OVCUR .. OVTMP in wbench)
+* variables (the resident part's, from GLOBRM; OVCUR in wbench)
 WBONLY EQU  GLOBRM+>06         nonzero: one file, lexed and parsed only (the M5 part 1-3 tests)
 NF     EQU  GLOBRM+>08         files loaded
 DXN    EQU  GLOBRM+>0A         declarations in the index

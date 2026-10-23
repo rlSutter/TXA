@@ -7,16 +7,16 @@
 * record followed by a line feed.  The compiler's stages (lexer, parser,
 * meaning, code, linking) come in the following parts.
 *
-* Memory (M5 part 4): the resident part, >A000->AFFF, holds the front end
-* and what every stage shares; each stage is an overlay that runs at
-* >B000->CFFF from two SAMS pages of its own (OVSEL maps them in).  The
-* overlays are assembled at their run address with XORG, staged in the
-* image at >4000 (not RAM here), and the cartridge loader copies each
-* into its pages (tools/build.py, workbench_cart).  Overlays 5 on are
+* Memory (M5 part 4; M6): the resident part, >A000->AFFF, holds the front
+* end and what every stage shares; each stage is an overlay that runs at
+* >B000->CFFF.  The overlays are assembled at their run address with
+* XORG and staged at >4000 (not RAM here); tools/build.py
+* (workbench_cart) puts overlay n in cartridge bank n, and OVSEL copies it
+* to >B000 when a stage needs it (M6: until then each had two SAMS pages,
+* copied there by the cartridge loader; RAM and those pages were full).  Overlays 5 on are
 * assembled apart (wovl.a99), with this file's symbols, and staged from
 * >0000 in their own image; the resident part enters them at OVENT
 * (>B000), where each begins with a branch to its entry.  Overlay n uses
-* pages OVPG+2(n-1) and OVPG+2(n-1)+1:
 *   1  the lexer (wlex.a99), and the build date's prompt (wdate.a99)
 *   2  the parser (wparse.a99)
 *   3  the meaning stage, first half (wsema.a99; wsym.a99, resident, shared)
@@ -26,7 +26,7 @@
 *   7  the linker, second half (wlink2.a99): the rest, the story files
 * SAMS windows: >D000, >E000, >F000 are the stages' data windows.
 * SAMS pages (512K, the least the workbench needs):
-*   16-31   the overlays (two pages each)
+*   16-31   free (the overlays' until M6; they live in the cartridge now)
 *   32-47   a file's source text (SRCPG), while it is lexed
 *   48-63   its tokens (TOKPG), while they are parsed
 *   64-111  the trees, every file's after the last (TREEPG)
@@ -81,11 +81,8 @@ WKLST  EQU  URECS+>6C          the key last reported (WKEY)
 KWNUM  EQU  URECS+>6E          KWIN: the entry being compared
 WBTREE EQU  URECS+>70          the tree's length
 * the resident part (from GLOBRM: the engine's globals, unused here)
-OVPG   EQU  16                 the first overlay's first SAMS page
 OVENT  EQU  >B000              overlays 5 on: their entry is their first word
 OVCUR  EQU  GLOBRM+>00         the overlay mapped in (0: none)
-OVRET  EQU  GLOBRM+>02
-OVTMP  EQU  GLOBRM+>04
 LINBUF EQU  >3300              256 bytes: the line being lexed (the font's
 STRBUF EQU  >3400              1K: a token's text   / space, after startup)
 
@@ -624,22 +621,22 @@ TPUTW  MOV  R11,@LXRET2
        MOV  @LXRET2,R11
        RT
 
-* OVSEL - overlay R0 (1, 2 ...) into >B000->CFFF: map its two SAMS
-* pages, unless it is the one there already.  Uses R0-R3, R12.
+* OVSEL - overlay R0 (1, 2 ...) into >B000->CFFF, unless it is there
+* already: its 8K copied from cartridge bank R0 (the workbench runs from
+* RAM, so it can switch the cartridge's banks and read them directly).
+* Uses R0-R3.
 OVSEL  C    R0,@OVCUR
        JEQ  OVS9
        MOV  R0,@OVCUR
-       MOV  R11,@OVRET
-       SLA  R0,1
-       AI   R0,OVPG-2
-       MOV  R0,@OVTMP
-       LI   R1,>B
-       BL   @MAPPG
-       MOV  @OVTMP,R0
-       INC  R0
-       LI   R1,>C
-       BL   @MAPPG
-       MOV  @OVRET,R11
+       SLA  R0,1               the bank: a write to >6000 + 2 x its number
+       AI   R0,>6000
+       CLR  *R0
+       LI   R1,>6000
+       LI   R2,>B000
+       LI   R3,4096            (words)
+OVS1   MOV  *R1+,*R2+
+       DEC  R3
+       JNE  OVS1
 OVS9   RT
 
 * DSKFIX - nothing to repair after a disk call (no fast block here).

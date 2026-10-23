@@ -61,14 +61,19 @@ def ea5_segments(prefix):
             return segs
         name = name[:-1] + chr(ord(name[-1]) + 1)
 
-def cart_from_segments(segs, name, extra=b'', out=None):
-    """A FinalGROM cartridge: the loader in bank 0, the E/A 5 image in
-    banks 1.., then `extra` (the story) from the next bank boundary.
+def cart_from_segments(segs, name, extra=b'', out=None, pre=()):
+    """A FinalGROM cartridge: the loader in bank 0, then the banks in `pre`
+    (8K each, not loaded: the workbench's overlays, which it copies from
+    the cartridge itself), then the E/A 5 image, then `extra` (the story)
+    from the next bank boundary.
     A segment is (address, data) or (address, data, SAMS page): a paged
     one is copied into that page through its address's 4K window (it
     must not cross a window).  Returns (cartridge bytes, first bank of
     extra)."""
     image, pieces = bytearray(), []
+    for b in pre:
+        assert len(b) <= 0x2000, 'a pre bank is more than 8K'
+        image += bytes(b) + bytes(0x2000 - len(b))
     for seg in segs:
         addr, data = seg[0], seg[1]
         page = seg[2] if len(seg) > 2 else 0
@@ -215,8 +220,9 @@ def workbench_cart(name='TXA WORKBENCH'):
     """The workbench cartridge (src/wbench.a99, M5): (cart bytes, segments).
     The resident part must end below >B000.  Overlay n (code assembled to
     run at >B000, labels OVnEND at its end) is staged in the image from
-    >4000, the overlays one after another; each goes into SAMS pages
-    OVPG+2(n-1) and the next, through windows >B000 and >C000."""
+    >4000 (overlays 1-4) or in the second assembly from >0000 (5 on), and
+    goes in cartridge bank n; the workbench copies it to >B000 when it is
+    needed (OVSEL)."""
     gen_workbench_tables()
     for f in glob.glob(os.path.join(B, 'WBENC?')):
         os.remove(f)
@@ -254,8 +260,8 @@ def workbench_cart(name='TXA WORKBENCH'):
     staged2 = bytearray(0x10000)
     for addr, data in ea5_segments('WOVL1'):
         staged2[addr: addr + len(data)] = data
-    segs, pos, n = list(real), 0, 1
-    while f'OV{n}END' in sy:
+    banks, pos, n = [], 0, 1                    # overlay n goes in bank n (M6): the
+    while f'OV{n}END' in sy:                    # workbench copies it to >B000 itself
         if n == 5:
             if pos > 0x6000:
                 sys.exit(f'overlays 1-4 take {pos} bytes, past their staging room (>4000->9FFF)')
@@ -263,12 +269,10 @@ def workbench_cart(name='TXA WORKBENCH'):
         size = sy[f'OV{n}END'] - 0xB000
         if size > 0x2000:
             sys.exit(f'workbench overlay {n} is {size} bytes, more than 8K')
-        data, page = bytes(staged[pos:pos + size]), sy['OVPG'] + 2 * (n - 1)
-        segs.append((0xB000, data[:0x1000], page))
-        if size > 0x1000:
-            segs.append((0xC000, data[0x1000:], page + 1))
+        banks.append(bytes(staged[pos:pos + size]))
         pos += size; n += 1
-    cart, _ = cart_from_segments(segs, name, b'')
+    segs = list(real)
+    cart, _ = cart_from_segments(segs, name, b'', pre=banks)
     return cart, segs
 
 def engine_cart(story_image, name='TXA STORY', pictures=b'', sounds=b''):
