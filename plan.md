@@ -862,6 +862,19 @@ the console's menu font lacks).  Fixed, and m5_load_test checks the
 menu name.  The cartridges in checkpoints M5, M5.1 and M5.2 have the bad
 name; M5.3's is right.
 
+M6 design (23 October 2026): https://claude.ai/artifact/2c1ubphLesnAHeFRezzUAc
+(doc id 0cfcbac1-18ef-4833-8238-a9b4cb6bfa91).  The spec's M6: test-play,
+debug verbs, RECORD/REPLAY, TI Artist import with preview, statistics,
+the game writer; done when Lamplight is edited, compiled, played and
+built entirely on the TI.  Decisions D1-D6 await Rebecca: a generic
+engine (length from the header, prefix patched in); pictures and music
+as files of their own; 4K chunks kept; test-play from SAMS with FCTN 9
+back; debug verbs in the library, live only when the header's flags
+mark a test-play run; errors in Python's own words, first error only.
+Nine parts, starting with the generic engine.  Overlays move to the
+cartridge (copied into SAMS when used): RAM and the overlay pages are
+full.
+
 ## Next
 
 1. M6, the workbench tools: decision (2) above first (the engine reading
