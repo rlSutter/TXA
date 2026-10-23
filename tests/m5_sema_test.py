@@ -74,7 +74,8 @@ DATE = datetime.date(2026, 10, 22)              # the build date both compilers 
 def run_ti(d, main_name, max_steps=2_000_000_000):
     m = S.Machine(cart, f18a=True, pages=128); cpu = S.CPU(m); m.disk_dir = d
     cpu.pc = m.rw(m.rw(0x6006) + 2)
-    queue = list(keys_for('dsk1.' + main_name.lower())) + keys_for('')   # the name; ENTER takes the date
+    # the menu (M6): P, the name, ENTER takes the date offered, C compiles
+    queue = keys_for('p')[:-1] + keys_for('dsk1.' + main_name.lower()) + keys_for('') + keys_for('c')[:-1]
     steps = hold = free = 0
     dated = False
     while steps < max_steps:
@@ -442,7 +443,8 @@ if which in ('date', 'all'):
         date set beforehand; returns the machine and the screen at the end."""
         m = S.Machine(cart, f18a=True, pages=128); cpu = S.CPU(m); m.disk_dir = d
         cpu.pc = m.rw(m.rw(0x6006) + 2)
-        queue = [k for ln in lines for k in keys_for(ln)]
+        # a line is typed with ENTER after it; ('key', c) is the one key c (the menu's)
+        queue = [k for ln in lines for k in (keys_for(ln[1])[:-1] if isinstance(ln, tuple) else keys_for(ln))]
         steps = hold = free = 0
         while steps < max_steps:
             pc = cpu.pc
@@ -460,17 +462,18 @@ if which in ('date', 'all'):
     path = os.path.join(ROOT, 'tests/txa/run1.txa')
     d, ppath = stage(open(path).read(), 'run1', TLIB)
     # no date yet: ENTER alone, then month 13, are refused; a rub-out; then a date
-    m, scr = run_keys(d, ['dsk1.run1', '', '261322'])
+    P, C = ('key', 'p'), ('key', 'c')
+    m, scr = run_keys(d, [P, 'dsk1.run1', '', '261322'])
     check('date: the prompt asks for the build date', 'Build date (yymmdd):' in scr[3], scr[3])
     check('date: ENTER without a date, or month 13, compiles nothing (and the prompt still takes keys)',
           m.rw(sy['WBDONE']) < 4 and '261322' in scr[3] and cpu_waits(m), scr[3])
-    m, scr = run_keys(d, ['dsk1.run1', '', '261322', '261023\b2'])
+    m, scr = run_keys(d, [P, 'dsk1.run1', '', '261322', '261023\b2', C])
     base = m.rw(sy['IMGPG']) * 4096
     check('date: a date (with a rub-out) compiles, and the header has it',
           m.rw(sy['WBDONE']) >= 4 and bytes(m.ams[base + 38: base + 44]) == b'261022', f'{bytes(m.ams[base + 38: base + 44])} {scr[3]}')
-    m, scr = run_keys(d, ['dsk1.run1', '261022', '', 'dsk1.run1'])
+    m, scr = run_keys(d, [P, 'dsk1.run1', '261022', C, P, 'dsk1.run1'])
     check('date: the next compile offers the last date', '261022' in scr[3], scr[3])
-    m, scr = run_keys(d, ['dsk1.run1', '261022', '', 'dsk1.run1', ''])
+    m, scr = run_keys(d, [P, 'dsk1.run1', '261022', C, P, 'dsk1.run1', '', C])
     check('date: ENTER takes it', m.rw(sy['WBDONE']) >= 4 and bytes(m.ams[m.rw(sy['IMGPG']) * 4096 + 38:][:6]) == b'261022', scr[3])
 
 if which in ('errors', 'all'):

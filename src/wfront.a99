@@ -1,0 +1,290 @@
+*======================================================================
+* wfront.a99 - the workbench's front end (M6 part 2), overlay 8: the main
+* menu, the project's settings (the source file, the build date), and the
+* keys of the parts still to come.  The resident part enters it at OVENT
+* (MENUGO) at start-up and after every compile; a compile's results stay
+* on rows 4-8 under the project and above the menu.
+*
+* Rows: 2 the source file, 3 the build date, 4-8 results (the compile's,
+* resident), 5 the progress line while compiling, 10 the menu's keys, 11
+* a message.
+*======================================================================
+MRET   EQU  GLOBRM+>68         saved returns
+MRET2  EQU  GLOBRM+>6A
+
+* MENU - draw the project and the keys, then act on a key.
+MENU   LI   R10,STACKT         (a fresh stack: the menu is the top level)
+       BL   @MSRC              row 2: the source file
+       BL   @MDATE             row 3: the build date, if one is set
+       LI   R0,10              row 10: the keys
+       BL   @WCLR
+       LI   R0,10
+       LI   R1,1
+       BL   @TXAT
+       LI   R1,QKEYS
+       CLR  R2
+       BL   @TXSTR
+       LI   R0,11
+       BL   @WCLR
+MN1    BL   @WKEY
+       CI   R0,'a'             a letter, in capitals
+       JL   MN2
+       CI   R0,'z'
+       JH   MN2
+       AI   R0,-32
+MN2    CI   R0,'P'
+       JEQ  MPROJ
+       CI   R0,'C'
+       JEQ  MCOMP
+       LI   R1,QSOON           a key of a part still to come: say which
+MN3    MOVB *R1+,R2
+       JEQ  MN1                (not a menu key)
+       SRL  R2,8
+       C    R2,R0
+       JEQ  MN4
+       MOVB *R1,R2             past its message
+       SRL  R2,8
+       A    R2,R1
+       INC  R1
+       JMP  MN3
+MN4    MOV  R1,R4
+       LI   R0,11
+       BL   @WCLR
+       LI   R0,11
+       LI   R1,1
+       BL   @TXAT
+       MOV  R4,R1
+       CLR  R2
+       BL   @TXSTR
+       JMP  MN1
+* P: the source file, then the build date (the one-file tests ask no date).
+MPROJ  BL   @MNAME
+       MOV  @WBONLY,R0
+       JNE  MENU
+       BL   @WDPROM
+       B    @MENU
+* C: compile the project (the date asked first if none is set yet).
+MCOMP  MOV  @WBONLY,R0
+       JNE  MC1
+       MOVB @WDATE,R0
+       JNE  MC1
+       BL   @WDPROM
+MC1    LI   R0,11
+       BL   @WCLR
+       B    @WLOAD
+
+* MSRC - row 2: "Source file: " and the name.  Uses R0-R2.
+MSRC   MOV  R11,@MRET
+       LI   R0,2
+       BL   @WCLR
+       LI   R0,2
+       LI   R1,1
+       BL   @TXAT
+       LI   R1,QASK
+       CLR  R2
+       BL   @TXSTR
+       LI   R0,2*COLS+14
+       LI   R1,WBNAME
+       MOV  @WBNLEN,R2
+       JEQ  MS9
+       BL   @VMBW
+MS9    MOV  @MRET,R11
+       RT
+* MDATE - row 3: "Build date (yymmdd): " and the date, if one is set.
+MDATE  MOV  R11,@MRET
+       LI   R0,3
+       BL   @WCLR
+       MOVB @WDATE,R0
+       JEQ  MD9
+       LI   R0,3
+       LI   R1,1
+       BL   @TXAT
+       LI   R1,SDATE
+       CLR  R2
+       BL   @TXSTR
+       LI   R0,3*COLS+22
+       LI   R1,WDATE
+       LI   R2,6
+       BL   @VMBW
+MD9    MOV  @MRET,R11
+       RT
+
+* MNAME - the source file's name, edited on row 2: the first key typed
+* replaces it, FCTN S rubs out, ENTER keeps it (TI names are capitals).
+MNAME  MOV  R11,@MRET2
+       SETO R9
+MNM2   BL   @MSRC
+MNM3   BL   @WKEY
+       CI   R0,13
+       JNE  MNM4
+       MOV  @MRET2,R11
+       RT
+MNM4   CI   R0,8
+       JNE  MNM5
+       MOV  @WBNLEN,R0         rub out
+       JEQ  MNM2
+       DEC  @WBNLEN
+       CLR  R9
+       JMP  MNM2
+MNM5   CI   R0,' '
+       JLE  MNM3
+       CI   R0,'a'
+       JL   MNM6
+       CI   R0,'z'
+       JH   MNM6
+       AI   R0,-32
+MNM6   MOV  R9,R9
+       JEQ  MNM7
+       CLR  @WBNLEN
+       CLR  R9
+MNM7   MOV  @WBNLEN,R1
+       CI   R1,26
+       JHE  MNM2
+       SWPB R0
+       MOVB R0,@WBNAME(R1)
+       INC  @WBNLEN
+       JMP  MNM2
+
+QKEYS  BYTE QKEYSX-QKEYS-1
+       TEXT 'P Project  C Compile  T Test-play  R Run  B Build  E Errors  '
+       TEXT 'S Statistics  I Import  O Options'
+QKEYSX
+QASK   BYTE QASKX-QASK-1
+       TEXT 'Source file: '
+QASKX
+* the keys still to come: the key, then its message
+QSOON  BYTE 'T'
+       BYTE 41
+       TEXT 'Test-play: not built yet (M6 part 5).    '
+       BYTE 'R'
+       BYTE 35
+       TEXT 'Run: not built yet (M6 part 4).    '
+       BYTE 'B'
+       BYTE 37
+       TEXT 'Build: not built yet (M6 part 3).    '
+       BYTE 'E'
+       BYTE 49
+       TEXT 'Errors in plain words: not built yet (M6 part 6).'
+       BYTE 'S'
+       BYTE 43
+       TEXT 'Statistics: not built yet (M6 part 10).   '
+       BYTE 'I'
+       BYTE 47
+       TEXT 'Picture import: not built yet (M6 part 9).     '
+       BYTE 'O'
+       BYTE 40
+       TEXT 'Options: not built yet (M6 part 10).    '
+       BYTE 0
+       EVEN
+
+* ---- the build date (from wdate.a99, M5 part 6) --------------------------------
+* WDPROM - the build date, for the story's header (the TI has no clock):
+* "Build date (yymmdd): " with the last one given (none at first); a
+* digit typed replaces it (and the first after a refused ENTER), FCTN S
+* rubs out, ENTER takes six digits making a month 01-12 and a day 01-31
+* into WDATE.  A subroutine.
+WDPROM MOV  R11,@MRET2         (a subroutine now: returns once a date is taken)
+       LI   R1,WDATE           the last date, if it is one
+       LI   R2,WDBUF
+       CLR  @WDLEN
+       MOVB *R1,R0
+       JEQ  WDP1               (none yet)
+       LI   R0,6
+       MOV  R0,@WDLEN
+WDP0   MOVB *R1+,*R2+
+       DEC  R0
+       JNE  WDP0
+WDP1   SETO R9                 (the first key typed replaces it)
+WDP2   LI   R0,3               draw "Build date (yymmdd): " and the date
+       BL   @WCLR
+       LI   R0,3
+       LI   R1,1
+       BL   @TXAT
+       LI   R1,SDATE
+       CLR  R2
+       BL   @TXSTR
+       LI   R0,3*COLS+22
+       LI   R1,WDBUF
+       MOV  @WDLEN,R2
+       JEQ  WDP3
+       BL   @VMBW
+WDP3   BL   @WKEY
+       CI   R0,13
+       JNE  WDP5
+       BL   @WDOK              ENTER: a date?
+       MOV  R0,R0
+       JNE  WDP3A
+       SETO R9                 no: the next digit starts it over
+       JMP  WDP3
+WDP3A
+       LI   R1,WDBUF           yes: kept
+       LI   R2,WDATE
+       LI   R0,6
+WDP4   MOVB *R1+,*R2+
+       DEC  R0
+       JNE  WDP4
+       MOV  @MRET2,R11
+       RT
+WDP5   CI   R0,8
+       JNE  WDP6
+       MOV  @WDLEN,R0          rub out
+       JEQ  WDP2
+       DEC  @WDLEN
+       CLR  R9
+       JMP  WDP2
+WDP6   CI   R0,'0'             digits only
+       JL   WDP3
+       CI   R0,'9'
+       JH   WDP3
+       MOV  R9,R9
+       JEQ  WDP7
+       CLR  @WDLEN
+       CLR  R9
+WDP7   MOV  @WDLEN,R1
+       CI   R1,6
+       JHE  WDP2
+       SWPB R0
+       MOVB R0,@WDBUF(R1)
+       INC  @WDLEN
+       JMP  WDP2
+* WDOK - R0 = 1 if WDBUF is a date: six digits, month 01-12, day 01-31.
+WDOK   MOV  R11,@WDRET         (it calls WD2)
+       MOV  @WDLEN,R0
+       CI   R0,6
+       JNE  WDK8
+       LI   R1,2               the month: digits 2, 3
+       BL   @WD2
+       MOV  R0,R0
+       JEQ  WDK8
+       CI   R0,12
+       JH   WDK8
+       LI   R1,4               the day: digits 4, 5
+       BL   @WD2
+       MOV  R0,R0
+       JEQ  WDK8
+       CI   R0,31
+       JH   WDK8
+       LI   R0,1
+       MOV  @WDRET,R11
+       RT
+WDK8   CLR  R0
+       MOV  @WDRET,R11
+       RT
+* WD2 - R0 = the two digits of WDBUF at R1.  Uses R0-R2.
+WD2    MOVB @WDBUF(R1),R0
+       SRL  R0,8
+       AI   R0,-'0'
+       MOV  R0,R2
+       SLA  R0,3               x 10: x 8 + x 2
+       A    R2,R0
+       A    R2,R0
+       MOVB @WDBUF+1(R1),R2
+       SRL  R2,8
+       AI   R2,-'0'
+       A    R2,R0
+       RT
+
+SDATE  BYTE SDATEX-SDATE-1
+       TEXT 'Build date (yymmdd): '
+SDATEX
+       EVEN

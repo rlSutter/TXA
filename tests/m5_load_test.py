@@ -41,7 +41,8 @@ check('every record fits DV80 (80 characters)', max(len(l) for l in lines) <= 80
 def run(typed, max_steps=150_000_000):
     m = S.Machine(cart, f18a=True, pages=128); cpu = S.CPU(m); m.disk_dir = d
     cpu.pc = m.rw(m.rw(0x6006) + 2)
-    queue = [k for t in typed for k in keys_for(t)]
+    # a line is typed with ENTER after it; ('key', c) is the one key c (the menu's)
+    queue = [k for t in typed for k in (keys_for(t[1])[:-1] if isinstance(t, tuple) else keys_for(t))]
     steps = hold = free = 0
     while steps < max_steps:
         pc = cpu.pc
@@ -56,7 +57,8 @@ def run(typed, max_steps=150_000_000):
         cpu.step(); steps += 1
     return m
 
-m = run([''])                                  # ENTER: the default, DSK1.LAMPLIGHT
+P, C, T = ('key', 'p'), ('key', 'c'), ('key', 't')
+m = run([P, '', C])                            # the menu (M6): P, ENTER keeps DSK1.LAMPLIGHT, C compiles
 nl, ln = m.rw(sy['WBLNS']), m.rw(sy['WBLENL']) | (m.rw(sy['WBLENH']) << 16)
 got = bytes(m.ams[32 * 4096: 32 * 4096 + ln])
 check(f'the workbench read {len(lines)} lines, {len(want)} bytes (lexed and parsed them: done 3)', (m.rw(sy['WBDONE']), nl, ln) == (3, len(lines), len(want)), (m.rw(sy['WBDONE']), nl, ln))
@@ -64,18 +66,24 @@ check('the text in SAMS (from page 32, a line feed after each record) is the fil
       next((f'at byte {i}: {want[max(0,i-30):i+30]!r} / {got[max(0,i-30):i+30]!r}' for i in range(min(len(got), len(want))) if got[i] != want[i]), 'length'))
 scr = R.screen(m).splitlines()
 check('the screen says so', scr[4].strip() == f'Read {len(lines)} lines, {len(want)} bytes.' and scr[0].startswith(' TXA Workbench'), scr[:5])
-m2 = run(['dsk1.nosuch'])            # (lower case: KEYGET stops at SHIFT; it gives capitals)
+check('the main menu shows the project and its keys, the results under them',
+      scr[2].strip() == 'Source file: DSK1.LAMPLIGHT' and scr[10].strip().startswith('P Project  C Compile  T Test-play  R Run  B Build'), scr[:12])
+m2 = run([P, 'dsk1.nosuch', C])            # (lower case: KEYGET stops at SHIFT; it gives capitals)
 check('a file that isn\'t there: "Cannot open that file."', m2.rw(sy['WBDONE']) == 0xFFFF and 'Cannot open that file.' in R.screen(m2), R.screen(m2).splitlines()[:5])
-m3 = run(['dsk1.lamplightx\b'])         # an extra letter, then FCTN S rubs it out
+m3 = run([P, 'dsk1.lamplightx\b', C])     # an extra letter, then FCTN S rubs it out
 check('FCTN S rubs out: "DSK1.LAMPLIGHTX" then FCTN S reads DSK1.LAMPLIGHT', m3.rw(sy['WBLNS']) == len(lines) and m3.rw(sy['WBDONE']) == 3,
       (m3.rw(sy['WBDONE']), m3.rw(sy['WBLNS']), R.screen(m3).splitlines()[2]))
-m4 = run(['DSK1.LAMPLIGHT'])            # capitals typed with SHIFT
+m4 = run([P, 'DSK1.LAMPLIGHT', C])          # capitals typed with SHIFT
 check('a name typed with SHIFT (capitals) works', m4.rw(sy['WBLNS']) == len(lines) and m4.rw(sy['WBDONE']) == 3,
       (m4.rw(sy['WBDONE']), R.screen(m4).splitlines()[2]))
-check('after the results it says what a key does', 'Press a key to choose another file.' in R.screen(m4), R.screen(m4).splitlines()[:9])
-m5 = run(['', '', ''])                  # ENTER loads; ENTER (any key) clears; ENTER loads again
-scr5 = R.screen(m5).splitlines()
-check('a key clears the results and asks again; the next file loads', m5.rw(sy['WBDONE']) == 3 and m5.rw(sy['WBLNS']) == len(lines)
-      and scr5[2].strip() == 'Source file: DSK1.LAMPLIGHT', scr5[:9])
+m5 = run([C])                               # C alone: the project's default file
+check('C alone compiles the project as it stands (DSK1.LAMPLIGHT at start-up)', m5.rw(sy['WBDONE']) == 3 and m5.rw(sy['WBLNS']) == len(lines),
+      R.screen(m5).splitlines()[:12])
+m6 = run([C, C])                            # compiled twice
+check('C again compiles again, the results replaced', m6.rw(sy['WBDONE']) == 3 and m6.rw(sy['WBLNS']) == len(lines)
+      and R.screen(m6).splitlines()[4].strip() == f'Read {len(lines)} lines, {len(want)} bytes.', R.screen(m6).splitlines()[:12])
+m7 = run([T])
+check('a key of a part still to come says so: T, "Test-play: not built yet (M6 part 5)."',
+      'Test-play: not built yet (M6 part 5).' in R.screen(m7).splitlines()[11], R.screen(m7).splitlines()[9:12])
 print('ALL PASS' if not fails else f'{fails} FAILED')
 sys.exit(1 if fails else 0)

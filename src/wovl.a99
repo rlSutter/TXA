@@ -28,4 +28,8 @@ OV6END
        B    @LINK7             overlay 7: the linker, second half
        COPY "wlink2.a99"
 OV7END
+       XORG >B000
+       B    @MENU              overlay 8: the front end (the main menu)
+       COPY "wfront.a99"
+OV8END
        END

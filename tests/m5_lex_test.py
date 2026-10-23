@@ -35,7 +35,8 @@ def run_ti(text, max_steps=400_000_000):
     open(os.path.join(d, 'DSK1', 'SOURCE'), 'w', encoding='latin-1').write(text if text.endswith('\n') else text + '\n')
     m = S.Machine(cart, f18a=True, pages=128); cpu = S.CPU(m); m.disk_dir = d
     cpu.pc = m.rw(m.rw(0x6006) + 2)
-    queue = [k for k in keys_for('dsk1.source')]   # (lower case: the kernel's KEYGET stops at SHIFT, and gives capitals anyway)
+    # the menu (M6): P, the name, C (lower case: the kernel's KEYGET stops at SHIFT, and gives capitals anyway)
+    queue = keys_for('p')[:-1] + keys_for('dsk1.source') + keys_for('c')[:-1]
     steps = hold = free = 0; lex0 = lex1 = None
     while steps < max_steps:
         pc = cpu.pc

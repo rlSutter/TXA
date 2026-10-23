@@ -17,13 +17,14 @@
 * assembled apart (wovl.a99), with this file's symbols, and staged from
 * >0000 in their own image; the resident part enters them at OVENT
 * (>B000), where each begins with a branch to its entry.  Overlay n uses
-*   1  the lexer (wlex.a99), and the build date's prompt (wdate.a99)
+*   1  the lexer (wlex.a99)
 *   2  the parser (wparse.a99)
 *   3  the meaning stage, first half (wsema.a99; wsym.a99, resident, shared)
 *   4  the meaning stage, second half (wsema2.a99)
 *   5  the code generator (wcode.a99)
 *   6  the linker, first half (wlink.a99): substitutions, the first tables
 *   7  the linker, second half (wlink2.a99): the rest, the story files
+*   8  the front end (wfront.a99): the main menu, the project's settings
 * SAMS windows: >D000, >E000, >F000 are the stages' data windows.
 * SAMS pages (512K, the least the workbench needs):
 *   16-31   free (the overlays' until M6; they live in the cartridge now)
@@ -135,66 +136,18 @@ WS2    LI   R0,30              80 columns, 30 rows, the font, colours
        CLR  R2
        BL   @TXSTR
 
-* ---- the prompt -------------------------------------------------------------
-WPROMP LI   R0,3               (the date's row: blank until it is asked)
-       BL   @WCLR
-       LI   R1,SDEFLT          the default name
+       LI   R1,SDEFLT          the default source file
        LI   R2,WBNAME
        MOVB *R1+,R0
        SRL  R0,8
        MOV  R0,@WBNLEN
-WP1    MOVB *R1+,*R2+
+WS3    MOVB *R1+,*R2+
        DEC  R0
-       JNE  WP1
-       SETO R9                 (the first key typed replaces the default)
-WP2    LI   R0,2               draw "Source file: " and the name
-       BL   @WCLR
-       LI   R0,2
-       LI   R1,1
-       BL   @TXAT
-       LI   R1,SASK
-       CLR  R2
-       BL   @TXSTR
-       LI   R0,2*COLS+14
-       LI   R1,WBNAME
-       MOV  @WBNLEN,R2
-       JEQ  WP3
-       BL   @VMBW
-WP3    BL   @WKEY              a key
-       CI   R0,13
-       JNE  WP3A
-       MOV  @WBONLY,R0         ENTER: one file only (parts 1-3's tests) goes
-       JEQ  WP3B               straight on; else the build date first
-       B    @WLOAD
-WP3B   LI   R0,1               (the date prompt lives in overlay 1)
+       JNE  WS3
+* MENUGO - the main menu (overlay 8): at start-up, and after each compile.
+MENUGO LI   R0,8
        BL   @OVSEL
-       B    @WDPROM
-WP3A
-       CI   R0,8
-       JNE  WP4
-       MOV  @WBNLEN,R0         rub out
-       JEQ  WP2
-       DEC  @WBNLEN
-       CLR  R9
-       JMP  WP2
-WP4    CI   R0,' '
-       JLE  WP3
-       CI   R0,'a'             upper case, as TI file names are
-       JL   WP5
-       CI   R0,'z'
-       JH   WP5
-       AI   R0,-32
-WP5    MOV  R9,R9
-       JEQ  WP6
-       CLR  @WBNLEN
-       CLR  R9
-WP6    MOV  @WBNLEN,R1
-       CI   R1,26
-       JHE  WP2
-       SWPB R0
-       MOVB R0,@WBNAME(R1)
-       INC  @WBNLEN
-       JMP  WP2
+       B    @OVENT
 
 * ---- compiling ---------------------------------------------------------------------
 * WLOAD - the program named at the prompt: its first file read, lexed and
@@ -202,7 +155,7 @@ WP6    MOV  @WBNLEN,R1
 * which loads each INCLUDEd file where it stands.
 WLOAD  MOV  @WBNLEN,R0         FNBUF = the name, with its length byte
        JNE  $+6
-       B    @WP2
+       B    @MENUGO
        SWPB R0
        MOVB R0,@FNBUF
        SWPB R0
@@ -211,8 +164,12 @@ WLOAD  MOV  @WBNLEN,R0         FNBUF = the name, with its length byte
 WL1    MOVB *R1+,*R2+
        DEC  R0
        JNE  WL1
-       LI   R0,4
+       LI   R14,4              rows 4-9 cleared: the last results
+WL1A   MOV  R14,R0
        BL   @WCLR
+       INC  R14
+       CI   R14,10
+       JL   WL1A
        CLR  @NF
        CLR  @DXN
        CLR  @WBLTOT
@@ -235,7 +192,7 @@ WL1    MOVB *R1+,*R2+
        LI   R1,SNOPEN
        CLR  R2
        BL   @TXSTR
-       B    @WP2
+       B    @MENUGO
 WL3    MOV  @WBONLY,R0
        JEQ  WL3A
        B    @WL1E
@@ -470,20 +427,7 @@ WL6A
        LI   R1,SREAD3
        CLR  R2
        BL   @TXSTR
-WL9    LI   R0,8               then: say what a key does, wait for one,
-       LI   R1,1               and clear the results for the next file
-       BL   @TXAT
-       LI   R1,SAGAIN
-       CLR  R2
-       BL   @TXSTR
-       BL   @WKEY
-       LI   R14,4
-WL10   MOV  R14,R0
-       BL   @WCLR
-       INC  R14
-       CI   R14,30
-       JL   WL10
-       B    @WPROMP
+WL9    B    @MENUGO            the menu again (the results stay on rows 4-8)
 * WTOKS - row 6: "n tokens." (the last file's).
 WTOKS  MOV  R11,@WBRET2
        LI   R0,6
@@ -649,9 +593,6 @@ STITLX
 SDEFLT BYTE SDEFLX-SDEFLT-1
        TEXT 'DSK1.LAMPLIGHT'
 SDEFLX
-SASK   BYTE SASKX-SASK-1
-       TEXT 'Source file: '
-SASKX
 SNOPEN BYTE SNOPNX-SNOPEN-1
        TEXT 'Cannot open that file.'
 SNOPNX
@@ -670,9 +611,6 @@ STOKSX
 SLXERR BYTE SLXERX-SLXERR-1
        TEXT 'Lexer error '
 SLXERX
-SAGAIN BYTE SAGAIX-SAGAIN-1
-       TEXT 'Press a key to choose another file.'
-SAGAIX
 SPSERR BYTE SPSERX-SPSERR-1
        TEXT 'Parse error '
 SPSERX
@@ -735,7 +673,6 @@ WBEND
        AORG >4000
        XORG >B000
        COPY "wlex.a99"
-       COPY "wdate.a99"
 OV1END
        XORG >B000
        COPY "wparse.a99"
