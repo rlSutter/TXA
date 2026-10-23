@@ -16,7 +16,9 @@ file, lexes, parses, checks the meaning, generates the code and links
 the story image, identical to Python byte for byte on the corpus, and
 writes it to disk as 4K PROGRAM files (asking for the build date: the
 TI has no clock).  Next: M6, starting with a playable game from the TI
-alone (plan.md, decision 2).  The M5 design Claude Doc (below) ends
+alone (plan.md, decision 2).  Candidates to decide once M6 is done
+(plan.md, "Later"): a stock-TI engine (32K only, no F18A or SAMS) and a
+more faithful disk test.  The M5 design Claude Doc (below) ends
 with "Where it stands": what was built and how it departed from the design.
 Earlier: **(checkpoint-m4):** M0-M4 complete (engine 1.0
 beta: save, restore, undo, scrollback, pictures, sound and music, stories
