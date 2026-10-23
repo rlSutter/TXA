@@ -282,6 +282,7 @@ A disk must be mounted as DSK1. With the cartridge, any blank disk image; with t
 
 - [ ] E/A option 5, `DSK1.LAMP1`: "Loading" and eight dots, then the game.
 - [ ] Rename or delete one story file (for example `LAMPS03`) on a copy of the disk and load again: the engine stops with "Cannot read the story file DSK1.LAMPS03". A key returns to the title screen.
+- [ ] On another copy, delete the picture files (`LAMPP01` to `LAMPP03`) and load: the game plays without its pictures (M6: pictures and music are files of their own).
 - [ ] (Optional) On real hardware with TIPI or a CF7 as DSK1: the same.
 
 ### 5.8 The end screen

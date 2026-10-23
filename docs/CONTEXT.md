@@ -11,7 +11,7 @@ keep it current when the language changes.  The six manuals still to
 write are stubbed in the Claude Doc
 https://claude.ai/artifact/VqqmmXaB3E5RBxdTcfBtU2 (one tab each).
 
-**State (22 October 2026):** M5 is done: the workbench loads every
+**State (23 October 2026):** M6 part 1 (the generic engine) done.  M5 is done: the workbench loads every
 file, lexes, parses, checks the meaning, generates the code and links
 the story image, identical to Python byte for byte on the corpus, and
 writes it to disk as 4K PROGRAM files (asking for the build date: the
@@ -75,7 +75,9 @@ owns it; Claude builds it. The engine comes first; the story later.
 | `src/undo.a99` | UNDOSAVE/UNDO: LAST in SAMS pages 16-19, XOR/RLE records in pages 20-26; PGCOPY; UPMAP (window B base in UBBASE) |
 | `src/disk.a99` | DSKCAL (PAB at >37A0, file buffer FBUF >2000) and Lantern's DSRLNK; SPRZER |
 | `src/save.a99` | SAVE/RESTORE: the portable save file built in and read from VRAM; FNAME (DSK1. prefix) |
-| `tools/txa_game.py` | the game writer: E/A 5 engine files, 4K story (and picture) files, disk image, optional cartridge |
+| `tools/txa_game.py` | the game writer: the generic engine's E/A 5 files (the story name patched in), 4K story, picture and music files, disk image, optional cartridge |
+| `src/stload.a99` | the engine's disk loading (M6): a story by its header's length, then pictures and music, each set until a file is missing |
+| `tests/m6_engine_test.py` | the generic engine: one engine for every game; the TI's own story files play with the PC's pictures and music |
 | `src/picture.a99` | PICTURE: the picture area through window D into the bitmap layer; PICOFF, PICRDW (kernel window) |
 | `src/wbench.a99` | the TXA Workbench cartridge (M5): the front end, the overlay switch (OVSEL), the memory and SAMS layout |
 | `src/wload.a99` | resident: LOADF (one file read, lexed, parsed onto the tree), WALK (the declaration index, INCLUDEs followed), the tree reader (XB, XW, XSKIP), DMAP, and the routines both meaning overlays use |

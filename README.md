@@ -46,6 +46,10 @@ The font is X11 misc-fixed 5x8, public domain.
     python3 tools/txa_game.py samples/lamplight.txa --prefix LAMP --title LAMPLIGHT --cart
 
 writes the engine as E/A option 5 files (LAMP1..), the story as 4K files
-(LAMPS01..), a disk image, and a FinalGROM cartridge, in build/game/lamp/.
+(LAMPS01..), the pictures (LAMPP01..) and the music (LAMPM01..) as files
+of their own, a disk image, and a FinalGROM cartridge, in
+build/game/lamp/. The engine is the same for every game but for the
+story name patched into it, so a story the workbench compiles on the TI
+(LAMPLIS01.. for the prefix LAMPLI) plays on it too.
 The language is described in the Authoring Language Reference (a Claude
 Doc: see docs/CONTEXT.md).

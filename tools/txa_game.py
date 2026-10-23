@@ -8,12 +8,18 @@ Writes, into the output folder:
   LAMP1, LAMP2, ...   the engine, as E/A option 5 program files (load
                       LAMP1 from Editor/Assembler option 5, a FinalGROM
                       menu or a TIPI menu)
-  LAMPS01, ...        the story, 4K a file (PROGRAM files): the engine
-                      loads them from DSK1 into SAMS at startup
+  LAMPS01, ...        the story image, 4K a file (PROGRAM files)
+  LAMPP01, ...        the pictures, if the story has any, 4K a file
+  LAMPM01, ...        the music and sounds, if any, 4K a file
+                      (the engine loads all three sets from the device
+                      into SAMS at startup: the story by its header's
+                      length, the other two until a file is missing)
   <title>.dsk         a DSSD disk image holding all of them
   <title>8.bin        with --cart: a FinalGROM cartridge carrying the
                       story itself (no disk needed)
 
+The engine is the generic one (M6): the same files for every game but
+for its story-name field (device and prefix), which is patched in here.
 The prefix is at most 6 letters, so every file name fits the TI's ten
 characters.  The player needs an F18A (or PICO9918), 512K of SAMS and,
 for the disk version, a disk drive (or TIPI / CF7 as DSK1)."""

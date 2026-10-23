@@ -879,11 +879,27 @@ Build.  Overlays move to the
 cartridge (copied into SAMS when used): RAM and the overlay pages are
 full.
 
+M6 part 1 done (23 October 2026): the generic engine (D1, D2).
+- The engine's disk loader (startup.a99's LOADDK; LDSET and LDFIL in the
+  new resident stload.a99, the start-up segment being full) reads the
+  story's length from the first story file's header and loads that many
+  files; then the pictures (PREFIXP01..) and the music and sounds
+  (PREFIXM01..), each set until a file is missing; PICPG and SNDPG are
+  set where the sets land (0: none).  The cartridge build is unchanged.
+- One engine for every game: build.generic_engine_files assembles it
+  once with a placeholder name; the story-name field ("TXANAME:", then a
+  length byte and 16 characters) is patched by build.patch_engine_name.
+- The game writer writes the generic engine (patched), the story, the
+  pictures and the music as three sets of 4K files.
+- tests/m6_engine_test.py: two games' engine files equal but the name;
+  the workbench's own LAMPLIS01-08 play with the PC's picture and music
+  files (the walkthrough's start as the Python VM plays it); without the
+  picture files the game still plays.  m4_disk_test plays the new layout.
+
 ## Next
 
-1. M6, the workbench tools: decision (2) above first (the engine reading
-   the story's length from its header; pictures and sounds as files),
-   then test-play, debug verbs, a list of several errors.
+1. M6 part 2: the main menu (P C T R E I B S O), with the overlays moved
+   to the cartridge first (copied into SAMS when used).
 
 The reference used for part 6's disk writes:
    (part 6) libre99's clean-room TI disk controller DSR and its notes,
