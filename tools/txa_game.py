@@ -37,32 +37,31 @@ def write_game(source, prefix, title=None, lib=None, out=None, cart=False, devic
     srcdir = os.path.dirname(os.path.abspath(source))
     pictures = txpics.picture_area(info, [srcdir, os.path.join(srcdir, 'pics')])
     sounds = txsound.sound_area(info, [srcdir, os.path.join(srcdir, 'sounds')])
-    blob, picpg, sndpg = build.story_blob(image, pictures, sounds)
     os.makedirs(os.path.join(ROOT, 'src/gen'), exist_ok=True)
     if not os.path.exists(os.path.join(ROOT, 'src/gen/font.a99')):
         subprocess.run([sys.executable, 'tools/mkfont.py'], cwd=ROOT, check=True)
     build.check_ramvars()
-    # the engine, reading the story from disk files
-    build.write_storysrc(blob, disk_prefix=f'{device}.{prefix}S', picpg=picpg, sndpg=sndpg)
-    segs = build.assemble_engine(prefix + '1')
+    # the engine: the generic one (M6, D1), its story name patched in
     ea5 = []
-    name = prefix + '1'
-    while True:
-        p = os.path.join(build.B, name)
-        shutil.copy(p, os.path.join(out, name)); ea5.append(name)
-        if not int.from_bytes(open(p, 'rb').read()[:2], 'big'):
-            break
-        name = name[:-1] + chr(ord(name[-1]) + 1)
-    # the story, 4K a file
-    story = []
-    for i in range(0, len(blob), 4096):          # the story, then any pictures
-        n = f'{prefix}S{i // 4096 + 1:02d}'
-        open(os.path.join(out, n), 'wb').write(blob[i:i + 4096]); story.append(n)
+    for i, data in enumerate(build.generic_engine_files()):
+        n = f'{prefix}{i + 1}'
+        patched = build.patch_engine_name(data, device, prefix)
+        open(os.path.join(out, n), 'wb').write(patched if patched is not None else data); ea5.append(n)
+    if not any(build.NAMEMARK.encode() in open(os.path.join(out, n), 'rb').read() for n in ea5):
+        sys.exit('the engine files have no story-name field')
+    # the story, the pictures, the music and sounds: each in 4K files (M6, D2)
+    def chunks(data, letter):
+        names = []
+        for i in range(0, len(data), 4096):
+            n = f'{prefix}{letter}{i // 4096 + 1:02d}'
+            open(os.path.join(out, n), 'wb').write(data[i:i + 4096]); names.append(n)
+        return names
+    story, picfiles, sndfiles = chunks(image, 'S'), chunks(pictures, 'P'), chunks(sounds, 'M')
     # the disk image
     dsk = os.path.join(out, title.lower() + '.dsk')
     build.run([sys.executable, build.XDM, dsk, '-X', 'dssd', '-n', title[:10]])
-    build.run([sys.executable, build.XDM, dsk, '-a'] + ea5 + story + ['-f', 'PROGRAM'], cwd=out)
-    files = {'engine': ea5, 'story': story, 'disk': dsk, 'image_bytes': len(image), 'picture_bytes': len(pictures),
+    build.run([sys.executable, build.XDM, dsk, '-a'] + ea5 + story + picfiles + sndfiles + ['-f', 'PROGRAM'], cwd=out)
+    files = {'engine': ea5, 'story': story, 'picture_files': picfiles, 'sound_files': sndfiles, 'disk': dsk, 'image_bytes': len(image), 'picture_bytes': len(pictures),
              'pictures': len(info['program'].pictures), 'warnings': info['program'].warnings}
     if cart:
         c, _ = build.engine_cart(image, title[:20], pictures=pictures, sounds=sounds)
@@ -70,7 +69,8 @@ def write_game(source, prefix, title=None, lib=None, out=None, cart=False, devic
         open(cp, 'wb').write(c); files['cart'] = cp
     if not quiet:
         pics = f', {files["pictures"]} pictures ({len(pictures)} bytes)' if pictures else ''
-        print(f'{title}: story {len(image)} bytes{pics}, in {len(story)} files; engine {len(ea5)} E/A 5 files')
+        print(f'{title}: story {len(image)} bytes in {len(story)} files{pics} in {len(picfiles)}, sounds in {len(sndfiles)}; '
+              f'engine {len(ea5)} E/A 5 files')
         print(f'  load {ea5[0]} with E/A option 5; the disk image is {os.path.basename(dsk)}')
         for w in info['program'].warnings:
             print('  ' + w)

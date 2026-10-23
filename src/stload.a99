@@ -1,0 +1,69 @@
+*======================================================================
+* stload.a99 - loading a story's files from disk (M6), resident: the
+* start-up segment (startup.a99's LOADDK, which calls these) is full.
+*======================================================================
+* LDSET - the set of files STNAME + R0 (a letter) + 01, 02 ... into the
+* next story pages, until one is missing.  R0 = the set's first page, or 0
+* when there was none.
+LDSET  .enter
+       MOV  R0,@VT3
+       CLR  @VT4
+       MOV  @VT2,@VT5          (where it starts)
+LDT1   BL   @LDFIL
+       MOV  R0,R0
+       JNE  LDT2
+       INC  @VT2
+       INC  @VT4
+       JMP  LDT1
+LDT2   CLR  R0
+       MOV  @VT4,R1            none: 0
+       JEQ  LDT9
+       MOV  @VT5,R0
+LDT9   .leave
+       RT
+* LDFIL - file STNAME + the letter in VT3 + VT4 + 1 in two digits, by the
+* DSR's LOAD, into story page VT2; a dot for it.  R0 = the DSR's error, or
+* 0.  FNBUF keeps the name (LDK9 shows it).
+LDFIL  .enter
+       LI   R1,STNAME          the name: STNAME, the letter, two digits
+       LI   R2,FNBUF
+       MOVB *R1,R3
+       SRL  R3,8
+       MOV  R3,R0
+       INC  R0
+LDF1   MOVB *R1+,*R2+
+       DEC  R0
+       JNE  LDF1
+       MOVB @VT3+1,*R2+
+       MOV  @VT4,R1
+       INC  R1
+       CLR  R0
+       DIV  @D10,R0
+       AI   R0,'0'
+       SWPB R0
+       MOVB R0,*R2+
+       AI   R1,'0'
+       SWPB R1
+       MOVB R1,*R2+
+       AI   R3,3
+       SWPB R3
+       MOVB R3,@FNBUF
+       LI   R0,5               the DSR's LOAD
+       LI   R1,DSKMAX
+       BL   @DSKCAL
+       MOV  R0,R0
+       JNE  LDF9
+       MOV  @VT2,R2            its page into window B ...
+       LI   R3,MAPRGB
+       BL   @MAPWIN
+       LI   R0,FBUF            ... and the 4K from VRAM into it
+       LI   R1,WINB
+       LI   R2,4096
+       BL   @VMBR
+       MOV  @VT2,R0            a dot for it
+       AI   R0,(2*COLS)+10
+       LI   R1,'.'*256
+       BL   @VSBW
+       CLR  R0
+LDF9   .leave
+       RT

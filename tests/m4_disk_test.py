@@ -32,13 +32,17 @@ neng = len(build.ea5_segments('TXAE1')) if False else len(files['engine'])
 check(f'the writer: {neng} engine files (the kernel, the font, the resident engine), {nfiles} story files, a disk image',
       neng >= 3 and len(files['story']) == nfiles and os.path.exists(files['disk']), files)
 cat = build.run([sys.executable, build.XDM, files['disk']])
-check('the disk image holds every file, as PROGRAM files', all(n in cat for n in files['engine'] + files['story']) and cat.count('PROGRAM') == neng + nfiles, cat)
+every = files['engine'] + files['story'] + files['picture_files'] + files['sound_files']
+check('the disk image holds every file, as PROGRAM files', all(n in cat for n in every) and cat.count('PROGRAM') == len(every), cat)
 chain = [open(os.path.join(out, n), 'rb').read() for n in files['engine']]
 flags = [int.from_bytes(c[:2], 'big') for c in chain]; addrs = [int.from_bytes(c[4:6], 'big') for c in chain]
 check('the E/A 5 chain: "more" flags, then the last; it starts at >2000 (KENTRY)', flags[:-1] == [0xFFFF] * (neng - 1) and flags[-1] == 0 and addrs[0] == 0x2000, (flags, [hex(a) for a in addrs]))
 
-# the engine as the writer built it (disk mode), loaded by the cartridge loader
-segs = build.ea5_segments('LAMP1')
+# the engine as the writer wrote it (the generic disk engine, its name patched in),
+# loaded by the cartridge loader
+for n in files['engine']:
+    shutil.copy(os.path.join(out, n), os.path.join(build.B, n))
+segs = build.ea5_segments(files['engine'][0])
 cart, _ = build.cart_from_segments(segs, 'LAMP DISK')
 def run(dsk_files, cmds, max_steps=150_000_000):
     d = tempfile.mkdtemp(); os.makedirs(os.path.join(d, 'DSK1'))
@@ -72,12 +76,14 @@ def run(dsk_files, cmds, max_steps=150_000_000):
 img, _ = compile_file(os.path.join(ROOT, 'samples/lamplight.txa'), [os.path.join(ROOT, 'lib')], title='LAMPLIGHT')
 walk = open(os.path.join(ROOT, 'samples/lamplight.walk')).read().split('\n')[:-1][:12]
 want = run_image(img, walk)
-got, m, why = run(files['story'], walk)
+allfiles = files['story'] + files['picture_files'] + files['sound_files']
+got, m, why = run(allfiles, walk)
 want = want[:want.rindex('\n>') + 2] if why == 'waiting' else want
 i = next((k for k in range(min(len(got), len(want))) if got[k] != want[k]), min(len(got), len(want)))
-check(f'the story and pictures loaded from {nfiles} disk files: the walkthrough\'s start plays identically', got == want,
+check(f'the story ({nfiles} files), pictures ({len(files["picture_files"])}) and sounds ({len(files["sound_files"])}) loaded from '
+      f'their own disk files: the walkthrough\'s start plays identically', got == want,
       f'{why} at {i}: python {want[max(0,i-80):i+60]!r}\n  ti {got[max(0,i-80):i+60]!r}')
-got2, m2, why2 = run([n for n in files['story'] if n != 'LAMPS03'], [])
+got2, m2, why2 = run([n for n in allfiles if n != 'LAMPS03'], [])
 screen = R.screen(m2)
 check('a missing story file stops with its name', why2 == 'nofile' and 'Cannot read the story file DSK1.LAMPS03' in screen, screen[:400])
 

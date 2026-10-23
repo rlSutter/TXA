@@ -18,6 +18,7 @@
        COPY "undo.a99"
        COPY "save.a99"
        COPY "fast.a99"
+       COPY "stload.a99"
        COPY "gen/storysrc.a99"
 * ENGND: first free byte of the resident window
 ENGND

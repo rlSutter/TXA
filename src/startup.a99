@@ -136,10 +136,14 @@ LDS2   MOV  *R0+,*R1+
        .leave
        RT
 
-* LOADDK - the story from disk: files STNAME01, STNAME02 ... (STNAME
-* from storysrc.a99, e.g. DSK1.LAMPS), 4K each, one SAMS page apiece,
-* through the file buffer in VRAM.  "Loading" and a dot a file on the
-* screen; a file that cannot be read stops with its name.
+* LOADDK - the story from disk (M6, D1 and D2: one engine for every game).
+* STNAME is the device and the game's prefix ("DSK1.LAMPLI"), patched into
+* the engine files when they are written.  The story: STNAME S01, S02 ...,
+* as many as its header's length needs (read from the first file); then
+* the pictures, STNAME P01 ..., and the music and sounds, STNAME M01 ...,
+* each set until a file is missing (none: no pictures, no music).  4K a
+* file, one SAMS story page each, from story page 0; PICPG and SNDPG are
+* where those sets begin (0: none).
 LOADDK .enter
        LI   R0,2
        LI   R1,2
@@ -147,63 +151,48 @@ LOADDK .enter
        LI   R1,SLOAD
        CLR  R2
        BL   @TXSTR
-       MOV  @STLENH,R0         files = (length + 4095) / 4096
-       MOV  @STLENL,R1
-       AI   R1,>0FFF
-       JNC  LDK0
+       CLR  @VT2               the next story page
+       LI   R0,1               files wanted: 1 until the header is read
+       MOV  R0,@VT1
+       LI   R0,'S'
+       MOV  R0,@VT3
+       CLR  @VT4               the file's number in its set, from 0
+LDK1   BL   @LDFIL             the story's files
+       MOV  R0,R0
+       JEQ  LDK1B
+       B    @LDK9
+LDK1B
+       MOV  @VT4,R0
+       JNE  LDK2
+       MOV  @WINB+10,R0        the first: its header gives the length
+       MOV  R0,@STLENH         (H.IMAGE_LEN_HI, _LO)
+       MOV  @WINB+12,R1
+       MOV  R1,@STLENL
+       AI   R1,>0FFF           files = (length + 4095) / 4096
+       JNC  LDK1A
        INC  R0
-LDK0   SRL  R1,12
+LDK1A  SRL  R1,12
        SLA  R0,4
        SOC  R0,R1
        MOV  R1,@VT1
-       CLR  @VT2               file index
-LDK1   LI   R1,STNAME          the name: STNAME and two digits
-       LI   R2,FNBUF
-       MOVB *R1,R3
-       SRL  R3,8
-       MOV  R3,R0
-       INC  R0
-LDK2   MOVB *R1+,*R2+
-       DEC  R0
-       JNE  LDK2
-       MOV  @VT2,R1            index + 1, in two digits
-       INC  R1
-       CLR  R0
-       DIV  @D10,R0
-       AI   R0,'0'
-       SWPB R0
-       MOVB R0,*R2+
-       AI   R1,'0'
-       SWPB R1
-       MOVB R1,*R2+
-       INCT R3
-       SWPB R3
-       MOVB R3,@FNBUF
-       LI   R0,5               the DSR's LOAD
-       LI   R1,DSKMAX
-       BL   @DSKCAL
-       MOV  R0,R0
-       JNE  LDK9
-       MOV  @VT2,R2            its page into window B ...
-       LI   R3,MAPRGB
-       BL   @MAPWIN
-       LI   R0,FBUF            ... and the 4K from VRAM into it
-       LI   R1,WINB
-       LI   R2,4096
-       BL   @VMBR
-       MOV  @VT2,R0            a dot for it
-       AI   R0,(2*COLS)+10
-       LI   R1,'.'*256
-       BL   @VSBW
-       INC  @VT2
-       C    @VT2,@VT1
+LDK2   INC  @VT2
+       INC  @VT4
+       C    @VT4,@VT1
        JL   LDK1
+       LI   R0,'P'             the pictures, then the music: each set
+       BL   @LDSET             until a file is missing
+       MOV  R0,@PICPG
+       LI   R0,'M'
+       BL   @LDSET
+       MOV  R0,@SNDPG
        BL   @SPRZER
        SETO @CURBH
        LI   R0,2               the loading line cleared
        BL   @ECLR
        .leave
        RT
+* (LDSET and LDFIL are in stload.a99, resident: this segment is full.)
+
 LDK9   BL   @SPRZER            stop, naming the file
        LI   R0,4
        LI   R1,2
