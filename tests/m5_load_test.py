@@ -31,7 +31,11 @@ want = ''.join(l + '\n' for l in lines).encode('latin-1')
 d = tempfile.mkdtemp(); os.makedirs(os.path.join(d, 'DSK1'))
 open(os.path.join(d, 'DSK1', 'LAMPLIGHT'), 'w', encoding='latin-1').write('\n'.join(lines) + '\n')
 cart, _ = build.workbench_cart()
+_p = (cart[6] << 8) | cart[7]                    # the console menu's entry: next, start, name
+_n = cart[_p - 0x6000 + 4]
+_name = cart[_p - 0x6000 + 5: _p - 0x6000 + 5 + _n]
 sy = build.symbols(os.path.join(build.B, 'wbench.equ'))
+check(f'the console menu names the cartridge TXA WORKBENCH ({_name!r})', _name == b'TXA WORKBENCH')
 check('every record fits DV80 (80 characters)', max(len(l) for l in lines) <= 80)
 
 def run(typed, max_steps=150_000_000):

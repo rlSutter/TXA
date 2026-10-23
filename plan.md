@@ -854,6 +854,13 @@ found that overlay 7 had overwritten the code generator's routine
 directory with image places since part 6 (the code test read it back
 wrong; the image was right): a routine's place is 4 x its packed
 address, so the directory is left alone now.
+Rebecca found the console menu showing "2 FOR" and two coloured blocks
+for the workbench (js99er): since part 6, the loop that writes
+gen/wres.a99 reused the name `name`, shadowing workbench_cart's title, so
+the cartridge was named after the last symbol, "xw" (lower case, which
+the console's menu font lacks).  Fixed, and m5_load_test checks the
+menu name.  The cartridges in checkpoints M5, M5.1 and M5.2 have the bad
+name; M5.3's is right.
 
 ## Next
 
