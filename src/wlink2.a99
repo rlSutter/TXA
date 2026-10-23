@@ -820,7 +820,8 @@ JWR4   CLR  @DFPG              (the DSR moved nothing of ours, but be sure)
 JWR9   .leave
        RT
 * JNAME - FNBUF = the main file's device (the typed name up to its last
-* '.'), its first 6 letters, S, file JFILES + 1 in two digits.  Uses R0-R4.
+* '.'), the project's prefix (WPFX), S, file JFILES + 1 in two digits.
+* Uses R0-R4.
 JNAME  MOV  R11,@J2
        LI   R4,FNBUF+1
        MOV  @WBNLEN,R0         the device: up to the last '.'
@@ -840,15 +841,12 @@ JNM3   C    R2,R1
        MOVB @WBNAME(R2),*R4+
        INC  R2
        JMP  JNM3
-JNM4   MOVB @FTAB,R0           the prefix: the main file's first 6 letters
+JNM4   MOVB @WPFX,R0           the prefix: the project's (M6 part 3)
        SRL  R0,8
-       CI   R0,6
-       JLE  JNM5
-       LI   R0,6
 JNM5   CLR  R2
 JNM6   C    R2,R0
        JHE  JNM7
-       MOVB @FTAB+1(R2),*R4+
+       MOVB @WPFX+1(R2),*R4+
        INC  R2
        JMP  JNM6
 JNM7   MOVB @JLETS,*R4+        S, then the number

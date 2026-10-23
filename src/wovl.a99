@@ -32,4 +32,8 @@ OV7END
        B    @MENU              overlay 8: the front end (the main menu)
        COPY "wfront.a99"
 OV8END
+       XORG >B000
+       B    @BUILD             overlay 9: Build, the engine's files
+       COPY "wbuild.a99"
+OV9END
        END

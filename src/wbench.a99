@@ -427,7 +427,16 @@ WL6A
        LI   R1,SREAD3
        CLR  R2
        BL   @TXSTR
-WL9    B    @MENUGO            the menu again (the results stay on rows 4-8)
+WL9    MOV  @WBBLD,R0          a Build's compile that worked: the engine's
+       JEQ  WL9A               files next (overlay 9)
+       CLR  @WBBLD
+       C    @WBDONE,@D4W
+       JNE  WL9A
+       LI   R0,9
+       BL   @OVSEL
+       B    @OVENT
+WL9A   B    @MENUGO            the menu again (the results stay on rows 4-8)
+D4W    DATA 4
 * WTOKS - row 6: "n tokens." (the last file's).
 WTOKS  MOV  R11,@WBRET2
        LI   R0,6

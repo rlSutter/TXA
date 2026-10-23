@@ -11,10 +11,14 @@
 *======================================================================
 MRET   EQU  GLOBRM+>68         saved returns
 MRET2  EQU  GLOBRM+>6A
+MRET3  EQU  GLOBRM+>76
 
 * MENU - draw the project and the keys, then act on a key.
 MENU   LI   R10,STACKT         (a fresh stack: the menu is the top level)
-       BL   @MSRC              row 2: the source file
+       MOVB @WPFX,R0           no prefix yet (start-up): the source's
+       JNE  MEN1
+       BL   @MPDEF
+MEN1   BL   @MSRC              row 2: the source file
        BL   @MDATE             row 3: the build date, if one is set
        LI   R0,10              row 10: the keys
        BL   @WCLR
@@ -36,6 +40,11 @@ MN2    CI   R0,'P'
        JEQ  MPROJ
        CI   R0,'C'
        JEQ  MCOMP
+       CI   R0,'B'             B: compile, then the engine's files (overlay 9)
+       JNE  MN2A
+       SETO @WBBLD
+       JMP  MCOMP
+MN2A
        LI   R1,QSOON           a key of a part still to come: say which
 MN3    MOVB *R1+,R2
        JEQ  MN1                (not a menu key)
@@ -57,11 +66,14 @@ MN4    MOV  R1,R4
        CLR  R2
        BL   @TXSTR
        JMP  MN1
-* P: the source file, then the build date (the one-file tests ask no date).
+* P: the source file, then the build date and the game's prefix (the one-
+* file tests ask neither).  A new source file brings its default prefix.
 MPROJ  BL   @MNAME
+       BL   @MPDEF
        MOV  @WBONLY,R0
        JNE  MENU
        BL   @WDPROM
+       BL   @MPFX
        B    @MENU
 * C: compile the project (the date asked first if none is set yet).
 MCOMP  MOV  @WBONLY,R0
@@ -106,8 +118,104 @@ MDATE  MOV  R11,@MRET
        LI   R1,WDATE
        LI   R2,6
        BL   @VMBW
-MD9    MOV  @MRET,R11
+MD9    BL   @MPSHOW            and the prefix beside it
+       MOV  @MRET,R11
        RT
+* MPSHOW - row 3, column 40: "Game prefix: " and the prefix.  Uses R0-R2.
+MPSHOW MOV  R11,@MRET3
+       LI   R0,3
+       LI   R1,40
+       BL   @TXAT
+       LI   R1,QPFX
+       CLR  R2
+       BL   @TXSTR
+       LI   R0,3*COLS+53
+       LI   R1,WPFX+1
+       MOVB @WPFX,R2
+       SRL  R2,8
+       JEQ  MPS9
+       BL   @VMBW
+MPS9   MOV  @MRET3,R11
+       RT
+* MPDEF - WPFX := the source file's base name (after its last '.'), its
+* first 6 letters and digits.  Uses R0-R4.
+MPDEF  LI   R1,WBNAME          R1 = just after the last '.'
+       MOV  @WBNLEN,R2
+       LI   R3,WBNAME
+MPD1   MOV  R2,R2
+       JEQ  MPD3
+       CB   *R3+,@QDOT
+       JNE  MPD2
+       MOV  R3,R1
+MPD2   DEC  R2
+       JMP  MPD1
+MPD3   LI   R4,WPFX+1          then up to 6 letters or digits
+       CLR  R2
+MPD4   C    R1,R3
+       JHE  MPD6
+       CI   R2,6
+       JHE  MPD6
+       MOVB *R1+,R0
+       CB   R0,@QZERO
+       JL   MPD4
+       MOVB R0,*R4+
+       INC  R2
+       JMP  MPD4
+MPD6   SWPB R2
+       MOVB R2,@WPFX
+       RT
+* MPFX - the game's prefix, edited on row 3: 1 to 6 letters or digits,
+* the first key replacing it, FCTN S rubbing out, ENTER keeping it.
+MPFX   MOV  R11,@MRET2
+       SETO R9
+MPF2   BL   @MPSHOW
+       MOVB @WPFX,R1           (the end of it cleared)
+       SRL  R1,8
+       AI   R1,3*COLS+53
+       MOV  R1,R0
+       LI   R1,' '*256
+       LI   R2,6
+       BL   @VFILL
+       BL   @MPSHOW
+MPF3   BL   @WKEY
+       CI   R0,13
+       JNE  MPF4
+       MOVB @WPFX,R0           ENTER: not empty
+       JEQ  MPF3
+       MOV  @MRET2,R11
+       RT
+MPF4   CI   R0,8
+       JNE  MPF5
+       MOVB @WPFX,R0           rub out
+       JEQ  MPF2
+       SB   @QONE,@WPFX
+       CLR  R9
+       JMP  MPF2
+MPF5   CI   R0,'a'
+       JL   MPF6
+       CI   R0,'z'
+       JH   MPF6
+       AI   R0,-32
+MPF6   CI   R0,'0'             letters and digits only
+       JL   MPF3
+       CI   R0,'Z'
+       JH   MPF3
+       CI   R0,'9'
+       JLE  MPF7
+       CI   R0,'A'
+       JL   MPF3
+MPF7   MOV  R9,R9
+       JEQ  MPF8
+       CLR  @WPFX
+       CLR  R9
+MPF8   MOVB @WPFX,R1
+       SRL  R1,8
+       CI   R1,6
+       JHE  MPF2
+       SWPB R0
+       MOVB R0,@WPFX+1(R1)
+       SB   @QMONE,@WPFX
+       JMP  MPF2
 
 * MNAME - the source file's name, edited on row 2: the first key typed
 * replaces it, FCTN S rubs out, ENTER keeps it (TI names are capitals).
@@ -149,6 +257,13 @@ QKEYS  BYTE QKEYSX-QKEYS-1
        TEXT 'P Project  C Compile  T Test-play  R Run  B Build  E Errors  '
        TEXT 'S Statistics  I Import  O Options'
 QKEYSX
+QPFX   BYTE 13
+       TEXT 'Game prefix: '
+QDOT   BYTE '.'
+QZERO  BYTE '0'
+QONE   BYTE 1
+QMONE  BYTE >FF
+       EVEN
 QASK   BYTE QASKX-QASK-1
        TEXT 'Source file: '
 QASKX
@@ -159,9 +274,6 @@ QSOON  BYTE 'T'
        BYTE 'R'
        BYTE 35
        TEXT 'Run: not built yet (M6 part 4).    '
-       BYTE 'B'
-       BYTE 37
-       TEXT 'Build: not built yet (M6 part 3).    '
        BYTE 'E'
        BYTE 49
        TEXT 'Errors in plain words: not built yet (M6 part 6).'

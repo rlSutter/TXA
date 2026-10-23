@@ -151,19 +151,31 @@ def patch_engine_name(data, device, prefix):
     j = i + len(NAMEMARK)
     return data[:j] + bytes([len(name)]) + name.ljust(NAMEFLD, b' ') + data[j + 1 + NAMEFLD:]
 
-def generic_engine_files():
+def generic_engine_files(chunk=4096):
     """The generic disk engine (M6, D1): assembled once with a placeholder
-    story name (gen/storysrc.a99 in disk mode), as build/TXAG1, TXAG2 ...;
-    returns the E/A 5 files' bytes in chain order.  patch_engine_name
-    gives a game its name."""
+    story name (gen/storysrc.a99 in disk mode); returns its E/A 5 program
+    files' bytes in chain order.  The chain is cut into files of at most
+    `chunk` bytes of code (M6 part 3: the workbench writes them through the
+    disk buffer in VRAM, about 6K), never inside the story-name field;
+    patch_engine_name gives a game its name."""
     write_storysrc(b'', disk_prefix='DSK1.STORY')
     assemble_engine('TXAG1')
-    out, name = [], 'TXAG1'
-    while True:
-        d = open(os.path.join(B, name), 'rb').read(); out.append(d)
-        if not int.from_bytes(d[:2], 'big'):
-            return out
-        name = name[:-1] + chr(ord(name[-1]) + 1)
+    segs = ea5_segments('TXAG1')
+    pieces = []                                 # (address, data), each at most chunk
+    for addr, data in segs:
+        mark = data.find(NAMEMARK.encode())
+        off = 0
+        while off < len(data):
+            n = min(chunk, len(data) - off)
+            end = mark + len(NAMEMARK) + 1 + NAMEFLD    # the field: mark .. end
+            if mark >= 0 and mark < off + n < end:
+                n = mark - off                  # it would be cut: cut before it instead
+            pieces.append((addr + off, data[off:off + n])); off += n
+    out = []
+    for i, (addr, data) in enumerate(pieces):
+        more = 0xFFFF if i < len(pieces) - 1 else 0
+        out.append(more.to_bytes(2, 'big') + (len(data) + 6).to_bytes(2, 'big') + addr.to_bytes(2, 'big') + data)
+    return out
 
 def assemble_engine(out_name='TXAE1'):
     """Assemble the engine (with the current gen/storysrc.a99) into E/A 5
@@ -271,6 +283,20 @@ def workbench_cart(name='TXA WORKBENCH'):
             sys.exit(f'workbench overlay {n} is {size} bytes, more than 8K')
         banks.append(bytes(staged[pos:pos + size]))
         pos += size; n += 1
+    # the generic engine (M6 part 3), in the banks after the overlays, for
+    # Build: its files one after another; overlay 9's ENGTAB says where
+    eng = generic_engine_files()
+    blob = b''.join(eng)
+    first = len(banks) + 1
+    namefile = next(i for i, f in enumerate(eng) if NAMEMARK.encode() in f)
+    nameoff = eng[namefile].find(NAMEMARK.encode()) + len(NAMEMARK)
+    assert len(eng) <= 9, 'the engine has more than 9 files'
+    tab = [len(eng), first, namefile] + [len(f) for f in eng] + [0] * (9 - len(eng)) + [nameoff]
+    o = sy['ENGTAB'] - 0xB000
+    b9 = bytearray(banks[8])
+    b9[o:o + 2 * len(tab)] = b''.join(v.to_bytes(2, 'big') for v in tab)
+    banks[8] = bytes(b9)
+    banks += [blob[i:i + 0x2000] for i in range(0, len(blob), 0x2000)]
     segs = list(real)
     cart, _ = cart_from_segments(segs, name, b'', pre=banks)
     return cart, segs

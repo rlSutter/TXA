@@ -203,3 +203,7 @@ PCELLS EQU  40
 PDONE  EQU  GLOBRM+>52         cells drawn
 PSAV   EQU  GLOBRM+>54         18 bytes: registers kept (to GLOBRM+>65)
 PTOT   EQU  GLOBRM+>66         the parser's token stream: its length
+WPFX   EQU  GLOBRM+>6C         the project's game prefix: a length byte, 6 letters
+*                              (to GLOBRM+>72; M6 part 3: the story's and the
+*                              engine's file names)
+WBBLD  EQU  GLOBRM+>74         nonzero: the compile is a Build's (then the engine)

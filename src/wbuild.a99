@@ -1,0 +1,184 @@
+*======================================================================
+* wbuild.a99 - Build (M6 part 3), overlay 9: after B's compile (the story
+* files written by the linker), the engine's files: the generic engine,
+* carried in the cartridge's banks after the overlays, written as PROGRAM
+* files PREFIX1, PREFIX2 ... on the source's device, its story name
+* (device and prefix) patched in.  ENGTAB is filled in by tools/build.py
+* (workbench_cart) once the cartridge is laid out.
+*======================================================================
+BRET   EQU  GLOBRM+>78
+BFILE  EQU  GLOBRM+>7A         the engine file being written (from 0)
+BDONE  EQU  GLOBRM+>7C         its bytes copied so far
+BPOS   EQU  GLOBRM+>7E         where it is in the cartridge: its bank (word) ...
+BPOS2  EQU  ULIT+40            ... and offset in the bank (0-8191) (the linker's
+*                              scratch: free once the story is linked)
+
+* BUILD - the engine's files, then the menu (from WL9, after B's compile;
+* only when it succeeded).
+BUILD  LI   R10,STACKT
+       CLR  @BFILE
+       MOV  @ENGTAB+2,@BPOS    the engine's first bank, offset 0
+       CLR  @BPOS2
+BD1    C    @BFILE,@ENGTAB
+       JHE  BD9
+       BL   @BNAME             FNBUF: device, prefix, the file's number
+       LI   R1,QWRT            (the progress line)
+       LI   R2,FNBUF
+       BL   @PSTAGE
+       MOV  @BFILE,R1          its length
+       SLA  R1,1
+       MOV  @ENGTAB+6(R1),R5
+       CLR  @BDONE
+BD2    C    @BDONE,R5          its bytes from the cartridge into VRAM FBUF:
+       JHE  BD4                as much of a bank as is left at a time
+       MOV  @BPOS,R0
+       SLA  R0,1
+       AI   R0,>6000
+       CLR  *R0                (the bank)
+       LI   R2,>2000
+       S    @BPOS2,R2          left in this bank
+       MOV  R5,R3
+       S    @BDONE,R3          left of the file
+       C    R3,R2
+       JHE  BD3
+       MOV  R3,R2
+BD3    MOV  @BDONE,R0
+       AI   R0,FBUF
+       MOV  @BPOS2,R1
+       AI   R1,>6000
+       A    R2,@BDONE
+       A    R2,@BPOS2
+       BL   @VMBW
+       MOV  @BPOS2,R0          past the bank's end: the next
+       CI   R0,>2000
+       JL   BD2
+       CLR  @BPOS2
+       INC  @BPOS
+       JMP  BD2
+BD4    C    @BFILE,@ENGTAB+4   the story-name field in this one: patched
+       JNE  BD5
+       BL   @BPATCH
+BD5    LI   R0,6               the DSR's SAVE
+       MOV  R5,R1
+       BL   @DSKCAL
+       MOV  R0,R0
+       JNE  BD8
+       INC  @BFILE
+       JMP  BD1
+BD8    BL   @PCLEAR            a disk error: said on row 8
+       LI   R0,8
+       LI   R1,1
+       BL   @TXAT
+       LI   R1,QDERR
+       CLR  R2
+       BL   @TXSTR
+       LI   R1,FNBUF
+       CLR  R2
+       BL   @TXSTR
+       B    @MENUGO
+BD9    BL   @PCLEAR            done: row 8 says how to play it
+       LI   R0,8
+       LI   R1,1
+       BL   @TXAT
+       LI   R1,QBUILT
+       CLR  R2
+       BL   @TXSTR
+       CLR  @BFILE             (the first engine file's name)
+       BL   @BNAME
+       LI   R1,FNBUF
+       CLR  R2
+       BL   @TXSTR
+       LI   R1,QBLT2
+       CLR  R2
+       BL   @TXSTR
+       B    @MENUGO
+
+* BNAME - FNBUF = the source file's device (up to its last '.'), the
+* prefix, and BFILE + 1 (one digit: an engine has at most 9 files).
+* Uses R0-R4.
+BNAME  LI   R4,FNBUF+1
+       MOV  @WBNLEN,R0         the device: up to the last '.'
+       CLR  R1
+       CLR  R2
+BN1    C    R2,R0
+       JHE  BN2
+       CB   @WBNAME(R2),@QDOT9
+       JNE  BN1A
+       MOV  R2,R1
+       INC  R1
+BN1A   INC  R2
+       JMP  BN1
+BN2    CLR  R2
+BN3    C    R2,R1
+       JHE  BN4
+       MOVB @WBNAME(R2),*R4+
+       INC  R2
+       JMP  BN3
+BN4    MOVB @WPFX,R0           the prefix
+       SRL  R0,8
+       CLR  R2
+BN5    C    R2,R0
+       JHE  BN6
+       MOVB @WPFX+1(R2),*R4+
+       INC  R2
+       JMP  BN5
+BN6    MOV  @BFILE,R0          the digit
+       AI   R0,'1'
+       SWPB R0
+       MOVB R0,*R4+
+       MOV  R4,R0
+       AI   R0,-FNBUF-1
+       SWPB R0
+       MOVB R0,@FNBUF
+       RT
+* BPATCH - the story-name field (at ENGTAB+24 within its file: a length
+* byte and 16 characters) written into the file in VRAM: the device and
+* the prefix (FNBUF without the file's digit), padded with spaces.
+* Uses R0-R3.
+BPATCH MOV  R11,@BRET
+       LI   R1,BNBUF+1         device and prefix: FNBUF less its last byte
+       MOVB @FNBUF,R2
+       SRL  R2,8
+       DEC  R2
+       LI   R3,FNBUF+1
+       CLR  R0
+BP1    C    R0,R2
+       JHE  BP2
+       MOVB *R3+,*R1+
+       INC  R0
+       JMP  BP1
+BP2    SWPB R0
+       MOVB R0,@BNBUF
+       SWPB R0
+BP3    CI   R0,16              padded
+       JHE  BP4
+       MOVB @QSP9,*R1+
+       INC  R0
+       JMP  BP3
+BP4    MOV  @ENGTAB+24,R0
+       AI   R0,FBUF
+       LI   R1,BNBUF
+       LI   R2,17
+       BL   @VMBW
+       MOV  @BRET,R11
+       RT
+BNBUF  BSS  18                 the patched field
+
+* ENGTAB - where the engine is (filled in by tools/build.py): +0 its
+* files, +2 its first bank (offset 0 there; the files follow each other),
+* +4 the file holding the story-name field (from 0), +6 .. +22 its files'
+* lengths (9 at most), +24 the field's offset (its length byte) in its file.
+ENGTAB DATA 0,0,0              files, first bank, the name's file
+       DATA 0,0,0,0,0,0,0,0,0  the lengths
+       DATA 0                  the name field's offset (its length byte) in its file
+QWRT   BYTE 8
+       TEXT 'Writing '
+QDERR  BYTE 24
+       TEXT 'A disk error writing:   '
+QBUILT BYTE 24
+       TEXT 'The game is built: load '
+QBLT2  BYTE 30
+       TEXT ' (E/A 5, FinalGROM, TIPI).    '
+QDOT9  BYTE '.'
+QSP9   BYTE ' '
+       EVEN
