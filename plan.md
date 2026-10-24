@@ -992,6 +992,9 @@ replaces it).  Now each field (source file, date, prefix) shows a cursor
 after its text and a hint on row 11 with the keys; m5_load_test checks
 both, and that typing after P replaces the name.
 
+Rebecca confirmed Run on js99er (24 October 2026): B then R starts the
+built game from the workbench.
+
 ## Next
 
 1. M6 part 5: test-play (T, D4): the compiled image played from SAMS
