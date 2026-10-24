@@ -296,6 +296,16 @@ def workbench_cart(name='TXA WORKBENCH'):
     b9 = bytearray(banks[8])
     b9[o:o + 2 * len(tab)] = b''.join(v.to_bytes(2, 'big') for v in tab)
     banks[8] = bytes(b9)
+    # overlay 10's TPENG (test-play): the same, and where STMODE is
+    esy = symbols(os.path.join(B, 'engine.equ'))
+    stm = esy['STMODE']
+    stfile = next(i for i, f in enumerate(eng)
+                  if int.from_bytes(f[4:6], 'big') <= stm < int.from_bytes(f[4:6], 'big') + len(f) - 6)
+    tab10 = tab + [stfile, stm - int.from_bytes(eng[stfile][4:6], 'big')]
+    o = sy['TPENG'] - 0xB000
+    b10 = bytearray(banks[9])
+    b10[o:o + 2 * len(tab10)] = b''.join(v.to_bytes(2, 'big') for v in tab10)
+    banks[9] = bytes(b10)
     banks += [blob[i:i + 0x2000] for i in range(0, len(blob), 0x2000)]
     segs = list(real)
     cart, _ = cart_from_segments(segs, name, b'', pre=banks)

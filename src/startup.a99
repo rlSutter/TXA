@@ -28,7 +28,12 @@ STR1   CLR  *R1+
        MOV  R0,R0
        JEQ  STR2
        BL   @AMSINI
-       BL   @AMSSIZ
+       C    @STMODE,@D2ST      test-play (mode 2): the story is in SAMS already,
+       JNE  STR1S              and AMSSIZ's probe writes the last word of every
+       LI   R0,128             page; the workbench needs 512K, so 128 pages
+       MOV  R0,@AMSPGS         (all the engine's own check asks)
+       JMP  STR2
+STR1S  BL   @AMSSIZ
 STR2   MOV  @F18FLG,R0
        JNE  STR3
        B    @NOF18
@@ -152,7 +157,11 @@ LOADDK .enter
        CLR  R2
        BL   @TXSTR
        CLR  @VT2               the next story page
-       LI   R0,1               files wanted: 1 until the header is read
+       C    @STMODE,@D2ST      test-play (mode 2): the story is in SAMS already
+       JNE  LDK0               (the workbench put it there): past it to the
+       BL   @LDTP              pictures and music
+       JMP  LDK3
+LDK0   LI   R0,1               files wanted: 1 until the header is read
        MOV  R0,@VT1
        LI   R0,'S'
        MOV  R0,@VT3
@@ -179,7 +188,7 @@ LDK2   INC  @VT2
        INC  @VT4
        C    @VT4,@VT1
        JL   LDK1
-       LI   R0,'P'             the pictures, then the music: each set
+LDK3   LI   R0,'P'             the pictures, then the music: each set
        BL   @LDSET             until a file is missing
        MOV  R0,@PICPG
        LI   R0,'M'

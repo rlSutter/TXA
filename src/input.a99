@@ -89,11 +89,13 @@ KG28   CLR  R0
 KG29   .leave
        RT
 D6     DATA 6
+D2IN   DATA 2
 * modifier, key, result
 MODTAB DATA >1000,'S',8
        DATA >1000,'E',11       FCTN E: the up arrow (history back)
        DATA >1000,'X',12       FCTN X: the down arrow (history forward)
        DATA >1000,'9',15       FCTN 9: BACK (the scrollback)
+       DATA >1000,'=',5        FCTN =: QUIT (test-play only: back to the workbench)
        DATA >1000,'I','?'
        DATA >1000,'O',>27
        DATA >1000,'P','"'
@@ -197,7 +199,12 @@ RDL2A  CI   R0,12
        INC  @HISPOS
        BL   @SHOWHS
        JMP  RDL2
-RDL2B  CI   R0,15
+RDL2B  CI   R0,5               FCTN = in test-play (STMODE 2): the end, which
+       JNE  RDL2D              restarts the console and so the workbench; a
+       C    @STMODE,@D2IN      built game ignores it (no game lost to a slip)
+       JNE  RDL2
+       B    @QUIT
+RDL2D  CI   R0,15
        JNE  RDL2C
        BL   @SBVIEW            BACK: read the earlier text
        JMP  RDL2

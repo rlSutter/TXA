@@ -44,9 +44,15 @@ MN2    CI   R0,'P'
        JNE  MN2R
        LI   R0,10              (OVGO: from an overlay, the switch must be made
        B    @OVGO              by the resident part, not return into this one)
-MN2R   CI   R0,'B'             B: compile, then the engine's files (overlay 9)
+MN2R   CI   R0,'T'             T: compile, then test-play (overlay 10, >B004)
+       JNE  MN2T
+       LI   R0,2
+       MOV  R0,@WBBLD
+       JMP  MCOMP
+MN2T   CI   R0,'B'             B: compile, then the engine's files (overlay 9)
        JNE  MN2A
-       SETO @WBBLD
+       LI   R0,1
+       MOV  R0,@WBBLD
        JMP  MCOMP
 MN2A
        LI   R1,QSOON           a key of a part still to come: say which
@@ -310,10 +316,6 @@ QASKX
 * the keys still to come: the key, then its message (a length byte the
 * assembler counts, and the text)
 QSOON
-       BYTE 'T'
-QS0    BYTE QS0X-QS0-1
-       TEXT 'Test-play: not built yet (M6 part 5).'
-QS0X
        BYTE 'E'
 QS2    BYTE QS2X-QS2-1
        TEXT 'Errors in plain words: not built yet (M6 part 6).'

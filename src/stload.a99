@@ -67,3 +67,25 @@ LDF1   MOVB *R1+,*R2+
        CLR  R0
 LDF9   .leave
        RT
+
+* LDTP - test-play (STMODE 2): the story is in SAMS already, from story
+* page 0; its length from its header; VT2 = the page after it (where the
+* pictures go).
+LDTP   .enter
+       CLR  R2                 story page 0 into window B
+       LI   R3,MAPRGB
+       BL   @MAPWIN
+       MOV  @WINB+10,R0        (H.IMAGE_LEN_HI, _LO)
+       MOV  R0,@STLENH
+       MOV  @WINB+12,R1
+       MOV  R1,@STLENL
+       AI   R1,>0FFF           pages = (length + 4095) / 4096
+       JNC  LDTP1
+       INC  R0
+LDTP1  SRL  R1,12
+       SLA  R0,4
+       SOC  R0,R1
+       MOV  R1,@VT2
+       .leave
+       RT
+D2ST   DATA 2

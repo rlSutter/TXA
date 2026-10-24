@@ -90,8 +90,7 @@ check('C alone compiles the project as it stands (DSK1.LAMPLIGHT at start-up)', 
 m6 = run([C, C])                            # compiled twice
 check('C again compiles again, the results replaced', m6.rw(sy['WBDONE']) == 3 and m6.rw(sy['WBLNS']) == len(lines)
       and R.screen(m6).splitlines()[4].strip() == f'Read {len(lines)} lines, {len(want)} bytes.', R.screen(m6).splitlines()[:12])
-SOON = {'t': 'Test-play: not built yet (M6 part 5).',
-        'e': 'Errors in plain words: not built yet (M6 part 6).', 's': 'Statistics: not built yet (M6 part 10).',
+SOON = {'e': 'Errors in plain words: not built yet (M6 part 6).', 's': 'Statistics: not built yet (M6 part 10).',
         'i': 'Picture import: not built yet (M6 part 9).', 'o': 'Options: not built yet (M6 part 10).'}
 for k, msg in SOON.items():                 # each key of a part still to come says so (Rebecca found O silent)
     mk = run([('key', k)])

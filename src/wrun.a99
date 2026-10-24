@@ -22,14 +22,23 @@ RFILE  EQU  GLOBRM+>78         the engine file being loaded (from 0)  (BRET's:
 *                              Build and Run never run together)
 RHDR   EQU  ULIT+42            its E/A 5 header: flag, length, address (6 bytes)
 RSTAGE EQU  16                 the first staging page
+RSRC   EQU  GLOBRM+>7C         where the engine comes from: 0 the disk (Run), 1 the
+*                              cartridge (test-play)
+TBANK  EQU  GLOBRM+>7E         test-play: the cartridge bank being read ...
+TOFF   EQU  ULIT+40            ... and the offset in it (0-8191)
+TDONE  EQU  ULIT+48            the file's bytes copied so far
 RRELPG EQU  15                 the relocator's page (window F): 15, the page >F000
 *                              shows with mapping off too, so the relocator can
 *                              turn mapping off and still run (see RL9)
 
-* RUN - from the menu (R).
+* RUN - from the menu (R): the engine from the game's files on disk.
 RUN    LI   R10,STACKT
+       CLR  @RSRC
        CLR  @RFILE
-RU1    BL   @RNAME             FNBUF: device, prefix, the file's number
+RU1    MOV  @RSRC,R0           test-play: the file from the cartridge instead
+       JEQ  RU1D
+       B    @TPFILE
+RU1D   BL   @RNAME             FNBUF: device, prefix, the file's number
        LI   R1,QLOAD           (the progress line: "Loading DSK1.LAMPLI1")
        LI   R2,FNBUF
        BL   @PSTAGE
@@ -62,8 +71,14 @@ RU2    LI   R0,FBUF            its header: "more" flag, length, address
        AI   R0,-6
        MOV  R0,@RTAB+4(R2)
        INC  @RFILE
-       MOV  @RHDR,R0           more files?
+       MOV  @RSRC,R0           (test-play: as many as the cartridge holds)
+       JEQ  RU2M
+       C    @RFILE,@TPENG
+       JL   RU2N
+       JMP  RU3
+RU2M   MOV  @RHDR,R0           more files?
        JEQ  RU3
+RU2N
        MOV  @RFILE,R0
        CI   R0,9
        JHE  RU3
@@ -71,6 +86,10 @@ RU2    LI   R0,FBUF            its header: "more" flag, length, address
 RU3    MOV  @RFILE,R1          the table's end
        MPY  @D6R,R1
        CLR  @RTAB(R2)
+       MOV  @RSRC,R0           test-play: the name and mode 2 into the staged
+       JEQ  RU3A               engine
+       BL   @TPATCH
+RU3A
        LI   R0,RRELPG          the relocator and its table to >F000 ...
        LI   R1,>F
        BL   @MAPPG
@@ -88,6 +107,120 @@ RU5    MOV  *R1+,*R2+
        JGT  RU5
        LIMI 0                  ... and away: the workbench is overwritten
        B    @RELOC
+* TPLAY - test-play (T, decision D4), after T's compile: the compiled
+* image (from IMGPG) copied into the engine's story pages (from 32), then
+* the engine from the cartridge (Build's copy of it), staged and started as
+* Run starts a built game, with STMODE 2 (the story already in SAMS; the
+* engine loads only the pictures and music) and the game's name patched in
+* (for those files).  FCTN = or QUIT ends it: the console restarts, and the
+* workbench with it.  Nothing is written to disk.
+TPLAY  LI   R10,STACKT
+       MOV  @IPH,R0            the image's pages: (length + 4095) / 4096
+       MOV  @IPL,R1
+       AI   R1,>0FFF
+       JNC  TP0
+       INC  R0
+TP0    SRL  R1,12
+       SLA  R0,4
+       SOC  R0,R1
+       MOV  R1,R5
+       CLR  R6
+TP1    C    R6,R5              each into its story page: through windows E
+       JHE  TP2                (from) and D (to)
+       MOV  @IMGPG,R0
+       A    R6,R0
+       LI   R1,>E
+       BL   @MAPPG
+       MOV  R6,R0
+       AI   R0,32
+       LI   R1,>D
+       BL   @MAPPG
+       LI   R1,>E000
+       LI   R2,>D000
+       LI   R3,2048
+TP1A   MOV  *R1+,*R2+
+       DEC  R3
+       JNE  TP1A
+       INC  R6
+       JMP  TP1
+TP2    SETO @RSRC              the engine from the cartridge
+       CLR  @RFILE
+       MOV  @TPENG+2,@TBANK
+       CLR  @TOFF
+       B    @RU1
+* TPFILE - engine file RFILE from the cartridge into VRAM FBUF (as Build
+* copies it), then on to staging it (RU2).
+TPFILE LI   R1,QTPLAY          (the progress line)
+       CLR  R2
+       BL   @PSTAGE
+       MOV  @RFILE,R1
+       SLA  R1,1
+       MOV  @TPENG+6(R1),R5    its length
+       CLR  @TDONE
+TPF1   C    @TDONE,R5
+       JHE  TPF3
+       MOV  @TBANK,R0          the bank
+       SLA  R0,1
+       AI   R0,>6000
+       CLR  *R0
+       LI   R2,>2000           left in this bank
+       S    @TOFF,R2
+       MOV  R5,R3              left of the file
+       S    @TDONE,R3
+       C    R3,R2
+       JHE  TPF2
+       MOV  R3,R2
+TPF2   MOV  @TDONE,R0
+       AI   R0,FBUF
+       MOV  @TOFF,R1
+       AI   R1,>6000
+       A    R2,@TDONE
+       A    R2,@TOFF
+       BL   @VMBW
+       MOV  @TOFF,R0
+       CI   R0,>2000
+       JL   TPF1
+       CLR  @TOFF
+       INC  @TBANK
+       JMP  TPF1
+TPF3   CLR  @>6000             (bank 0 again)
+       B    @RU2
+* TPATCH - into the staged engine: the story name (device and prefix) in
+* its field, for the picture and music files, and STMODE = 2.
+TPATCH .enter
+       CLR  @RFILE             FNBUF: device, prefix, "1": the name less its
+       BL   @RNAME             last byte
+       MOV  @TPENG+4,R0        the name's file's staging page into window E
+       AI   R0,RSTAGE
+       LI   R1,>E
+       BL   @MAPPG
+       MOV  @TPENG+24,R4       the field (its length byte), in the page: less
+       AI   R4,>E000-6         the file's 6-byte header
+       MOVB @FNBUF,R0          its length: FNBUF's, less the digit
+       SB   @QONER,R0
+       MOVB R0,*R4+
+       SRL  R0,8
+       LI   R1,FNBUF+1
+       LI   R2,16
+TPA1   MOV  R0,R0              the name, then spaces
+       JEQ  TPA2
+       MOVB *R1+,*R4+
+       DEC  R0
+       DEC  R2
+       JMP  TPA1
+TPA2   MOVB @QSPR,*R4+
+       DEC  R2
+       JGT  TPA2
+       MOV  @TPENG+26,R0       STMODE's file's page: 2 there
+       AI   R0,RSTAGE
+       LI   R1,>E
+       BL   @MAPPG
+       MOV  @TPENG+28,R1
+       LI   R0,2
+       MOV  R0,@>E000(R1)
+       .leave
+       RT
+
 * RUERR - an engine file would not load: say which, and how to make it.
 RUERR  BL   @PCLEAR
        LI   R0,8
@@ -145,6 +278,19 @@ RNM6   MOV  @RFILE,R0
        RT
 
 D6R    DATA 6
+* TPENG - the engine in the cartridge (filled in by tools/build.py, as
+* overlay 9's ENGTAB, and more): +0 its files, +2 its first bank, +4 the
+* name field's file, +6 .. +22 the files' lengths, +24 the field's offset
+* in its file (with the header), +26 STMODE's file, +28 STMODE's offset in
+* that file's code.
+TPENG  DATA 0,0,0
+       DATA 0,0,0,0,0,0,0,0,0
+       DATA 0,0,0
+QTPLAY BYTE 9
+       TEXT 'Test-play'
+QONER  BYTE 1
+QSPR   BYTE ' '
+       EVEN
 RTAB   BSS  6*9+2              page, address, length a file; a 0 page ends it
 RTABX
 QLOAD  BYTE 8
