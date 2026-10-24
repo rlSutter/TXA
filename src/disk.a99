@@ -133,6 +133,13 @@ DLNM1  CB   *R6+,*R2+          ... and every character
        JNE  DLNM1
 * found: re-run the controller's power-up once (VRAM buffers, >8370)
        MOV  R12,@DSRCRU
+* a record file open across calls (READ, CLOSE): no power-up, which would
+* forget it (M6: found on js99er with a real controller; the engine never
+* sets DSRKEEP)
+       MOV  @DSRKEEP,R0
+       JEQ  DLPU0
+       B    @DLCALL
+DLPU0
 *                              (every call: the engine's own VRAM use, the
 *                               picture pane, overwrites the controller's buffers)
        LI   R0,>3FFF

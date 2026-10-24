@@ -92,7 +92,10 @@ class Machine:
         rom[0x20:0x22] = b'\x00\x00'; rom[0x22:0x24] = (0x4040).to_bytes(2, 'big'); rom[0x24] = 0
         for i, w in enumerate((0x0180, 0x1302, 0x05CB, 0x045B, 0x045B)):
             rom[0x30 + 2 * i: 0x32 + 2 * i] = w.to_bytes(2, 'big')
-        rom[0x40:0x42] = (0x045B).to_bytes(2, 'big')
+        # the power-up routine: a trap too (pc >4040), then RT.  As on a real
+        # controller, power-up resets the controller's buffers: open files are
+        # forgotten (READ or CLOSE on one then fails with error 7).
+        rom[0x40:0x42] = (0x0180).to_bytes(2, 'big'); rom[0x42:0x44] = (0x045B).to_bytes(2, 'big')
         self.dsrrom = rom
 
     # ---- memory ------------------------------------------------------
@@ -309,6 +312,9 @@ class Machine:
         # reaches the VDP and GROM through that workspace's R15 (>8C02) and R13
         # (>9800). Called any other way its VDP traffic goes astray: it does
         # nothing useful, yet still returns as if it had handled the call.
+        if cpu.pc - 2 == 0x4040:                      # the power-up routine (M6: Rebecca's js99er,
+            self.__dict__['dsr_files'] = {}           # with a real controller, found the workbench's
+            return True                               # DSRLNK forgetting its open file)
         if getattr(self, 'dsr_strict_ws', True) and (cpu.wp != 0x83E0 or self.rw(0x83FE) != 0x8C02 or self.rw(0x83FA) != 0x9800):
             return True
         import os

@@ -56,6 +56,7 @@ DVREAD .enter
        LI   R0,PABADR          opcode 2: READ
        LI   R1,>0200
        BL   @VSBW
+       SETO @DSRKEEP           (the file is open: no power-up, see DSRLNK)
        BL   @DVCALL
        MOV  R0,R0
        JEQ  DVR1
@@ -73,6 +74,7 @@ DVCLOS .enter
        LI   R0,PABADR
        LI   R1,>0100
        BL   @VSBW
+       SETO @DSRKEEP           (the file is open: no power-up, see DSRLNK)
        BL   @DVCALL
        .leave
        RT
@@ -88,6 +90,7 @@ DVCALL .enter
        LI   R0,PABADR+9
        MOV  R0,@>8356
        BL   @DSRLNK
+       CLR  @DSRKEEP           (one call only)
        MOV  R0,@DSKRES
        BL   @DSKFIX
        MOV  @SVREG,R4

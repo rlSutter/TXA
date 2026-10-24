@@ -247,6 +247,9 @@ DSR56  EQU  RAMVAR+>6E6        DSRLNK: >8356
 DSRD0  EQU  RAMVAR+>6E8        DSRLNK: >83D0
 DSRD2  EQU  RAMVAR+>6EA        DSRLNK: >83D2
 DSRENT EQU  RAMVAR+>6EC        DSRLNK: the routine to call
+DSRKEEP EQU RAMVAR+>6EE        DSRLNK: nonzero = no power-up this call (a file
+*                              stays open across calls: READ, CLOSE; power-up
+*                              resets the controller's buffers, forgetting it)
 NAMBUF EQU  RAMVAR+>6F0        8 bytes: the device name being looked for
 FNBUF  EQU  RAMVAR+>0D0        32 bytes: a file name, with its length byte
 SVSUM  EQU  RAMVAR+>384        the save file: running byte sum
