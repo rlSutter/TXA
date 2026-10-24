@@ -67,7 +67,8 @@ check('the text in SAMS (from page 32, a line feed after each record) is the fil
 scr = R.screen(m).splitlines()
 check('the screen says so', scr[4].strip() == f'Read {len(lines)} lines, {len(want)} bytes.' and scr[0].startswith(' TXA Workbench'), scr[:5])
 check('the main menu shows the project and its keys, the results under them',
-      scr[2].strip() == 'Source file: DSK1.LAMPLIGHT' and scr[10].strip().startswith('P Project  C Compile  T Test-play  R Run  B Build'), scr[:12])
+      scr[2].strip() == 'Source file: DSK1.LAMPLIGHT'
+      and scr[10].strip() == 'P Project C Compile T Test R Run B Build E Errors S Stats I Import O Options', scr[:12])
 m2 = run([P, 'dsk1.nosuch', C])            # (lower case: KEYGET stops at SHIFT; it gives capitals)
 check('a file that isn\'t there: "Cannot open that file."', m2.rw(sy['WBDONE']) == 0xFFFF and 'Cannot open that file.' in R.screen(m2), R.screen(m2).splitlines()[:5])
 m3 = run([P, 'dsk1.lamplightx\b', C])     # an extra letter, then FCTN S rubs it out
@@ -82,8 +83,13 @@ check('C alone compiles the project as it stands (DSK1.LAMPLIGHT at start-up)', 
 m6 = run([C, C])                            # compiled twice
 check('C again compiles again, the results replaced', m6.rw(sy['WBDONE']) == 3 and m6.rw(sy['WBLNS']) == len(lines)
       and R.screen(m6).splitlines()[4].strip() == f'Read {len(lines)} lines, {len(want)} bytes.', R.screen(m6).splitlines()[:12])
-m7 = run([T])
-check('a key of a part still to come says so: T, "Test-play: not built yet (M6 part 5)."',
-      'Test-play: not built yet (M6 part 5).' in R.screen(m7).splitlines()[11], R.screen(m7).splitlines()[9:12])
+SOON = {'t': 'Test-play: not built yet (M6 part 5).', 'r': 'Run: not built yet (M6 part 4).',
+        'e': 'Errors in plain words: not built yet (M6 part 6).', 's': 'Statistics: not built yet (M6 part 10).',
+        'i': 'Picture import: not built yet (M6 part 9).', 'o': 'Options: not built yet (M6 part 10).'}
+for k, msg in SOON.items():                 # each key of a part still to come says so (Rebecca found O silent)
+    mk = run([('key', k)])
+    check(f'{k.upper()} says "{msg}"', R.screen(mk).splitlines()[11].strip() == msg, R.screen(mk).splitlines()[10:12])
+mx = run([('key', 'o'), ('key', 'x')])
+check('another key (X) leaves the message and the menu as they were', R.screen(mx).splitlines()[11].strip() == SOON['o'], R.screen(mx).splitlines()[10:12])
 print('ALL PASS' if not fails else f'{fails} FAILED')
 sys.exit(1 if fails else 0)

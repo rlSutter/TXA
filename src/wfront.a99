@@ -253,9 +253,8 @@ MNM7   MOV  @WBNLEN,R1
        INC  @WBNLEN
        JMP  MNM2
 
-QKEYS  BYTE QKEYSX-QKEYS-1
-       TEXT 'P Project  C Compile  T Test-play  R Run  B Build  E Errors  '
-       TEXT 'S Statistics  I Import  O Options'
+QKEYS  BYTE QKEYSX-QKEYS-1     (76 columns, from column 1: the row is 80)
+       TEXT 'P Project C Compile T Test R Run B Build E Errors S Stats I Import O Options'
 QKEYSX
 QPFX   BYTE 13
        TEXT 'Game prefix: '
@@ -267,25 +266,33 @@ QMONE  BYTE >FF
 QASK   BYTE QASKX-QASK-1
        TEXT 'Source file: '
 QASKX
-* the keys still to come: the key, then its message
-QSOON  BYTE 'T'
-       BYTE 41
-       TEXT 'Test-play: not built yet (M6 part 5).    '
+* the keys still to come: the key, then its message (a length byte the
+* assembler counts, and the text)
+QSOON
+       BYTE 'T'
+QS0    BYTE QS0X-QS0-1
+       TEXT 'Test-play: not built yet (M6 part 5).'
+QS0X
        BYTE 'R'
-       BYTE 35
-       TEXT 'Run: not built yet (M6 part 4).    '
+QS1    BYTE QS1X-QS1-1
+       TEXT 'Run: not built yet (M6 part 4).'
+QS1X
        BYTE 'E'
-       BYTE 49
+QS2    BYTE QS2X-QS2-1
        TEXT 'Errors in plain words: not built yet (M6 part 6).'
+QS2X
        BYTE 'S'
-       BYTE 43
-       TEXT 'Statistics: not built yet (M6 part 10).   '
+QS3    BYTE QS3X-QS3-1
+       TEXT 'Statistics: not built yet (M6 part 10).'
+QS3X
        BYTE 'I'
-       BYTE 47
-       TEXT 'Picture import: not built yet (M6 part 9).     '
+QS4    BYTE QS4X-QS4-1
+       TEXT 'Picture import: not built yet (M6 part 9).'
+QS4X
        BYTE 'O'
-       BYTE 40
-       TEXT 'Options: not built yet (M6 part 10).    '
+QS5    BYTE QS5X-QS5-1
+       TEXT 'Options: not built yet (M6 part 10).'
+QS5X
        BYTE 0
        EVEN
 
