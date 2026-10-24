@@ -951,14 +951,20 @@ Testing on js99er (24 October 2026), with the test plan
   by the assembler now, the line is 76 columns, m5_load_test checks every
   key.
 - Compiling gave "Meaning error 83 at line 0" (no ROUTINE Main) on
-  Rebecca's js99er, never in the simulator.  js99er emulates the TI's own
-  disk controller sector by sector (its log: Restore, Seek, Read sector);
-  tools/sim9900.py fakes the DSR at the file level, so it cannot see
-  this.  The suspect: the 360K double-density disk (the TI controller is
-  single density; and the files xdm99 added, or the story files the real
-  DSR wrote, may overlap STDLIB's sectors).  txa_srcdisk now makes 180K
-  single-density disks by default (--dsdd for 360K).  To be confirmed by
-  Rebecca's rerun.  This is the case for the faithful disk test below.
+  Rebecca's js99er, with its emulated TI and Myarc controllers alike,
+  never in the simulator.  The error screens now show what a compile got
+  through (row 4 files and lines, row 7 the counts, row 9 the files'
+  names): "Read 1 files, 0 lines", "Files: LAMPLIGHT".  The first READ
+  of the opened file failed.  The cause: DSRLNK re-ran the controller's
+  power-up on every call (for the engine, whose picture pane overwrites
+  the controller's VRAM buffers), and power-up resets those buffers, so
+  a real controller forgot the open file (READ on an unopened file: error
+  7).  The simulator's fake controller had a no-op power-up.  Fixed:
+  DSRKEEP makes DSRLNK skip power-up for READ and CLOSE (the engine never
+  sets it); the simulator's power-up now forgets open files, and the
+  load test failed without the fix.  txa_srcdisk also makes 180K
+  single-density disks by default now (--dsdd for 360K): what the TI's
+  own controller reads, though the format was not the cause.
 
 ## Next
 
