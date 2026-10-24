@@ -22,7 +22,11 @@ def ti_name(path):
         sys.exit(f'{path}: its name must be 1-10 letters and digits, starting with a letter, for the TI')
     return n
 
-def make_disk(game, out=None, lib=None, label=None):
+def make_disk(game, out=None, lib=None, label=None, fmt='dssd'):
+    """fmt: 'dssd' (180K, single density: what the TI's own disk controller
+    reads and writes; the default since M6.3, when a double-density disk
+    failed under js99er's emulated TI controller) or 'dsdd' (360K, for
+    CorComp, Myarc or TIPI)."""
     lib = lib or os.path.join(ROOT, 'lib')
     out = os.path.abspath(out or os.path.join(ROOT, 'build', os.path.splitext(os.path.basename(game))[0] + '-src.dsk'))
     files = [game] + sorted(glob.glob(os.path.join(lib, '*.txa')))
@@ -35,7 +39,7 @@ def make_disk(game, out=None, lib=None, label=None):
         names.append(n); texts[n] = t
     if os.path.exists(out):
         os.remove(out)
-    build.run([sys.executable, build.XDM, out, '-X', 'dsdd', '-n', (label or ti_name(game))[:10]])
+    build.run([sys.executable, build.XDM, out, '-X', fmt, '-n', (label or ti_name(game))[:10]])
     build.run([sys.executable, build.XDM, out, '-a'] + names + ['-f', 'DIS/VAR80'], cwd=tmp)
     chk = tempfile.mkdtemp()                  # read every file back from the image
     for n in names:
@@ -48,6 +52,7 @@ def make_disk(game, out=None, lib=None, label=None):
 if __name__ == '__main__':
     a = argparse.ArgumentParser(description='A TXA game\'s source and the library as DV80 files on a TI disk image.')
     a.add_argument('source'); a.add_argument('-o', '--out')
+    a.add_argument('--dsdd', action='store_true', help='a 360K double-density disk (CorComp, Myarc, TIPI) instead of 180K single density')
     o = a.parse_args()
-    out, names, size = make_disk(o.source, o.out)
+    out, names, size = make_disk(o.source, o.out, fmt='dsdd' if o.dsdd else 'dssd')
     print(f'{out}: {len(names)} DIS/VAR 80 files ({", ".join(names)}), {size} bytes of source; each checked')
