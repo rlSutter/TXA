@@ -26,7 +26,8 @@ beta: save, restore, undo, scrollback, pictures, sound and music, stories
 on disk and the game writer, title page, end screen).  Next: M5, the
 native compiler on the TI; its design (decisions D1-D4 for Rebecca) is
 the Claude Doc https://claude.ai/artifact/UZ6z6yM1ZeuFV9V4cja64D.  The M6 design (decisions
-D1-D7, approved): https://claude.ai/artifact/2c1ubphLesnAHeFRezzUAc.  The sample game is
+D1-D7, approved): https://claude.ai/artifact/2c1ubphLesnAHeFRezzUAc.  The workbench test
+plan for Rebecca (js99er, checkpoint M6.3): https://claude.ai/artifact/Wq7r3GtVasvnGcubAzF8rG.  The sample game is
 `samples/lamplight.txa`; Rebecca tests it from `LAMPLIGHT-TESTING.md`.
 
 ## What it is
