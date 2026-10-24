@@ -640,6 +640,9 @@ OVSEL  C    R0,@OVCUR
 OVS1   MOV  *R1+,*R2+
        DEC  R3
        JNE  OVS1
+       CLR  @>6000             bank 0 again: a console reset keeps the bank
+*                              selected, and only bank 0 has the header (else
+*                              the workbench leaves the console's menu)
 OVS9   RT
 
 * DSKFIX - nothing to repair after a disk call (no fast block here).

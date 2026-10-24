@@ -92,7 +92,7 @@ def run_keys(d, items, max_steps=400_000_000):
 
 
 
-def run_then_play(d, items, walk, max_steps=120_000_000):
+def run_then_play(d, items, walk, max_steps=120_000_000, to_reset=False):
     """The workbench from power-up: the menu's keys; once R's relocator has
     run and the engine has started at >2000, the engine's output is kept
     and the walkthrough's lines are typed at its prompt.  Returns the
@@ -106,6 +106,8 @@ def run_then_play(d, items, walk, max_steps=120_000_000):
     steps = hold = free = 0; dated = reloc = engine = False; out = []
     while steps < max_steps:
         pc = cpu.pc
+        if m.__dict__.get('console_resets'):           # the engine's QUIT restarted the console
+            return ''.join(out), m, 'reset'
         if not engine:
             if pc == wsy['WK1'] and not dated:
                 for i, c in enumerate(g['DATE'].strftime('%y%m%d').encode()):
@@ -122,7 +124,7 @@ def run_then_play(d, items, walk, max_steps=120_000_000):
         else:
             if pc == esy['CHOUT']:
                 out.append(chr(m.rw(0x8300) & 0xFF))
-            if pc in (esy['VMHALT'], esy['LDK9']):
+            if pc == esy['LDK9'] or (pc == esy['VMHALT'] and not to_reset):
                 return ''.join(out), m, 'halt' if pc == esy['VMHALT'] else 'nofile'
             if pc == esy['WKY1'] and not hold and steps >= free:
                 m.held = keys_for(' ')[0]; hold = steps + 12_000
@@ -157,6 +159,18 @@ got2, m2, why2 = run_then_play(d2, [Rk], [])
 scr = g['R'].screen(m2).splitlines()
 check('R with no game built says which file: "Cannot load: DSK1.LAMPLI1 (B builds the game first)."',
       why2 == 'menu' and 'Cannot load:' in scr[8] and 'DSK1.LAMPLI1' in scr[8] and 'B builds the game first' in scr[8], scr[7:11])
+
+d3, _ = g['stage'](open('samples/lamplight.txa').read(), 'lamplight', g['LIB'])
+for n in fc['picture_files'] + fc['sound_files']:
+    shutil.copy(os.path.join(outC, n), os.path.join(d3, 'DSK1', n))
+try:
+    got3, m3, why3 = run_then_play(d3, [P, 'dsk1.lamplight', '', '', B, Rk], ['quit', 'y'], to_reset=True)
+    ok3 = why3 == 'reset' and m3.bank == 0
+    detail = (why3, getattr(m3, 'bank_at_reset', None))
+except S.Halt as e:
+    ok3, detail = False, str(e)
+check('QUIT in the game R started: the console restarts with the cartridge on bank 0, so the workbench is in its menu again '
+      '(Rebecca found it gone)', ok3, detail)
 
 print('ALL PASS' if not fails else f'{fails} FAILED')
 sys.exit(1 if fails else 0)

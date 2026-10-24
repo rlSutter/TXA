@@ -692,7 +692,14 @@ class CPU:
                     # power-up), so a program must clear it before BLWP @>0000
                     self.m.scratch_at_reset = bytes(self.m.scratch)
                     for i in range(0x100): self.m.scratch[i] = 0
-                    self.m.bank = 0
+                    # the cartridge keeps the bank last selected (a FinalGROM's
+                    # latch survives the reset: Rebecca's js99er lost the
+                    # workbench from the menu after a game started with R
+                    # quit), so the console finds a cartridge only if that
+                    # bank holds the header
+                    self.m.bank_at_reset = self.m.bank
+                    if self.m.nbanks and self.m.cart[self.m.bank * 0x2000] != 0xAA:
+                        raise Halt(f'the console finds no cartridge: bank {self.m.bank} is selected at the reset')
                     self.m.console_resets = getattr(self.m, 'console_resets', 0) + 1
                     self.wp = 0x83E0
                     self.pc = self.m.rw(self.m.rw(0x6006) + 2)

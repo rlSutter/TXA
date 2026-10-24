@@ -147,6 +147,10 @@ QUIT   MOV  @F18FLG,R0
        BL   @F18RST
 QT1    BLWP @SOFFV            the chip quiet
        BL   @AMSOFF
+       CLR  @>6000             the cartridge on bank 0, its header's: the
+*                              console's reset keeps the bank last selected
+*                              (a cartridge game reads its story from other
+*                              banks; Run leaves the workbench on its own)
        LI   R0,>8320           the scratchpad above this workspace cleared:
 QT2    CLR  *R0+               the fast block lives there, over the console's
        CI   R0,>8400           user interrupt hook (>83C4) and sound count
