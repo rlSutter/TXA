@@ -966,10 +966,31 @@ Testing on js99er (24 October 2026), with the test plan
   single-density disks by default now (--dsdd for 360K): what the TI's
   own controller reads, though the format was not the cause.
 
+M6 part 4 done (24 October 2026): Run.
+- R (overlay 10, src/wrun.a99) runs the built game from its own files
+  on disk, as Editor/Assembler option 5 would.  The engine loads over
+  the workbench (its kernel and disk routines included), so: each engine
+  file PREFIX1.. is loaded through the DSR and its code kept in a SAMS
+  page of its own (16, 17 ...); then a relocator, assembled for >F000 and
+  copied there (SAMS page 15), maps each page into window E, copies it to
+  its address, turns SAMS mapping off and branches to >2000.
+- Mapping off matters: the engine's AMSDET probes the window-2 register,
+  and with mapping on that switches out the page AMSDET runs from (found
+  in the simulator: the engine died at >2266 on a zero word).  Page 15
+  for the relocator: the page >F000 shows with mapping off too.
+- R with no game built: row 8 "Cannot load: DSK1.PREFIX1 (B builds the
+  game first)."
+- OVGO (resident): an overlay hands control to another by branching
+  there; OVSEL overwrites the caller, so it must not return into it.
+- tests/m6_run_test.py: B then R in the simulator; the title page and
+  the start of Lamplight's walkthrough as the Python VM plays them;
+  the picture files found; the message with no game built.
+
 ## Next
 
-1. M6 part 4: Run (R, D7): the finished game run from its own files on
-   disk, E/A 5 style, as a player's loader would.
+1. M6 part 5: test-play (T, D4): the compiled image played from SAMS
+   without writing to disk, FCTN 9 back to the menu, the debug verbs
+   live (part 7) only here.
 
 The reference used for part 6's disk writes:
    (part 6) libre99's clean-room TI disk controller DSR and its notes,
