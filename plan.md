@@ -995,6 +995,16 @@ both, and that typing after P replaces the name.
 Rebecca confirmed Run on js99er (24 October 2026): B then R starts the
 built game from the workbench.
 
+Rebecca (24 October 2026): after QUIT in a game started with R, the
+console's menu no longer listed the workbench.  A FinalGROM keeps its
+bank across the console's reset, and the workbench had left bank 10 (the
+Run overlay) selected; the console looks for the header at >6000.  Fixed:
+OVSEL switches back to bank 0 after each copy, and the engine's QUIT
+selects bank 0 before BLWP @>0000 (cartridge games read their story from
+other banks, so they had the same risk).  The simulator's reset used to
+force bank 0; now it keeps the bank and halts if the console would find
+no cartridge.  m6_run_test checks QUIT back to the workbench.
+
 ## Next
 
 1. M6 part 5: test-play (T, D4): the compiled image played from SAMS
