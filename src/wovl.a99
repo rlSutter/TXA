@@ -36,4 +36,8 @@ OV8END
        B    @BUILD             overlay 9: Build, the engine's files
        COPY "wbuild.a99"
 OV9END
+       XORG >B000
+       B    @RUN               overlay 10: Run, the built game from its files
+       COPY "wrun.a99"
+OV10END
        END

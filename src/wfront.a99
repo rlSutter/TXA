@@ -40,7 +40,11 @@ MN2    CI   R0,'P'
        JEQ  MPROJ
        CI   R0,'C'
        JEQ  MCOMP
-       CI   R0,'B'             B: compile, then the engine's files (overlay 9)
+       CI   R0,'R'             R: run the built game (overlay 10)
+       JNE  MN2R
+       LI   R0,10              (OVGO: from an overlay, the switch must be made
+       B    @OVGO              by the resident part, not return into this one)
+MN2R   CI   R0,'B'             B: compile, then the engine's files (overlay 9)
        JNE  MN2A
        SETO @WBBLD
        JMP  MCOMP
@@ -273,10 +277,6 @@ QSOON
 QS0    BYTE QS0X-QS0-1
        TEXT 'Test-play: not built yet (M6 part 5).'
 QS0X
-       BYTE 'R'
-QS1    BYTE QS1X-QS1-1
-       TEXT 'Run: not built yet (M6 part 4).'
-QS1X
        BYTE 'E'
 QS2    BYTE QS2X-QS2-1
        TEXT 'Errors in plain words: not built yet (M6 part 6).'

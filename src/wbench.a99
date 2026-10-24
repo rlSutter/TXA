@@ -146,7 +146,9 @@ WS3    MOVB *R1+,*R2+
        JNE  WS3
 * MENUGO - the main menu (overlay 8): at start-up, and after each compile.
 MENUGO LI   R0,8
-       BL   @OVSEL
+* OVGO - overlay R0, entered at OVENT (an overlay passing control to another
+* branches here: OVSEL overwrites the caller).
+OVGO   BL   @OVSEL
        B    @OVENT
 
 * ---- compiling ---------------------------------------------------------------------

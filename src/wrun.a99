@@ -1,0 +1,187 @@
+*======================================================================
+* wrun.a99 - Run (M6 part 4, decision D7), overlay 10: the finished game
+* run from its own files on disk, as Editor/Assembler option 5 would run
+* it: the engine's files PREFIX1, PREFIX2 ... (following their "more"
+* flags) loaded and started at >2000; the engine then loads the story,
+* picture and music files itself.  QUIT ends at the console's title
+* screen, where the workbench is in the menu again.
+*
+* The engine loads over the workbench itself (>2000->37FF, >A000->CDFF),
+* its disk routines included, so Run works in two steps:
+*   1. each engine file, loaded through the disk DSR into VRAM, has its
+*      code copied into a SAMS page of its own (16, 17 ...: free since the
+*      overlays moved to the cartridge); a table keeps page, address and
+*      length;
+*   2. the relocator (RELOC, assembled to run at >F000 and copied there,
+*      SAMS page 15 in window F) maps each page into window E, copies it
+*      to its address, turns SAMS mapping off (the machine as E/A 5 leaves
+*      it) and branches to >2000.  It calls nothing: the kernel is gone by
+*      then.
+*======================================================================
+RFILE  EQU  GLOBRM+>78         the engine file being loaded (from 0)  (BRET's:
+*                              Build and Run never run together)
+RHDR   EQU  ULIT+42            its E/A 5 header: flag, length, address (6 bytes)
+RSTAGE EQU  16                 the first staging page
+RRELPG EQU  15                 the relocator's page (window F): 15, the page >F000
+*                              shows with mapping off too, so the relocator can
+*                              turn mapping off and still run (see RL9)
+
+* RUN - from the menu (R).
+RUN    LI   R10,STACKT
+       CLR  @RFILE
+RU1    BL   @RNAME             FNBUF: device, prefix, the file's number
+       LI   R1,QLOAD           (the progress line: "Loading DSK1.LAMPLI1")
+       LI   R2,FNBUF
+       BL   @PSTAGE
+       LI   R0,5               the DSR's LOAD, into VRAM FBUF
+       LI   R1,DSKMAX
+       BL   @DSKCAL
+       MOV  R0,R0
+       JEQ  RU2
+       B    @RUERR
+RU2    LI   R0,FBUF            its header: "more" flag, length, address
+       LI   R1,RHDR
+       LI   R2,6
+       BL   @VMBR
+       MOV  @RFILE,R0          its staging page into window E ...
+       AI   R0,RSTAGE
+       LI   R1,>E
+       BL   @MAPPG
+       LI   R0,FBUF+6          ... and its code into it
+       LI   R1,>E000
+       MOV  @RHDR+2,R2
+       AI   R2,-6
+       BL   @VMBR              (VRAM to RAM)
+       MOV  @RFILE,R1          the table: page, address, length
+       MPY  @D6R,R1            (R2 = file x 6)
+       MOV  @RFILE,R0
+       AI   R0,RSTAGE
+       MOV  R0,@RTAB(R2)
+       MOV  @RHDR+4,@RTAB+2(R2)
+       MOV  @RHDR+2,R0
+       AI   R0,-6
+       MOV  R0,@RTAB+4(R2)
+       INC  @RFILE
+       MOV  @RHDR,R0           more files?
+       JEQ  RU3
+       MOV  @RFILE,R0
+       CI   R0,9
+       JHE  RU3
+       B    @RU1
+RU3    MOV  @RFILE,R1          the table's end
+       MPY  @D6R,R1
+       CLR  @RTAB(R2)
+       LI   R0,RRELPG          the relocator and its table to >F000 ...
+       LI   R1,>F
+       BL   @MAPPG
+       LI   R1,RLSRC
+       LI   R2,>F000
+       LI   R3,RLCODE
+RU4    MOV  *R1+,*R2+
+       DECT R3
+       JGT  RU4
+       LI   R1,RTAB
+       LI   R2,RLTAB
+       LI   R3,RTABX-RTAB
+RU5    MOV  *R1+,*R2+
+       DECT R3
+       JGT  RU5
+       LIMI 0                  ... and away: the workbench is overwritten
+       B    @RELOC
+* RUERR - an engine file would not load: say which, and how to make it.
+RUERR  BL   @PCLEAR
+       LI   R0,8
+       BL   @WCLR
+       LI   R0,8
+       LI   R1,1
+       BL   @TXAT
+       LI   R1,QRERR
+       CLR  R2
+       BL   @TXSTR
+       LI   R1,FNBUF
+       CLR  R2
+       BL   @TXSTR
+       LI   R1,QRER2
+       CLR  R2
+       BL   @TXSTR
+       B    @MENUGO
+
+* RNAME - FNBUF = the source file's device (up to its last '.'), the
+* prefix, and RFILE + 1.  Uses R0-R4.  (Build's BNAME, in overlay 9.)
+RNAME  LI   R4,FNBUF+1
+       MOV  @WBNLEN,R0
+       CLR  R1
+       CLR  R2
+RNM1   C    R2,R0
+       JHE  RNM2
+       CB   @WBNAME(R2),@QDOTR
+       JNE  RNM1A
+       MOV  R2,R1
+       INC  R1
+RNM1A  INC  R2
+       JMP  RNM1
+RNM2   CLR  R2
+RNM3   C    R2,R1
+       JHE  RNM4
+       MOVB @WBNAME(R2),*R4+
+       INC  R2
+       JMP  RNM3
+RNM4   MOVB @WPFX,R0
+       SRL  R0,8
+       CLR  R2
+RNM5   C    R2,R0
+       JHE  RNM6
+       MOVB @WPFX+1(R2),*R4+
+       INC  R2
+       JMP  RNM5
+RNM6   MOV  @RFILE,R0
+       AI   R0,'1'
+       SWPB R0
+       MOVB R0,*R4+
+       MOV  R4,R0
+       AI   R0,-FNBUF-1
+       SWPB R0
+       MOVB R0,@FNBUF
+       RT
+
+D6R    DATA 6
+RTAB   BSS  6*9+2              page, address, length a file; a 0 page ends it
+RTABX
+QLOAD  BYTE 8
+       TEXT 'Loading '
+QRERR  BYTE 15
+       TEXT 'Cannot load:   '
+QRER2  BYTE 34
+       TEXT '  (B builds the game first).      '
+QDOTR  BYTE '.'
+       EVEN
+
+* ---- the relocator: assembled for >F000, copied there by RUN -------------------
+RLSRC
+       XORG >F000
+RELOC  LI   R4,RLTAB
+RL1    MOV  *R4+,R0            a page (0: done)
+       JEQ  RL9
+       MOV  R0,R2              into window E: (page<<8)|page at >401C
+       SLA  R2,8
+       SOC  R0,R2
+       LI   R12,AMSCRU
+       SBO  0
+       MOV  R2,@AMSREG+>1C
+       SBZ  0
+       MOV  *R4+,R2            its address
+       MOV  *R4+,R3            its length
+       LI   R1,>E000
+RL2    MOVB *R1+,*R2+
+       DEC  R3
+       JNE  RL2
+       JMP  RL1
+RL9    LI   R12,AMSCRU         SAMS mapping off, as Editor/Assembler leaves it:
+       SBZ  1                  the engine's AMSDET probes the window-2
+*                              register, which with mapping on switches out the
+*                              very page AMSDET runs from (found in the simulator)
+       B    @>2000             the engine's entry (KENTRY)
+RLTAB  BSS  6*9+2
+RLEND
+RLCODE EQU  RLTAB-RELOC        the code's length (the table follows it)
+       XORG RLSRC+RLEND-RELOC  (back to the overlay's own addresses)
