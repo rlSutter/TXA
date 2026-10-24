@@ -986,6 +986,12 @@ M6 part 4 done (24 October 2026): Run.
   the start of Lamplight's walkthrough as the Python VM plays them;
   the picture files found; the message with no game built.
 
+Rebecca (24 October 2026): "you can't change the filename".  After P
+nothing on screen showed the name was being edited (the first key typed
+replaces it).  Now each field (source file, date, prefix) shows a cursor
+after its text and a hint on row 11 with the keys; m5_load_test checks
+both, and that typing after P replaces the name.
+
 ## Next
 
 1. M6 part 5: test-play (T, D4): the compiled image played from SAMS

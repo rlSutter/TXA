@@ -172,6 +172,8 @@ MPD6   SWPB R2
 * the first key replacing it, FCTN S rubbing out, ENTER keeping it.
 MPFX   MOV  R11,@MRET2
        SETO R9
+       LI   R1,QHPFX           row 11: what to type
+       BL   @MHINT
 MPF2   BL   @MPSHOW
        MOVB @WPFX,R1           (the end of it cleared)
        SRL  R1,8
@@ -181,7 +183,11 @@ MPF2   BL   @MPSHOW
        LI   R2,6
        BL   @VFILL
        BL   @MPSHOW
-MPF3   BL   @WKEY
+MPF3   MOVB @WPFX,R0           the cursor, after the prefix
+       SRL  R0,8
+       AI   R0,3*COLS+53
+       BL   @MCURS
+       BL   @WKEY
        CI   R0,13
        JNE  MPF4
        MOVB @WPFX,R0           ENTER: not empty
@@ -225,8 +231,13 @@ MPF8   MOVB @WPFX,R1
 * replaces it, FCTN S rubs out, ENTER keeps it (TI names are capitals).
 MNAME  MOV  R11,@MRET2
        SETO R9
+       LI   R1,QHNAME          row 11: what to type
+       BL   @MHINT
 MNM2   BL   @MSRC
-MNM3   BL   @WKEY
+MNM3   MOV  @WBNLEN,R0         the cursor, after the name
+       AI   R0,2*COLS+14
+       BL   @MCURS
+       BL   @WKEY
        CI   R0,13
        JNE  MNM4
        MOV  @MRET2,R11
@@ -260,6 +271,32 @@ MNM7   MOV  @WBNLEN,R1
 QKEYS  BYTE QKEYSX-QKEYS-1     (76 columns, from column 1: the row is 80)
        TEXT 'P Project C Compile T Test R Run B Build E Errors S Stats I Import O Options'
 QKEYSX
+* MHINT - row 11: the hint at R1 (a length byte first).
+MHINT  .enter
+       MOV  R1,R4
+       LI   R0,11
+       BL   @WCLR
+       LI   R0,11
+       LI   R1,1
+       BL   @TXAT
+       MOV  R4,R1
+       CLR  R2
+       BL   @TXSTR
+       .leave
+       RT
+* MCURS - a cursor (_) at VRAM R0, where the next character typed goes.
+MCURS  LI   R1,'_'*256
+       B    @VSBW
+QHNAME BYTE QHNAMEX-QHNAME-1
+       TEXT 'Type the source file (DSK1.NAME): FCTN S rubs out, ENTER keeps the one shown.'
+QHNAMEX
+QHDATE BYTE QHDATEX-QHDATE-1
+       TEXT 'The build date, yymmdd (261024 is 24 October 2026): ENTER takes it.'
+QHDATEX
+QHPFX  BYTE QHPFXX-QHPFX-1
+       TEXT 'The game prefix: 1-6 letters or digits naming its files. ENTER keeps it.'
+QHPFXX
+       EVEN
 QPFX   BYTE 13
        TEXT 'Game prefix: '
 QDOT   BYTE '.'
@@ -314,6 +351,8 @@ WDP0   MOVB *R1+,*R2+
        DEC  R0
        JNE  WDP0
 WDP1   SETO R9                 (the first key typed replaces it)
+       LI   R1,QHDATE          row 11: what to type
+       BL   @MHINT
 WDP2   LI   R0,3               draw "Build date (yymmdd): " and the date
        BL   @WCLR
        LI   R0,3
@@ -327,7 +366,10 @@ WDP2   LI   R0,3               draw "Build date (yymmdd): " and the date
        MOV  @WDLEN,R2
        JEQ  WDP3
        BL   @VMBW
-WDP3   BL   @WKEY
+WDP3   MOV  @WDLEN,R0          the cursor, after the date
+       AI   R0,3*COLS+22
+       BL   @MCURS
+       BL   @WKEY
        CI   R0,13
        JNE  WDP5
        BL   @WDOK              ENTER: a date?

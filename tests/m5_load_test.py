@@ -69,6 +69,13 @@ check('the screen says so', scr[4].strip() == f'Read {len(lines)} lines, {len(wa
 check('the main menu shows the project and its keys, the results under them',
       scr[2].strip() == 'Source file: DSK1.LAMPLIGHT'
       and scr[10].strip() == 'P Project C Compile T Test R Run B Build E Errors S Stats I Import O Options', scr[:12])
+mp = run([P])                               # P: the name open for editing, and said so (Rebecca: "you can't change the filename")
+sp = R.screen(mp).splitlines()
+check('P shows a cursor after the name and a hint on row 11', sp[2].rstrip().endswith('DSK1.LAMPLIGHT_')
+      and sp[11].strip() == 'Type the source file (DSK1.NAME): FCTN S rubs out, ENTER keeps the one shown.', sp[2:12])
+mq = run([P, 'dsk1.ab'])                    # typed: the first key replaced the name; ENTER took it
+check('typing after P replaces the name (DSK1.AB), and ENTER keeps it', R.screen(mq).splitlines()[2].strip().startswith('Source file: DSK1.AB'),
+      R.screen(mq).splitlines()[2])
 m2 = run([P, 'dsk1.nosuch', C])            # (lower case: KEYGET stops at SHIFT; it gives capitals)
 check('a file that isn\'t there: "Cannot open that file."', m2.rw(sy['WBDONE']) == 0xFFFF and 'Cannot open that file.' in R.screen(m2), R.screen(m2).splitlines()[:5])
 m3 = run([P, 'dsk1.lamplightx\b', C])     # an extra letter, then FCTN S rubs it out
