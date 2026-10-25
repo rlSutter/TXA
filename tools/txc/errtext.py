@@ -5,7 +5,9 @@ the workbench's message overlay; tests/errtext_test.py checks each
 template against the Python compiler's own message for every error case.
 
 The fields a template may use, which the TI's error sites record:
-  {n1} {n2}  names or words (an identifier, a dictionary word, a kind)
+  {n1} {n2}  names or words (an identifier, a dictionary word, a kind; for
+             the parser, {n2} is the token found, described as Python's
+             describe() does; code 14's {n1} is "KIND NAME")
   {a} {b}    numbers
   {f} {l}    another declaration's file and line
 """
@@ -15,9 +17,28 @@ TEMPLATES = {
     1: 'string not closed',
     2: 'a dictionary word in single quotes is not closed',
     3: 'expected an action name after ##',
-    4: 'number {a} is larger than 32767',
+    4: 'number {n1} is larger than 32767',
     5: 'hex number {n1} does not fit in 16 bits',
     6: 'unexpected character {n1}',
+    # the parser
+    10: 'expected {n1}, found {n2}',
+    11: 'expected the end of the line, found {n2}',
+    12: 'expected a declaration (OBJECT, ROOM, ROUTINE ...), found {n2}',
+    13: '{n1} cannot start a declaration',
+    14: '{n1} has no END',
+    15: 'expected a property, HAS, NAME, CLASS, IN or END, found {n2}',
+    16: 'expected an attribute',
+    17: 'VERB has no END',
+    18: 'expected a grammar token or ->, found {n2}',
+    19: 'missing END',
+    20: 'WRITE needs something to write',
+    21: 'only a variable, a property or an array element can be assigned to',
+    22: 'this line computes a value and does nothing with it: a statement, call or assignment is needed here',
+    23: 'comparisons cannot be chained: use AND',
+    24: 'a call takes at most 7 arguments',
+    25: 'number 32768 is larger than 32767 (-32768 is allowed)',
+    26: 'expected a value, found {n2}',
+    27: 'expected an action name, found {n2}',
     # loading and meaning
     40: 'cannot find the file {n1} (looked for {n2}.txa)',
     41: '{n1} is a built-in function and cannot be declared',

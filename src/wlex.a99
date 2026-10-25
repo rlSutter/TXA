@@ -275,6 +275,66 @@ LXA99  .leave
        RT
 
 * LXERR - stop: error R0 on line R7.
+* LXFLD - EFN1 := LINBUF from R4 to R9 (not included); R3 nonzero: leading
+* zeros dropped (a decimal's value, as Python prints it).  Uses R0-R3, R8.
+LXFLD  MOV  R11,@LXFRET
+       MOV  R4,R8
+       MOV  R3,R3
+       JEQ  LXF2
+LXF1   MOV  R9,R0              (keep one digit at least)
+       DEC  R0
+       C    R8,R0
+       JHE  LXF2
+       CB   @LINBUF(R8),@LXZERO
+       JNE  LXF2
+       INC  R8
+       JMP  LXF1
+LXF2   CLR  R2
+LXF3   C    R8,R9
+       JHE  LXF4
+       CI   R2,39
+       JHE  LXF4
+       MOVB @LINBUF(R8),@LXFBUF+1(R2)
+       INC  R8
+       INC  R2
+       JMP  LXF3
+LXF4   SWPB R2
+       MOVB R2,@LXFBUF
+       LI   R0,EFN1
+       LI   R1,LXFBUF
+       BL   @EFSET
+       MOV  @LXFRET,R11
+       RT
+* LXCHR - EFN1 := repr() of the character in WBERRC: 'c', or "'" for a
+* single quote, or '\\' for a backslash.  Uses R0-R2.
+LXCHR  MOV  R11,@LXFRET
+       LI   R0,>27             the quotes: ' around it, " around a '
+       CB   @WBERRC,@LXSQ
+       JNE  LXQ1
+       LI   R0,'"'
+LXQ1   SWPB R0
+       MOVB R0,@LXFBUF+1
+       LI   R2,2
+       MOVB @WBERRC,@LXFBUF+2
+       CB   @WBERRC,@LXBSL     (a backslash: doubled)
+       JNE  LXQ2
+       MOVB @WBERRC,@LXFBUF+3
+       INC  R2
+LXQ2   INC  R2
+       MOVB R0,@LXFBUF(R2)
+       SWPB R2
+       MOVB R2,@LXFBUF
+       LI   R0,EFN1
+       LI   R1,LXFBUF
+       BL   @EFSET
+       MOV  @LXFRET,R11
+       RT
+LXFRET DATA 0
+LXFBUF BSS  42
+LXZERO BYTE '0'
+LXSQ   BYTE >27
+LXBSL  BYTE >5C
+       EVEN
 LXERR  MOV  R0,@WBERR
        MOV  R7,@WBERRL
        RT
@@ -420,7 +480,8 @@ LXC1   C    R1,R3
        JHE  LXC9               (a string past 1023 characters is cut)
        MOVB @LINBUF(R1),R0
        CB   R0,@BCARET
-       JNE  LXC2
+       JEQ  $+6
+       B    @LXC2
        MOVB @BLF,R0
        JMP  LXC3
 LXC2   CB   R0,@BTILDE
@@ -429,7 +490,7 @@ LXC2   CB   R0,@BTILDE
 LXC3   MOVB R0,@STRBUF(R9)
        INC  R9
        INC  R1
-       JMP  LXC1
+       B    @LXC1
 LXC9   RT
 
 * LXDICT - 'word': its lower-case text.
@@ -589,7 +650,10 @@ LXDC4  MOV  R3,R3
        MOV  @LXPOS,R4
        BL   @TEMIT
        JMP  LXDC9
-LXDC8  LI   R0,LE.BIG
+LXDC8  MOV  @LXPOS,R9           (the digits, leading zeros dropped: the message)
+       SETO R3
+       BL   @LXFLD
+       LI   R0,LE.BIG
        MOV  @LINENO,R7
        BL   @LXERR
 LXDC9  .leave
@@ -636,7 +700,10 @@ LXH5   MOV  R3,R3
        MOV  R1,R4
        BL   @TEMIT
        JMP  LXH9
-LXH8   LI   R0,LE.HEX
+LXH8   MOV  R1,R9              (the number as written: the message)
+       CLR  R3
+       BL   @LXFLD
+       LI   R0,LE.HEX
        MOV  @LINENO,R7
        BL   @LXERR
 LXH9   .leave
@@ -675,6 +742,8 @@ LXY5   LI   R6,TK.SYM
 LXY8   LI   R0,LE.CHR
        MOV  @LINENO,R7
        MOVB @LINBUF(R4),@WBERRC   (the character, for the message)
+       BL   @LXCHR
+       LI   R0,LE.CHR          (LXCHR used R0)
        BL   @LXERR
 LXY9   .leave
        RT

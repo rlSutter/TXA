@@ -283,6 +283,17 @@ ATK1   RT
 * PARSE's, and PARSE returns.
 PERR   MOV  @TLN,R7
 PERRL  MOV  R0,@WBERR
+       LI   R1,PDCODE          a code whose message names the token found:
+PERR1  MOVB *R1+,R2            its description into EFN2 (M6 part 6)
+       JEQ  PERR2
+       SRL  R2,8
+       C    R2,R0
+       JNE  PERR1
+       MOV  R7,@PDLN
+       BL   @PDESC
+       MOV  @PDLN,R7
+       MOV  @WBERR,R0
+PERR2  MOV  R0,@WBERR
        MOV  R7,@WBERRL
        MOV  @PSTKS,R10
        B    @PARSX
@@ -836,6 +847,9 @@ EPO2   LI   R1,TK.ID
        BL   @ATK
        MOV  R0,R0
        JNE  EPO3
+       LI   R1,QAPROP          (for the message)
+       LI   R0,EFN1
+       BL   @EFSET
        LI   R0,PE.EXP          expected a property name
        B    @PERR
 EPO3   BL   @ESTRT
@@ -879,6 +893,9 @@ EPO6   LI   R3,SCOMMA
 EPO7   LI   R3,SRPAR
        BL   @CMP1
        JEQ  EPO8
+       LI   R1,SRPAR           (for the message)
+       LI   R0,EFN1
+       BL   @EFSET
        LI   R0,PE.EXP          expected )
        B    @PERR
 EPO8   BL   @TTAKE
@@ -968,6 +985,9 @@ EPR6   LI   R3,SLPAR           ( expr )
        LI   R3,SRPAR
        BL   @CMP1
        JEQ  EPR8
+       LI   R1,SRPAR           (for the message)
+       LI   R0,EFN1
+       BL   @EFSET
        LI   R0,PE.EXP
        B    @PERR
 EPR7   LI   R0,PE.EXV
@@ -991,9 +1011,22 @@ ENL1   BL   @TTAKE
        RT
 * EXPKW - keyword R1 must come next (taken).  EXPSYM - symbol R3.
 EXPKW  .enter
+       MOV  R1,R4              (the keyword, for the message)
        BL   @ATKW
        MOV  R0,R0
        JNE  EXK1
+       LI   R1,QKWEND          its name: END, EACH, IN or TO
+       CI   R4,KW.EAC
+       JNE  EXK0A
+       LI   R1,QKWEAC
+EXK0A  CI   R4,KW.IN
+       JNE  EXK0B
+       LI   R1,QKWIN
+EXK0B  CI   R4,KW.TO
+       JNE  EXK0C
+       LI   R1,QKWTO
+EXK0C  LI   R0,EFN1
+       BL   @EFSET
        LI   R0,PE.EXP
        B    @PERR
 EXK1   BL   @TTAKE
@@ -1002,6 +1035,9 @@ EXK1   BL   @TTAKE
 EXPSYM .enter
        BL   @CMP1
        JEQ  EXS1
+       MOV  R3,R1              (the symbol, for the message)
+       LI   R0,EFN1
+       BL   @EFSET
        LI   R0,PE.EXP
        B    @PERR
 EXS1   BL   @TTAKE
@@ -1013,9 +1049,15 @@ IDENT  .enter
        BL   @ATK
        MOV  R0,R0
        JNE  IDN1
+       MOV  @PWHAT,R1          what was expected (default: a name)
+       JNE  IDN0
+       LI   R1,QANAME
+IDN0   LI   R0,EFN1
+       BL   @EFSET
        LI   R0,PE.EXP
        B    @PERR
-IDN1   BL   @TSTRT
+IDN1   CLR  @PWHAT             (the next IDENT's default again)
+       BL   @TSTRT
        BL   @TTAKE
        .leave
        RT
@@ -1024,9 +1066,13 @@ ISTR   .enter
        BL   @ATK
        MOV  R0,R0
        JNE  ISR1
+       MOV  @PWHAT,R1          what was expected
+       LI   R0,EFN1
+       BL   @EFSET
        LI   R0,PE.EXP
        B    @PERR
-ISR1   BL   @TSTRT
+ISR1   CLR  @PWHAT
+       BL   @TSTRT
        BL   @TTAKE
        .leave
        RT
@@ -1256,6 +1302,8 @@ STM12  CI   R0,KW.FOR
        LI   R0,NT.FOR
        MOV  *R10,R1
        BL   @TNODE
+       LI   R0,QLOOPV          (what is expected: the message)
+       MOV  R0,@PWHAT
        BL   @IDENT
        LI   R1,KW.IN
        BL   @EXPKW
@@ -1273,12 +1321,16 @@ STM14  CI   R0,KW.LOC
        MOV  *R10,R1
        BL   @TNODE
        BL   @LBEG
+       LI   R0,QLOCAL          (what is expected: the message)
+       MOV  R0,@PWHAT
        BL   @IDENT
        BL   @LINC
 STM15  LI   R3,SCOMMA
        BL   @CMP1
        JNE  STM15A
        BL   @TTAKE
+       LI   R0,QLOCAL          (what is expected: the message)
+       MOV  R0,@PWHAT
        BL   @IDENT
        BL   @LINC
        JMP  STM15
@@ -1551,6 +1603,8 @@ ATR3   .push R5
        BL   @TPUT
        LI   R0,>0200
        BL   @TPUT
+       LI   R0,QANATT          (what is expected: the message)
+       MOV  R0,@PWHAT
        BL   @IDENT
        .pop R0
        BL   @TBOOL
@@ -1610,6 +1664,9 @@ PARSX  MOV  @WBERR,R0
 
 * DECL - one declaration.
 DECL   .enter
+       MOV  @TXPG,@DTXPG       (its first token's text: code 13's message)
+       MOV  @TXOF,@DTXOF
+       MOV  @TLEN,@DTXLN
        .push @TLN              p
        LI   R1,TK.ID           MUSIC / SOUND name "file"
        BL   @ATK
@@ -1638,6 +1695,8 @@ DCL1   LI   R1,PKSAV           ... when a name follows
        MOV  R4,R1              its kind: MUSIC or SOUND
        BL   @TSTRC
        BL   @IDENT
+       LI   R0,QSNDFN          (what is expected: the message)
+       MOV  R0,@PWHAT
        BL   @ISTR
        BL   @EXPNL
        B    @DCL99
@@ -1658,6 +1717,8 @@ DCL3   MOV  @TVAL,R6           the keyword
        LI   R0,NT.INC          INCLUDE "file"
        MOV  *R10,R1
        BL   @TNODE
+       LI   R0,QFILEQ          (what is expected: the message)
+       MOV  R0,@PWHAT
        BL   @ISTR
        B    @DCL90
 DCL10  CI   R6,KW.CON
@@ -1711,6 +1772,9 @@ DCL16  LI   R1,TK.NUM
        BL   @ATK
        MOV  R0,R0
        JNE  DCL17
+       LI   R1,QASIZE          (for the message)
+       LI   R0,EFN1
+       BL   @EFSET
        LI   R0,PE.EXP
        B    @PERR
 DCL17  MOV  @TVAL,R0
@@ -1747,6 +1811,8 @@ DCL22  CI   R6,KW.PIC
        MOV  *R10,R1
        BL   @TNODE
        BL   @IDENT
+       LI   R0,QPICFN          (what is expected: the message)
+       MOV  R0,@PWHAT
        BL   @ISTR
        B    @DCL90
 DCL24  CI   R6,KW.CLA
@@ -1765,6 +1831,8 @@ DCL26  CI   R6,KW.VRB
        MOV  *R10,R1
        BL   @TNODE
        BL   @LBEG
+       LI   R0,QVWORD          (what is expected: the message)
+       MOV  R0,@PWHAT
        BL   @ISTR
        BL   @LINC
 DCL27  LI   R1,TK.STR
@@ -1784,6 +1852,8 @@ DCL28  CI   R6,KW.EXT
        LI   R0,NT.EXT          EXTEND "w" [FIRST] then lines
        MOV  *R10,R1
        BL   @TNODE
+       LI   R0,QVWORD          (what is expected: the message)
+       MOV  R0,@PWHAT
        BL   @ISTR
        LI   R1,KW.FST
        BL   @ATKW
@@ -1801,6 +1871,8 @@ DCL30  CI   R6,KW.REP
        LI   R0,NT.REP          REPLACE n
        MOV  *R10,R1
        BL   @TNODE
+       LI   R0,QRREPL          (what is expected: the message)
+       MOV  R0,@PWHAT
        BL   @IDENT
        B    @DCL90
 DCL32  CI   R6,KW.ROU
@@ -1808,6 +1880,8 @@ DCL32  CI   R6,KW.ROU
        LI   R0,NT.ROU          ROUTINE n [p, p] then statements
        MOV  *R10,R1
        BL   @TNODE
+       LI   R0,QRNAME          (what is expected: the message)
+       MOV  R0,@PWHAT
        BL   @IDENT
        BL   @LBEG
        LI   R1,TK.ID
@@ -1821,6 +1895,8 @@ DCL33  LI   R3,SCOMMA
        BL   @CMP1
        JNE  DCL34
        BL   @TTAKE
+       LI   R0,QPARAM          (what is expected: the message)
+       MOV  R0,@PWHAT
        BL   @IDENT
        BL   @LINC
        JMP  DCL33
@@ -1833,7 +1909,15 @@ DCL34  BL   @LEND
        BL   @EXPKW
        BL   @EXPNL
        B    @DCL99
-DCL36  LI   R0,PE.NOD          a keyword that cannot start a declaration
+DCL36  MOV  @DTXPG,@PTPG       (the keyword as written, for the message)
+       MOV  @DTXOF,@PTOF
+       MOV  @DTXLN,@PTLN
+       CLR  @PDBUF
+       BL   @PRAW
+       LI   R0,EFN1
+       LI   R1,PDBUF
+       BL   @EFSET
+       LI   R0,PE.NOD          a keyword that cannot start a declaration
        MOV  *R10,R7
        B    @PERRL
 DCL90  BL   @EXPNL
@@ -1886,7 +1970,21 @@ OBJDCL .enter
        CI   R4,KW.OBJ
        JEQ  OBJ1
        LI   R1,SROOM
-OBJ1   BL   @TSTRC
+OBJ1   MOV  R1,@OKIND          (its kind and name: code 14's message)
+       BL   @TSTRC
+       MOV  @TXPG,@ONMPG
+       MOV  @TXOF,@ONMOF
+       MOV  @TLEN,@ONMLN
+       LI   R0,QTHEOB          (what IDENT expects: "the object name" ...)
+       MOV  @OKIND,R1
+       CI   R1,SROOM
+       JNE  OBJ1A
+       LI   R0,QTHERM
+OBJ1A  MOV  @OKIND,R1
+       CI   R1,SCLASS
+       JNE  OBJ1B
+       LI   R0,QTHECL
+OBJ1B  MOV  R0,@PWHAT
        BL   @IDENT             its name
        MOV  *R10,R4            its short name (not for a class)
        CI   R4,KW.CLA
@@ -1907,6 +2005,8 @@ OBJ3   MOV  *R10,R4            IN parent (objects only)
        MOV  R0,R0
        JEQ  OBJ4
        BL   @TTAKE
+       LI   R0,QPAREN          (what is expected: the message)
+       MOV  R0,@PWHAT
        BL   @IDENT
        JMP  OBJ5
 OBJ4   BL   @TNONE
@@ -1920,6 +2020,26 @@ OBJ6   LI   R1,KW.END
        BL   @ATK
        MOV  R0,R0
        JEQ  OBJ7
+       MOV  @OKIND,R1          "KIND NAME" into EFN1, for the message
+       MOVB *R1+,R2
+       SRL  R2,8
+       CLR  R3
+OBJ6A  C    R3,R2
+       JHE  OBJ6B
+       MOVB *R1+,@PDBUF+1(R3)
+       INC  R3
+       JMP  OBJ6A
+OBJ6B  MOVB @QSPACE,@PDBUF+1(R3)
+       INC  R3
+       SWPB R3
+       MOVB R3,@PDBUF
+       MOV  @ONMPG,@PTPG
+       MOV  @ONMOF,@PTOF
+       MOV  @ONMLN,@PTLN
+       BL   @PRAW              (appends the name)
+       LI   R0,EFN1
+       LI   R1,PDBUF
+       BL   @EFSET
        LI   R0,PE.NEN
        B    @PERR
 OBJ7   BL   @BITEM
@@ -1955,6 +2075,8 @@ BIT10  CI   R0,KW.CLA
        MOV  *R10,R1
        BL   @TNODE
        BL   @LBEG
+       LI   R0,QCLASN          (what is expected: the message)
+       MOV  R0,@PWHAT
        BL   @IDENT
        BL   @LINC
 BIT11  LI   R1,TK.ID
@@ -1974,6 +2096,8 @@ BIT12  CI   R0,KW.IN
        LI   R0,NT.INP
        MOV  *R10,R1
        BL   @TNODE
+       LI   R0,QPAREN          (what is expected: the message)
+       MOV  R0,@PWHAT
        BL   @IDENT
        BL   @EXPNL
        B    @BIT99
@@ -1984,6 +2108,8 @@ BIT14  CI   R0,KW.NAM
        MOV  *R10,R1
        BL   @TNODE
        BL   @LBEG
+       LI   R0,QDWORD          (what is expected: the message)
+       MOV  R0,@PWHAT
        BL   @ISTR
        BL   @LINC
 BIT15  LI   R1,TK.STR
@@ -2101,6 +2227,8 @@ VLN6   LI   R0,NT.GTK          slot [= routine]
        BL   @CMP1
        JNE  VLN7
        BL   @TTAKE
+       LI   R0,QRTNAM          (what is expected: the message)
+       MOV  R0,@PWHAT
        BL   @IDENT
        JMP  VLN7A
 VLN7   BL   @TNONE
@@ -2190,6 +2318,239 @@ SMUSIC BYTE 5
        TEXT 'MUSIC'
 SSOUND BYTE 5
        TEXT 'SOUND'
+* ---- M6 part 6: what an error's message names -------------------------------------
+* PRAW - the text of a token (PTPG, PTOF; PTLN long) appended to PDBUF
+* (a length byte first), as written.  The parser's own place is kept.
+PRAW   MOV  R11,@PRRET
+       MOV  @RDPG,@PRSPG
+       MOV  @RDOF,@PRSOF
+       MOV  @PTPG,@RDPG
+       MOV  @PTOF,@RDOF
+       MOV  @PTLN,R5
+PRW1   MOV  R5,R5
+       JEQ  PRW9
+       BL   @TRB
+       BL   @PDCHR
+       DEC  R5
+       JMP  PRW1
+PRW9   MOV  @PRSPG,@RDPG
+       MOV  @PRSOF,@RDOF
+       MOV  @PRRET,R11
+       RT
+* PDCHR - character R0 (low byte) onto PDBUF (at most 39).  Uses R1, R2.
+PDCHR  MOVB @PDBUF,R1
+       SRL  R1,8
+       CI   R1,39
+       JHE  PDC9
+       SWPB R0
+       MOVB R0,@PDBUF+1(R1)
+       SWPB R0
+       INC  R1
+       SWPB R1
+       MOVB R1,@PDBUF
+PDC9   RT
+* PDESC - EFN2 := the current token as Python's describe() gives it: "the
+* end of the line", "the end of the file", or repr() of its text as
+* written (a string in its double quotes with ^ and ~ for a new line and a
+* quote, an action after ##, a dictionary word in single quotes).
+PDESC  MOV  R11,@PDRET
+       CLR  @PDBUF
+       LI   R1,QEOL
+       MOV  @TKND,R0
+       CI   R0,TK.NL
+       JNE  $+6
+       B    @PDS8
+       LI   R1,QEOF
+       CI   R0,TK.EOF
+       JNE  $+6
+       B    @PDS8
+       MOV  @TXPG,@PTPG        the text, as written, into PDRAWB ...
+       MOV  @TXOF,@PTOF
+       MOV  @TLEN,@PTLN
+       MOV  @TKND,R0
+       CI   R0,TK.STR
+       JNE  PDS1
+       LI   R0,'"'
+       BL   @PDCHR
+PDS1   MOV  @TKND,R0
+       CI   R0,TK.ACT
+       JNE  PDS2
+       LI   R0,'#'
+       BL   @PDCHR
+       BL   @PDCHR
+PDS2   MOV  @TKND,R0
+       CI   R0,TK.DIC
+       JNE  PDS3
+       LI   R0,>27
+       BL   @PDCHR
+PDS3   BL   @PRAW
+       MOV  @TKND,R0
+       CI   R0,TK.DIC
+       JNE  PDS4
+       LI   R0,>27
+       BL   @PDCHR
+PDS4   MOV  @TKND,R0
+       CI   R0,TK.STR
+       JNE  PDS5
+       LI   R0,'"'
+       BL   @PDCHR
+       LI   R1,PDBUF+2         (a string: ^ and ~ back for a new line and a quote)
+       MOVB @PDBUF,R2
+       SRL  R2,8
+       DECT R2
+PDS4A  MOV  R2,R2
+       JLE  PDS5
+       CB   *R1,@QNEWL
+       JNE  PDS4B
+       MOVB @QCARET,*R1
+PDS4B  CB   *R1,@QDQ
+       JNE  PDS4C
+       MOVB @QTILDE,*R1
+PDS4C  INC  R1
+       DEC  R2
+       JMP  PDS4A
+PDS5   LI   R1,PDBUF           ... then repr(): in PDRAWB, quoted
+       LI   R2,PDRAWB
+       MOVB *R1+,R3
+       MOVB R3,*R2+
+       SRL  R3,8
+PDS5A  MOV  R3,R3
+       JEQ  PDS5B
+       MOVB *R1+,*R2+
+       DEC  R3
+       JMP  PDS5A
+PDS5B  CLR  @PDHSQ             does it hold ' or "?
+       CLR  @PDHDQ
+       LI   R1,PDRAWB+1
+       MOVB @PDRAWB,R3
+       SRL  R3,8
+PDS6   MOV  R3,R3
+       JEQ  PDS6C
+       CB   *R1,@QSQ
+       JNE  PDS6A
+       SETO @PDHSQ
+PDS6A  CB   *R1,@QDQ
+       JNE  PDS6B
+       SETO @PDHDQ
+PDS6B  INC  R1
+       DEC  R3
+       JMP  PDS6
+PDS6C  LI   R4,>27             the quote: " if it holds ' and not ", else '
+       MOV  @PDHSQ,R0
+       JEQ  PDS6D
+       MOV  @PDHDQ,R0
+       JNE  PDS6D
+       LI   R4,'"'
+PDS6D  CLR  @PDBUF
+       MOV  R4,R0
+       BL   @PDCHR
+       LI   R6,PDRAWB+1
+       MOVB @PDRAWB,R7
+       SRL  R7,8
+PDS7   MOV  R7,R7
+       JEQ  PDS7C
+       MOVB *R6+,R0
+       SRL  R0,8
+       CI   R0,>5C             a backslash doubled; the quote escaped
+       JEQ  PDS7A
+       C    R0,R4
+       JNE  PDS7B
+PDS7A  MOV  R0,R8
+       LI   R0,>5C
+       BL   @PDCHR
+       MOV  R8,R0
+PDS7B  BL   @PDCHR
+       DEC  R7
+       JMP  PDS7
+PDS7C  MOV  R4,R0
+       BL   @PDCHR
+       LI   R1,PDBUF
+PDS8   LI   R0,EFN2
+       BL   @EFSET
+       MOV  @PDRET,R11
+       RT
+
+PWHAT  DATA 0                  what IDENT / ISTR expects (0: "a name")
+PDLN   DATA 0
+PRRET  DATA 0
+PDRET  DATA 0
+PRSPG  DATA 0
+PRSOF  DATA 0
+PTPG   DATA 0                  a token's text: page, offset, length
+PTOF   DATA 0
+PTLN   DATA 0
+DTXPG  DATA 0                  the declaration's first token
+DTXOF  DATA 0
+DTXLN  DATA 0
+OKIND  DATA 0                  an object's kind word and name
+ONMPG  DATA 0
+ONMOF  DATA 0
+ONMLN  DATA 0
+PDHSQ  DATA 0
+PDHDQ  DATA 0
+PDBUF  BSS  42
+PDRAWB BSS  42
+* the codes whose messages name the token found (0 ends)
+PDCODE BYTE 10,11,12,15,18,26,27,0
+QEOL   BYTE 19
+       TEXT 'the end of the line'
+QEOF   BYTE 19
+       TEXT 'the end of the file'
+QANAME BYTE 6
+       TEXT 'a name'
+QAPROP BYTE 15
+       TEXT 'a property name'
+QASIZE BYTE 14
+       TEXT 'the array size'
+QKWEND BYTE 3
+       TEXT 'END'
+QKWEAC BYTE 4
+       TEXT 'EACH'
+QKWIN  BYTE 2
+       TEXT 'IN'
+QKWTO  BYTE 2
+       TEXT 'TO'
+QLOOPV BYTE 17
+       TEXT 'the loop variable'
+QLOCAL BYTE 21
+       TEXT 'a local variable name'
+QANATT BYTE 12
+       TEXT 'an attribute'
+QSNDFN BYTE 17
+       TEXT 'a sound file name'
+QFILEQ BYTE 21
+       TEXT 'a file name in quotes'
+QPICFN BYTE 19
+       TEXT 'a picture file name'
+QVWORD BYTE 21
+       TEXT 'a verb word in quotes'
+QRREPL BYTE 22
+       TEXT 'the routine to replace'
+QRNAME BYTE 16
+       TEXT 'the routine name'
+QPARAM BYTE 16
+       TEXT 'a parameter name'
+QPAREN BYTE 17
+       TEXT 'the parent object'
+QCLASN BYTE 12
+       TEXT 'a class name'
+QDWORD BYTE 27
+       TEXT 'a dictionary word in quotes'
+QRTNAM BYTE 14
+       TEXT 'a routine name'
+QTHEOB BYTE 15
+       TEXT 'the object name'
+QTHERM BYTE 13
+       TEXT 'the room name'
+QTHECL BYTE 14
+       TEXT 'the class name'
+QSPACE BYTE ' '
+QSQ    BYTE >27
+QDQ    BYTE '"'
+QNEWL  BYTE >0A
+QCARET BYTE '^'
+QTILDE BYTE '~'
+       EVEN
 SCLASS BYTE 5
        TEXT 'CLASS'
 SOBJECT BYTE 6

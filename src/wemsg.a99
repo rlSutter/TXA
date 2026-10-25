@@ -13,8 +13,13 @@ EMSHOW LI   R10,STACKT
        CLR  @EMLEN
        MOV  @WBERRF,R0         "FILE line N: " (none for the whole program)
        C    R0,@NF
-       JL  $+6
-       B    @EMG1
+       JL   EMG0
+       JH   EMGX               (the file being read, for the lexer's and
+       MOV  @WBSTAG,R1         the parser's errors: in FTAB already, not yet
+       CI   R1,2               counted in NF)
+       JLE  EMG0
+EMGX   B    @EMG1
+EMG0
        MOV  @WBERRF,R0
        BL   @EMFNAM
        LI   R1,QLINE
