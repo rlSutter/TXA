@@ -214,4 +214,6 @@ EFF    EQU  >3744              ... another declaration's file (index) and line
 EFL    EQU  >3746
 EFEND  EQU  >3748
 EFTMP  EQU  GLOBRM+>1C0        (EFNUM's word)
+EFRET  EQU  GLOBRM+>1C2        (EFNAMB's return)
+EFSAV  EQU  GLOBRM+>1C4        (EFNAMB: R1-R3, 6 bytes)
 WBBLD  EQU  GLOBRM+>74         after the compile: 1 Build (the engine's files), 2 test-play

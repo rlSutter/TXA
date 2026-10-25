@@ -162,6 +162,53 @@ EFSET  MOVB *R1,R2
        LI   R2,39
 EFS1   INC  R2
        B    @VMBW
+* EFNAMB - field R0 := the name being looked up, as written (NAMB, KEYL
+* long).  Uses R0; keeps R1-R3.
+EFNAMB MOV  R11,@EFRET
+       MOV  R1,@EFSAV          (R1-R3 kept: an error site may have set its
+       MOV  R2,@EFSAV+2        line, file or declaration already)
+       MOV  R3,@EFSAV+4
+       MOV  R0,R3
+       MOV  @KEYL,R2
+       CI   R2,39
+       JLE  EFB1
+       LI   R2,39
+EFB1   SWPB R2
+       MOVB R2,@EFTMP
+       LI   R1,EFTMP
+       LI   R2,1
+       BL   @VMBW
+       MOV  R3,R0
+       INC  R0
+       LI   R1,NAMB
+       MOV  @KEYL,R2
+       CI   R2,39
+       JLE  EFB2
+       LI   R2,39
+EFB2   MOV  R2,R2
+       JEQ  EFB3
+       BL   @VMBW
+EFB3   MOV  @EFSAV,R1
+       MOV  @EFSAV+2,R2
+       MOV  @EFSAV+4,R3
+       MOV  @EFRET,R11
+       RT
+* EFDWB - field EFN1 := the dictionary word last read (DWB, lower case,
+* at most 12; DWB-1 takes its length).  Uses R0-R2.
+EFDWB  MOV  @DWL,R2
+       CI   R2,12
+       JLE  EFW1
+       LI   R2,12
+EFW1   SWPB R2
+       MOVB R2,@DWB-1
+       LI   R0,EFN1
+       LI   R1,DWB-1
+       B    @EFSET
+* DWERR - a bad dictionary word (DWORD, wsym.a99): its error, the word
+* recorded for the message (here: the kernel window is full).
+DWERR  BL   @EFDWB
+       LI   R0,SE.DWD
+       B    @SERRE
 EFNUM  MOV  R1,@EFTMP
        LI   R1,EFTMP
        LI   R2,2

@@ -496,7 +496,7 @@ if which in ('errors', 'all'):
         if pe:                                  # M6 part 6: the TI words it as Python does
             import re as _re
             scr = R.screen(m).splitlines()
-            ti_text = (scr[6][1:80] + scr[7][1:80]).rstrip()
+            ti_text = (scr[6].ljust(80)[1:80] + scr[7].ljust(80)[1:80]).rstrip()   # (a row's trailing space is part of the text)
             msg = _re.sub(r'([\w-]+)\.txa', lambda mm: mm.group(1).upper(), pe.msg)
             want_text = (msg if pfile == '?' else f'{pfile} line {pe.line}: {msg}')
             WORDS.append((label, ti_text == want_text))

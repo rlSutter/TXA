@@ -100,6 +100,7 @@ AC2    MOV  R9,R9
        BL   @DVBAT
        MOV  *R1,R0
        JEQ  AC3
+       BL   @EFDWB             (the word, for the message)
        LI   R0,SE.VWD          a word of another VERB
        B    @SERRE
 AC3    MOV  @CURV,*R1
@@ -142,6 +143,8 @@ AC6    MOV  R9,R9
        BL   @SLOOKK
        CI   R1,K.ATT
        JEQ  AC8
+       LI   R0,EFN1         (the name, for the message)
+       BL   @EFNAMB
        LI   R0,SE.GTK
        B    @SERRE
 AC7    BL   @DWORD             a word
@@ -153,6 +156,8 @@ AC8    BL   @XB                its filter: None, or a routine's name
        BL   @SLOOKK
        CI   R1,K.ROU
        JEQ  AC6
+       LI   R0,EFN1         (the name, for the message)
+       BL   @EFNAMB
        LI   R0,SE.FLT
        B    @SERRE
 AC10   MOV  @T1,@ELINE         (at the line)
@@ -256,6 +261,65 @@ QMGRM  BYTE 16
        TEXT 'Meaning: grammar'
 QMROU  BYTE 17
        TEXT 'Meaning: routines'
+* EFKIND - field EFN2 := the word for symbol kind R1 (as the Python
+* compiler names kinds).  Uses R0-R2.
+EFKIND MOV  R11,@EFKRET
+       MOV  R1,R2
+       LI   R1,QKINDS          the R1-th word (from 1)
+EFK1   DEC  R2
+       JEQ  EFK2
+       MOVB *R1+,R0
+       SRL  R0,8
+       A    R0,R1
+       JMP  EFK1
+EFK2   LI   R0,EFN2
+       BL   @EFSET
+       MOV  @EFKRET,R11
+       RT
+* EFARGS - the fields of "X takes N argument(s), not M": EFA := R4 (N),
+* EFB := R5 (M), EFN2 := "s" unless N is 1.  Uses R0-R2.
+EFARGS MOV  R11,@EFKRET
+       LI   R0,EFA
+       MOV  R4,R1
+       BL   @EFNUM
+       LI   R0,EFB
+       MOV  R5,R1
+       BL   @EFNUM
+       CI   R4,1
+       JEQ  EFA9
+       LI   R0,EFN2
+       LI   R1,QPLUR
+       BL   @EFSET
+EFA9   MOV  @EFKRET,R11
+       RT
+EFKRET DATA 0
+D3EF   DATA 3
+EFOP   DATA 0
+QKINDS BYTE 8
+       TEXT 'constant'
+       BYTE 6
+       TEXT 'global'
+       BYTE 5
+       TEXT 'array'
+       BYTE 9
+       TEXT 'attribute'
+       BYTE 8
+       TEXT 'property'
+       BYTE 5
+       TEXT 'class'
+       BYTE 6
+       TEXT 'object'
+       BYTE 7
+       TEXT 'routine'
+       BYTE 7
+       TEXT 'picture'
+       BYTE 5
+       TEXT 'music'
+       BYTE 5
+       TEXT 'sound'
+QPLUR  BYTE 1
+       TEXT 's'
+       EVEN
 SLOTS  BYTE 4
        TEXT 'NOUN'
        BYTE 4
@@ -326,6 +390,9 @@ UA6    MOVB *R3,@KEYB(R2)
        BL   @SLOOKK
        CI   R1,K.ROU
        JEQ  UA7
+       S    @D3EF,@KEYL        (the action's name: the routine's less "Sub")
+       LI   R0,EFN1
+       BL   @EFNAMB
        LI   R0,SE.ASB
        B    @SERRE
 UA7    MOV  R0,R5
@@ -510,6 +577,8 @@ CL2    MOV  R8,R8
        BL   @LFIND
        MOV  R0,R0
        JEQ  CL2A
+       LI   R0,EFN1         (the name, for the message)
+       BL   @EFNAMB
        LI   R0,SE.LTW
        B    @SERRE
 CL2A   BL   @LADD
@@ -682,6 +751,8 @@ STFOR  BL   @KEYRD             FOR EACH: the variable must be a LOCAL
        MOV  R0,R0
        JNE  STFR1
        MOV  R8,@ELINE
+       LI   R0,EFN1         (the name, for the message)
+       BL   @EFNAMB
        LI   R0,SE.LPV
        B    @SERRE
 STFR1  BL   @EXPR
@@ -757,6 +828,11 @@ STES1  BL   @KEYRD             a name on its own
        JNE  $+6
        B    @ST99
        MOV  R7,@ELINE
+       LI   R0,EFN1         (the name, for the message)
+       BL   @EFNAMB
+       MOV  R1,R4              (the counts: R1 wanted, none given)
+       CLR  R5
+       BL   @EFARGS
        LI   R0,SE.ARG
        B    @SERRE
 STES2  MOV  R6,R6              a routine: a call of none
@@ -766,6 +842,8 @@ STES2  MOV  R6,R6              a routine: a call of none
        JNE  $+6
        B    @ST99
 STES3  MOV  R8,@ELINE
+       LI   R0,EFN1         (the name, for the message)
+       BL   @EFNAMB
        LI   R0,SE.NOP
        B    @SERRE
 
@@ -774,6 +852,8 @@ ATTRC  MOV  R11,@SRET3
        BL   @SLOOKK
        CI   R1,K.ATT
        JEQ  ATC9
+       LI   R0,EFN1         (the name, for the message)
+       BL   @EFNAMB
        LI   R0,SE.UAT
        B    @SERRE
 ATC9   MOV  @SRET3,R11
@@ -799,10 +879,15 @@ TARGET .enter
        BL   @SLOOKK
        MOV  R0,R0
        JNE  TG2
+       LI   R0,EFN1         (the name, for the message)
+       BL   @EFNAMB
        LI   R0,SE.UNK
        B    @SERRE
 TG2    CI   R1,K.GLO
        JEQ  TG99
+       LI   R0,EFN1         (the name, for the message)
+       BL   @EFNAMB
+       BL   @EFKIND            (its kind: R1)
        LI   R0,SE.NVR
        B    @SERRE
 TG3    CI   R4,NT.PRF
@@ -881,19 +966,23 @@ EX5    CI   R4,NT.CST
        LI   R1,QSELF4
        BL   @OPIS
        MOV  R0,R0
-       JEQ  EX99
+       JNE  $+6
+       B    @EX99
        LI   R0,SW.SLF
        BL   @SWARN
-       JMP  EX99
+       B    @EX99
 EX6    CI   R4,NT.NAM
        JNE  EX7
        BL   @KEYRD             a name: a local, or a value's name
        BL   @LFIND
        MOV  R0,R0
-       JNE  EX99
+       JEQ  $+6
+       B    @EX99
        BL   @SLOOKK
        MOV  R0,R0
        JNE  EX6A
+       LI   R0,EFN1         (the name, for the message)
+       BL   @EFNAMB
        LI   R0,SE.UNK
        B    @SERRE
 EX6A   CI   R1,K.ATT
@@ -902,7 +991,10 @@ EX6A   CI   R1,K.ATT
        JEQ  EX6B
        CI   R1,K.CLA
        JNE  EX99
-EX6B   LI   R0,SE.NVL
+EX6B   LI   R0,EFN1         (the name, for the message)
+       BL   @EFNAMB
+       BL   @EFKIND            (its kind: R1)
+       LI   R0,SE.NVL
        B    @SERRE
 EX7    CI   R4,NT.UNA
        JNE  EX8
@@ -916,6 +1008,7 @@ EX8    CI   R4,NT.BIN
        LI   R1,QHAS
        BL   @OPIS
        SOC  R0,R9
+       MOV  R0,@EFOP           (HAS, not HASNT: for a message)
        LI   R1,QHASNT
        BL   @OPIS
        SOC  R0,R9
@@ -929,6 +1022,12 @@ EX8A   BL   @XB
        CI   R0,NT.NAM
        JEQ  EX8B
        MOV  R8,@ELINE
+       LI   R1,QHAS            the operator, for the message
+       MOV  @EFOP,R0
+       JNE  EX8H
+       LI   R1,QHASNT
+EX8H   LI   R0,EFN1
+       BL   @EFSET
        LI   R0,SE.HAS
        B    @SERRE
 EX8B   BL   @XW
@@ -944,6 +1043,8 @@ EX10   CI   R4,NT.PRF
        CI   R1,K.PRO
        JEQ  EX99
        MOV  R8,@ELINE
+       LI   R0,EFN1         (the name, for the message)
+       BL   @EFNAMB
        LI   R0,SE.UPX
        B    @SERRE
 EX11   CI   R4,NT.CAL
@@ -998,11 +1099,17 @@ CA2    BL   @XW
        C    R6,R7
        JEQ  CA3
        MOV  R8,@ELINE
+       LI   R0,EFN1         (the name, for the message)
+       BL   @EFNAMB
+       MOV  R7,R4              (the counts)
+       MOV  R6,R5
+       BL   @EFARGS
        LI   R0,SE.ARG
        B    @SERRE
 CA3    CLR  R5                 each argument; PROPLEN's and PROPWORD's
 CA3A   C    R5,R6              second is a property's name
-       JHE  CA9
+       JL  $+6
+       B    @CA9
        CI   R5,1
        JNE  CA4
        CI   R9,BPROPL
@@ -1027,6 +1134,8 @@ CA3B   .push R5
        CI   R1,K.PRO
        JEQ  CA4A
 CA3C   MOV  R8,@ELINE
+       LI   R0,EFN1         (the name, for the message)
+       BL   @EFNAMB
        LI   R0,SE.PAR
        B    @SERRE
 CA4    .push R5
@@ -1042,6 +1151,8 @@ CA5    BL   @SLOOKK            a declared name
        MOV  R0,R0
        JNE  CA6
        MOV  R8,@ELINE
+       LI   R0,EFN1         (the name, for the message)
+       BL   @EFNAMB
        LI   R0,SE.UNK
        B    @SERRE
 CA6    MOV  R0,R5
@@ -1061,12 +1172,21 @@ CA6    MOV  R0,R5
        B    @SERRE
 CA7    CI   R4,K.ROU
        JEQ  CA7A
+       LI   R0,EFN1            (the name and its kind, for the message)
+       BL   @EFNAMB
+       MOV  R4,R1
+       BL   @EFKIND
        LI   R0,SE.NCA
        B    @SERRE
 CA7A   MOV  R5,R0
        BL   @SYMAT
        C    R6,@14(R1)
        JLE  CA8
+       MOV  @14(R1),R4         (the counts, and the name, for the message)
+       MOV  R6,R5
+       BL   @EFARGS
+       LI   R0,EFN1
+       BL   @EFNAMB
        LI   R0,SE.ARG
        B    @SERRE
 CA8    BL   @ARGS

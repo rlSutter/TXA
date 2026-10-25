@@ -1057,6 +1057,8 @@ PQ2    CI   R4,NT.NAM
        BL   @SLOOKK
        MOV  R0,R0
        JNE  PQ3
+       LI   R0,EFN1            (the name, for the message)
+       BL   @EFNAMB
        LI   R0,SE.UNK
        B    @SERRE
 PQ3    MOV  R0,R6

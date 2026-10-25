@@ -23,7 +23,11 @@ EMSHOW LI   R10,STACKT
        BL   @EMDEC
        LI   R1,QCOLON
        BL   @EMSTR
-EMG1    MOV  @WBERR,R0          the template
+EMG1   MOV  @WBERR,R0          (40: the base name, n2, from the path, n1)
+       CI   R0,40
+       JNE  EMG1A
+       BL   @EMBASE
+EMG1A  MOV  @WBERR,R0          the template
        BL   @EMFIND
        MOV  R1,R1
        JNE  EMG2
@@ -127,6 +131,36 @@ EMOLD  LI   R0,6
        BL   @TXSTR
 EMO9   B    @WL9
 
+* EMBASE - field EFN2 := field EFN1 after its last '.' (an INCLUDE's
+* path: DSK1.NOSUCH gives NOSUCH, as the TI names its files).
+EMBASE MOV  R11,@EMRET
+       LI   R0,EFN1
+       LI   R1,EMTXT
+       LI   R2,40
+       BL   @VMBR
+       MOVB @EMTXT,R2          R3 = just after the last '.'
+       SRL  R2,8
+       LI   R1,EMTXT+1
+       MOV  R1,R3
+EMB1   MOV  R2,R2
+       JEQ  EMB2
+       CB   *R1+,@QDOTEM
+       JNE  EMB1A
+       MOV  R1,R3
+EMB1A  DEC  R2
+       JMP  EMB1
+EMB2   MOV  R1,R2              its length: the end less R3
+       S    R3,R2
+       DEC  R3                 a length byte just before it
+       SWPB R2
+       MOVB R2,*R3
+       LI   R0,EFN2
+       MOV  R3,R1
+       BL   @EFSET
+       MOV  @EMRET,R11
+       RT
+QDOTEM BYTE '.'
+       EVEN
 * EMFIND - R1 = the template for code R0 (its length byte), or 0.
 EMFIND LI   R1,EMSGS
 EMF1   MOVB *R1+,R2            the code (0 ends the table)

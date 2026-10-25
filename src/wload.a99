@@ -459,6 +459,9 @@ WF8C
        .pop @XPG
        .pop @WKN
        .pop @WKF
+       LI   R0,EFN1            (the file as INCLUDE names it, for the message)
+       LI   R1,FNBUF
+       BL   @EFSET
        LI   R0,SE.FIL
        B    @WERR
 WF8B   MOV  @NF,R0

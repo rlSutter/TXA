@@ -21,11 +21,12 @@
 * A NAME word: 1 cell: +0 the next, +2 the dictionary word.
 * A verb (VRBPG, 8 bytes): +0 its declaration, +2 its first grammar line,
 * +4 its last (heap: 2 cells each: +0 the next, +2 page, +4 offset of the
-* GLine node, +6 its file).  REPLACE (RPLPG, 72 bytes): +0 name length, +2 the name in
-* capitals (64), +66 file, +68 line, +70 1 once a ROUTINE is found.
+* GLine node, +6 its file).  REPLACE (RPLPG, 74 bytes): +0 name length, +2 the name in
+* capitals (64), +66 file, +68 line, +70 1 once a ROUTINE is found, +72 its
+* declaration (index entry: the name as written, for its error's message).
 *======================================================================
 RPLPG  EQU  62
-RPLMAX EQU  56
+RPLMAX EQU  55                 (74 bytes each, a page)
 * variables (SV0+64 on: the overlay's own)
 RPN    EQU  SV0+64             REPLACEs
 CURO   EQU  SV0+66             the object being built
@@ -129,6 +130,7 @@ RE3    BL   @RPAT
 RE3A   MOV  @EFILE,@66(R1)
        MOV  @ELINE,@68(R1)
        CLR  @70(R1)
+       MOV  R3,@72(R1)
 RE4    INC  R3
        JMP  RE1
 RE5    CLR  R3                 the ROUTINEs they drop
@@ -163,6 +165,15 @@ RE10   INC  R3
        BL   @RPAT
        MOV  @70(R1),R0
        JNE  RE10
+       MOV  R3,R6              (the name as written, for the message: read
+       MOV  @72(R1),R3         again from its declaration)
+       BL   @DXINF
+       BL   @DXSEEK
+       BL   @KEYRD
+       LI   R0,EFN1
+       BL   @EFNAMB
+       MOV  R6,R0
+       BL   @RPAT
        MOV  @68(R1),R0
        MOV  @66(R1),R2
        MOV  R0,R1
@@ -210,6 +221,8 @@ RE16   BL   @DXSEEK
 RE17   INC  R6
        C    R6,@VN
        JLE  RE17A
+       LI   R0,EFN1            (the word, for the message: KEYRD read it)
+       BL   @EFNAMB
        MOV  @XTLINE,R1
        MOV  @XTFILE,R2
        LI   R0,SE.EXT
@@ -303,7 +316,7 @@ RPAT   MOV  R11,@SRET4
        BL   @DMAP
        MOV  @SRET4,R11
        RT
-D72    DATA 72
+D72    DATA 74                 (a REPLACE's size: see RPLMAX)
 * BLINES - the list of GLine nodes at the reader as a chain of heap
 * items (LHEAD, LTAIL; 0 if empty), each with its file (EFILE).  Uses R0-R2, R4-R7; keeps R3.
 BLINES .enter
@@ -559,11 +572,17 @@ SDECL   MOV  R11,@SRET2
        BL   @BLOOK
        MOV  R0,R0
        JEQ  DE1
+       LI   R0,EFN1         (the name, for the message)
+       BL   @EFNAMB
        LI   R0,SE.BLT
        B    @SERRE
 DE1    BL   @SLOOK
        MOV  R0,R0
        JEQ  DE2
+       MOV  R0,R4              (the earlier one: its file and line, and
+       LI   R0,EFN1            the name, for the message)
+       BL   @EFNAMB
+       BL   @EFOLD
        LI   R0,SE.DUP
        B    @SERRE
 DE2    MOV  @STMP,R2
@@ -573,6 +592,52 @@ DE2    MOV  @STMP,R2
        MOV  @DCUR,R3
        MOV  @SRET2,R11
        RT
+* EFSYM - field R0 := symbol R4's name, as declared (the name heap).
+* Uses R0-R3.
+EFSYM  MOV  R11,@EFSRET
+       MOV  R0,@EFSFLD
+       MOV  R4,R0
+       BL   @SYMAT
+       MOVB @3(R1),R2          its length, page, offset
+       SRL  R2,8
+       MOV  @12(R1),R3
+       MOV  @10(R1),R0
+       BL   @DMAP
+       MOV  R2,R0              into EFSBUF (a length byte first)
+       SWPB R0
+       MOVB R0,@EFSBUF
+       LI   R1,EFSBUF+1
+       AI   R3,>D000
+EFS2   MOV  R2,R2
+       JEQ  EFS3
+       MOVB *R3+,*R1+
+       DEC  R2
+       JMP  EFS2
+EFS3   MOV  @EFSFLD,R0
+       LI   R1,EFSBUF
+       BL   @EFSET
+       MOV  @EFSRET,R11
+       RT
+* EFOLD - fields EFF, EFL := symbol R4's declaration's file and line (none
+* for the compiler's own).  Uses R0-R3.
+EFOLD  MOV  R11,@EFSRET
+       MOV  R4,R0
+       BL   @SYMAT
+       MOV  @6(R1),R3
+       JLT  EFO9
+       BL   @DXLOC
+       MOV  R1,@EFSFLD
+       LI   R0,EFF
+       MOV  R2,R1
+       BL   @EFNUM
+       LI   R0,EFL
+       MOV  @EFSFLD,R1
+       BL   @EFNUM
+EFO9   MOV  @EFSRET,R11
+       RT
+EFSRET DATA 0
+EFSFLD DATA 0
+EFSBUF BSS  66
 QMDECL BYTE 21
        TEXT 'Meaning: declarations'
 QMOBJ  BYTE 16
@@ -632,7 +697,10 @@ CVAL   .enter
        JNE  CV1
        MOV  @4(R1),R0          known
        JMP  CV9
-CV1    LI   R0,SE.SLF          being worked out: it depends on itself
+CV1    MOV  R5,R4              (its name, for the message)
+       LI   R0,EFN1
+       BL   @EFSYM
+       LI   R0,SE.SLF          being worked out: it depends on itself
        B    @SERRE
 CV2    LI   R0,2
        MOV  R0,@8(R1)
@@ -649,6 +717,9 @@ CV2    LI   R0,2
        .pop R5
        MOV  R1,R1
        JNE  CV3
+       MOV  R5,R4              (its name, for the message)
+       LI   R0,EFN1
+       BL   @EFSYM
        MOV  R5,R0              not worked out: at the CONSTANT
        BL   @SYMAT
        MOV  @6(R1),R3
@@ -965,6 +1036,11 @@ OB32   MOV  R6,R0
        INC  R7
        C    R7,@ON
        JLE  OB32
+       MOV  R8,R0              (the object's name, for the message)
+       BL   @OBJAT
+       MOV  *R1,R4
+       LI   R0,EFN1
+       BL   @EFSYM
        MOV  R8,R0
        BL   @OBJAT
        MOV  @30(R1),R3
@@ -1033,6 +1109,8 @@ CC3    MOV  R9,R9
        BL   @SLOOKK
        CI   R1,K.CLA
        JEQ  CC4
+       LI   R0,EFN1         (the name, for the message)
+       BL   @EFNAMB
        LI   R0,SE.NCL
        B    @SERRE
 CC4    MOV  R0,R6              in the path: it includes itself
@@ -1043,6 +1121,8 @@ CC5    C    R1,@PATHN
        SLA  R2,1
        C    @PATH(R2),R6
        JNE  CC5A
+       LI   R0,EFN1         (the name, for the message)
+       BL   @EFNAMB
        LI   R0,SE.CYC
        B    @SERRE
 CC5A   INC  R1
@@ -1159,6 +1239,8 @@ APH1A
        BL   @SLOOKK
        CI   R1,K.ATT
        JEQ  APH2
+       LI   R0,EFN1         (the name, for the message)
+       BL   @EFNAMB
        LI   R0,SE.UAT
        B    @SERRE
 APH2   BL   @SYMAT
@@ -1221,6 +1303,8 @@ APPRV  BL   @KEYRD             a property's values
        BL   @SLOOKK
        CI   R1,K.PRO
        JEQ  APV1
+       LI   R0,EFN1         (the name, for the message)
+       BL   @EFNAMB
        LI   R0,SE.UPR
        B    @SERRE
 APV1   BL   @SYMAT
@@ -1256,6 +1340,8 @@ APPRB  BL   @KEYRD             a property routine
        BL   @SLOOKK
        CI   R1,K.PRO
        JEQ  APB1
+       LI   R0,EFN1         (the name, for the message)
+       BL   @EFNAMB
        LI   R0,SE.UPR
        B    @SERRE
 APB1   BL   @SYMAT
@@ -1292,6 +1378,8 @@ PV2    CI   R4,NT.NAM
        BL   @SLOOKK
        MOV  R0,R0
        JNE  PV3
+       LI   R0,EFN1         (the name, for the message)
+       BL   @EFNAMB
        LI   R0,SE.UNK
        B    @SERRE
 PV3    MOV  R0,R6              (the symbol)
@@ -1411,6 +1499,8 @@ SETPAR .enter
        BL   @SLOOKK
        CI   R1,K.OBJ
        JEQ  SP1
+       LI   R0,EFN1         (the name, for the message)
+       BL   @EFNAMB
        LI   R0,SE.NOB
        B    @SERRE
 SP1    BL   @SYMAT
@@ -1421,6 +1511,11 @@ SP1    BL   @SYMAT
        JEQ  SP2
        C    R0,R5
        JEQ  SP2
+       MOV  @CURO,R0           (the object's name, for the message)
+       BL   @OBJAT
+       MOV  *R1,R4
+       LI   R0,EFN1
+       BL   @EFSYM
        LI   R0,SE.TWO
        B    @SERRE
 SP2    MOV  R5,@4(R1)

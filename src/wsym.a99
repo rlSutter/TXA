@@ -379,8 +379,7 @@ DW4    MOV  R4,R4
        JEQ  DW5
        MOV  @DWSP,R0
        JEQ  DW6
-DW5    LI   R0,SE.DWD
-       B    @SERRE
+DW5    B    @DWERR             (resident: the word recorded, then SE.DWD)
 DW6    MOV  @DWL,R0
        CI   R0,12
        JLE  DW7
