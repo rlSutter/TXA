@@ -1005,11 +1005,35 @@ other banks, so they had the same risk).  The simulator's reset used to
 force bank 0; now it keeps the bank and halts if the console would find
 no cartridge.  m6_run_test checks QUIT back to the workbench.
 
+M6 part 5 done (24 October 2026): test-play.
+- T compiles, then (overlay 10's second entry, >B004, TPLAY) copies the
+  image from IMGPG into the engine's story pages (32 on), stages the
+  engine from the cartridge (as Build copies it) with STMODE = 2 and the
+  game's name patched into the staged pages, and starts it through Run's
+  relocator.  Nothing is written to disk beyond the compile's own story
+  files.
+- The engine's mode 2: the story is in SAMS already (LDTP reads its
+  length from the header); the pictures and music still load from their
+  files.  AMSSIZ is skipped in mode 2 (AMSPGS := 128): its probe writes
+  the last word of every SAMS page and restores only the program's own,
+  which broke the story's checksum ("The story is damaged").
+- FCTN = ends test-play (the engine's QUIT: the console restarts on bank
+  0, the workbench with it); a built game ignores FCTN = (no game lost
+  to a slip).  FCTN 9 stays BACK (the scrollback), so the design's
+  "FCTN 9 back to the menu" became FCTN =.
+- Not as designed: after FCTN = the workbench starts afresh (its project
+  and compile are gone), so T compiles again.  Keeping the project's
+  settings across the restart is a small follow-up.
+- The simulator's key_pos('=') means ENTER (its command line's
+  convention); tests press = as (0, 0).
+- tests/m6_testplay_test.py: T plays Lamplight's start as the Python VM
+  does; STMODE 2 and the picture files found; no engine files written;
+  FCTN = returns to the workbench on bank 0.
+
 ## Next
 
-1. M6 part 5: test-play (T, D4): the compiled image played from SAMS
-   without writing to disk, FCTN 9 back to the menu, the debug verbs
-   live (part 7) only here.
+1. M6 part 6: errors in plain words (E, D6): the first error with its
+   file and line, worded as the Python compiler words it.
 
 The reference used for part 6's disk writes:
    (part 6) libre99's clean-room TI disk controller DSR and its notes,

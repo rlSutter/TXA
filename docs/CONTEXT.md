@@ -12,7 +12,8 @@ write are stubbed in the Claude Doc
 https://claude.ai/artifact/VqqmmXaB3E5RBxdTcfBtU2 (one tab each).
 
 **State (24 October 2026):** M6 parts 1 (the generic engine), 2 (the
-main menu; overlays in the cartridge), 3 (Build) and 4 (Run) done.  M5 is done: the workbench loads every
+main menu; overlays in the cartridge), 3 (Build), 4 (Run) and 5
+(test-play) done.  M5 is done: the workbench loads every
 file, lexes, parses, checks the meaning, generates the code and links
 the story image, identical to Python byte for byte on the corpus, and
 writes it to disk as 4K PROGRAM files (asking for the build date: the
@@ -92,7 +93,8 @@ owns it; Claude builds it. The engine comes first; the story later.
 | `src/wbuild.a99` | overlay 9: Build, the engine's files written from the cartridge (ENGTAB filled by the build) |
 | `tests/m6_build_test.py` | Build: the TI's engine files equal the PC's; the game it built plays |
 | `src/wrun.a99` | overlay 10: Run, the built game's engine staged in SAMS, relocated (from >F000) and started with SAMS mapping off |
-| `tests/m6_run_test.py` | Run: B then R plays Lamplight's start as the Python VM does |
+| `tests/m6_run_test.py` | Run: B then R plays Lamplight's start as the Python VM does; QUIT back to the workbench |
+| `tests/m6_testplay_test.py` | test-play: T plays from SAMS (engine STMODE 2); FCTN = back to the workbench |
 | `tests/m5_sema_test.py` | the workbench against sema.py and codegen.py: decls, meaning, code, link (the whole image), errors |
 | `tools/fixjumps.py` | rewrites jumps xas99 reports out of range as branches |
 | `src/wlex.a99` | the workbench's lexer: SAMS source to SAMS tokens, identical to lexer.py |
