@@ -1030,23 +1030,43 @@ M6 part 5 done (24 October 2026): test-play.
   does; STMODE 2 and the picture files found; no engine files written;
   FCTN = returns to the workbench on bank 0.
 
-M6 part 6 begun (24 October 2026): errors in plain words.
-- The messages as templates, by the TI's error code: tools/txc/errtext.py
-  (lexer 1-6, loading and meaning 40-82, code and link 83-90), with the
-  fields the TI's error sites must record: {n1} {n2} names or words
-  (an identifier, a word, a kind), {a} {b} numbers, {f} {l} another
-  declaration's file and line.  tests/errtext_test.py: every one of the
-  56 error cases matches its template (the Python compiler's own words).
-- Still to do: the parser's templates (codes 10-30: "expected X, found
-  Y" and the rest); each TI error site recording its fields (variables
-  beside WBERR, filled before SERR); the build generating the message
-  overlay from errtext.py; the error screen showing "FILE line N: the
-  message"; the errors stage comparing the TI's full text with Python's.
+M6 part 6 done (25 October 2026): errors in plain words.
+- An error shows as "FILE line N: the message" on rows 6-7 (no FILE for
+  an error of the whole program), in the Python compiler's own words.
+  Overlay 11 (src/wemsg.a99) expands templates generated from
+  tools/txc/errtext.py (gen/emsgs.a99, by build.write_emsgs; ".txa" after
+  a field dropped: the TI names files VERBS, not verbs.txa) with the
+  fields the error's site recorded: two names or words (EFN1, EFN2), two
+  numbers (EFA, EFB), another declaration's file and line (EFF, EFL),
+  kept in VRAM at >3700 (below the PAB) and cleared as a compile starts.
+  A code with no template shows the old form (stage, code, line, file).
+- The sites record their fields with EFSET / EFNUM (resident), EFNAMB
+  (the name just looked up, as written), EFDWB (a dictionary word), EFSYM
+  and EFOLD (a symbol's name; its declaration's file and line: overlay
+  3), EFKIND and EFARGS (a kind's word; "takes N argument(s), not M":
+  overlay 4); the parser's PWHAT (what IDENT / ISTR expected, about twenty
+  phrases), EXPKW's keyword, EXPSYM's symbol and PDESC (the token found,
+  as Python's describe() gives it, repr()'s quoting included); the
+  lexer's LXFLD and LXCHR.  REPLACE records keep their declaration (74
+  bytes; RPLMAX 55) so its error can name it as written.
+- Tests: tests/errtext_test.py (the templates against Python's 56
+  messages), m5_sema_test's errors stage now compares the full text
+  (all 56), tests/m6_words_test.py (the lexer's and parser's 27 cases as
+  whole programs).
+- Known limit: a dictionary word found where something else was expected
+  is described in lower case (the TI keeps words lower case only).
+- Bugs on the way: the new helpers were first placed where start-up falls
+  through (the workbench never reached the menu); EMVSTR and EMSTR shared
+  a return slot (any message with a field hung); the build's "error"
+  check tripped on an assembler warning echoing a comment.
+- Space: the resident part has about 18 bytes left, the kernel window 4,
+  overlay 2 (the parser) about 200: new code goes in new overlays.
 
 ## Next
 
-1. M6 part 6, the TI side: the error sites' fields, the message overlay,
-   the error screen (above).
+1. M6 part 7: the debug verbs (D5): TREE, GOTO, PURLOIN, SCOPE, ACTIONS
+   ON, TRACE, in the library, live only when the header's flags mark a
+   test-play run.
 
 The reference used for part 6's disk writes:
    (part 6) libre99's clean-room TI disk controller DSR and its notes,
