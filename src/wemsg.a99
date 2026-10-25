@@ -5,6 +5,10 @@
 * fields the error's site recorded (EFN1 .. in VRAM).  A code with no
 * template is shown as before: its stage, number, line and file.
 *======================================================================
+* (M6 optimization pass) Also the results: WL4 (a compile that worked),
+* WLERR (an error: what the compile got through, then EMSHOW's message),
+* WL1E / WL1F (one file only, the lexer's and parser's tests), and the
+* lines they share; moved from the resident part, which was full.
 EMLEN  EQU  ULIT+50            the message's length so far
 EMRET  EQU  ULIT+52
 
@@ -253,3 +257,311 @@ QCOLON BYTE 2
        TEXT ': '
        EVEN
        COPY "gen/emsgs.a99"
+
+* ---- the results (from the resident part) ------------------------------------
+OK4    BL   @PCLEAR
+       BL   @WREADL            row 4: files and lines
+       LI   R0,6               row 6: declarations, symbols, objects
+       BL   @WDECLS
+       BL   @WFILES            row 9: the files' names
+       LI   R0,7               "Story: n bytes in m files, PREFIXS01..."
+       LI   R1,1
+       BL   @TXAT
+       LI   R1,SSTORY
+       CLR  R2
+       BL   @TXSTR
+       MOV  @IPH,R0            (the image's length: IPH:IPL; K past 64K)
+       JNE  $+6
+       B    @WL4B
+       MOV  @IPL,R1            (R0:R1 / 1024)
+       SRL  R1,10
+       SLA  R0,6
+       SOC  R1,R0
+       CLR  R1
+       CLR  R2
+       BL   @TXDEC
+       LI   R1,SKB
+       B    @WL4C
+WL4B   MOV  @IPL,R0
+       CLR  R1
+       CLR  R2
+       BL   @TXDEC
+       LI   R1,SBYTES
+WL4C   CLR  R2
+       BL   @TXSTR
+       MOV  @IPH,R2            the files: the length / 4096, rounded up
+       MOV  @IPL,R1
+       AI   R1,4095
+       JOC  $+6               (the carry out of the low word: tested at once)
+       B    @WL4D
+       INC  R2
+WL4D   SRL  R1,12
+       MOV  R2,R0
+       SLA  R0,4
+       SOC  R1,R0
+       CLR  R1
+       CLR  R2
+       BL   @TXDEC
+       LI   R1,SFILES2
+       CLR  R2
+       BL   @TXSTR
+       LI   R0,4
+       MOV  R0,@WBDONE         (4: compiled, the story written)
+       B    @WL9
+* WLERR - an error, with its stage, code, line and file.
+OKERR  BL   @PCLEAR
+       MOV  @NF,R0             what the compile got through: files and lines
+       JNE  $+6               (row 4), the counts if the meaning stage ran
+       B    @WLR1
+       BL   @WREADL            (row 7), the files' names (row 9)
+       MOV  @SN,R0
+       JNE  $+6
+       B    @WLR0
+       LI   R0,8
+       BL   @WDECLS
+WLR0   BL   @WFILES
+WLR1   B    @EMSHOW            the error in the Python compiler's words (rows 6-7)
+
+* One file only (WBONLY): the results as parts 1-3 gave them.
+OK1E   BL   @PCLEAR
+       MOV  @WBSTAG,R0         an error
+       CI   R0,1
+       JEQ  $+6
+       B    @WL1G
+       LI   R0,6               the lexer's: its code and line
+       LI   R1,1
+       BL   @TXAT
+       LI   R1,SLXERR
+       B    @WL1H
+WL1G   BL   @WTOKS             the parser's: the tokens, then its code and line
+       LI   R0,7
+       LI   R1,1
+       BL   @TXAT
+       LI   R1,SPSERR
+WL1H   CLR  R2
+       BL   @TXSTR
+       MOV  @WBERR,R0
+       CLR  R1
+       CLR  R2
+       BL   @TXDEC
+       LI   R1,SLINE
+       CLR  R2
+       BL   @TXSTR
+       MOV  @WBERRL,R0
+       CLR  R1
+       CLR  R2
+       BL   @TXDEC
+       B    @WL6A
+OK1F   BL   @PCLEAR
+       BL   @WTOKS
+       LI   R0,7               "Parsed: n bytes of tree."
+       LI   R1,1
+       BL   @TXAT
+       LI   R1,SPARSD
+       CLR  R2
+       BL   @TXSTR
+       MOV  @TKPAGE,R0         (the tree's length: pages from TREEPG, offset)
+       AI   R0,-TREEPG
+       SLA  R0,12
+       A    @TKOFF,R0
+       MOV  R0,@WBTREE
+       CLR  R1
+       CLR  R2
+       BL   @TXDEC
+       LI   R1,STREE
+       CLR  R2
+       BL   @TXSTR
+WL6A
+       LI   R0,4               "Read n lines, m bytes."
+       LI   R1,1
+       BL   @TXAT
+       LI   R1,SREAD1
+       CLR  R2
+       BL   @TXSTR
+       MOV  @WBLNS,R0          (TXDEC: the number in R0, width R1, style R2)
+       CLR  R1
+       CLR  R2
+       BL   @TXDEC
+       LI   R1,SREAD2
+       CLR  R2
+       BL   @TXSTR
+       MOV  @WBLENL,R0         (the low word: files up to 64K for now)
+       CLR  R1
+       CLR  R2
+       BL   @TXDEC
+       LI   R1,SREAD3
+       CLR  R2
+       BL   @TXSTR
+
+* WREADL - row 4: "Read n files, m lines."
+WREADL .enter
+       LI   R0,4
+       LI   R1,1
+       BL   @TXAT
+       LI   R1,SREAD1
+       CLR  R2
+       BL   @TXSTR
+       MOV  @NF,R0
+       CLR  R1
+       CLR  R2
+       BL   @TXDEC
+       LI   R1,SFILES
+       CLR  R2
+       BL   @TXSTR
+       MOV  @WBLTOT,R0
+       CLR  R1
+       CLR  R2
+       BL   @TXDEC
+       LI   R1,SLINES
+       CLR  R2
+       BL   @TXSTR
+       .leave
+       RT
+* WDECLS - row R0: "n declarations, m symbols, k objects."
+WDECLS .enter
+       LI   R1,1
+       BL   @TXAT
+       MOV  @DXN,R0
+       CLR  R1
+       CLR  R2
+       BL   @TXDEC
+       LI   R1,SDECLS
+       CLR  R2
+       BL   @TXSTR
+       MOV  @SN,R0
+       CLR  R1
+       CLR  R2
+       BL   @TXDEC
+       LI   R1,SSYMS
+       CLR  R2
+       BL   @TXSTR
+       MOV  @ON,R0
+       CLR  R1
+       CLR  R2
+       BL   @TXDEC
+       LI   R1,SOBJS
+       CLR  R2
+       BL   @TXSTR
+       .leave
+       RT
+* WFILES - row 9: "Files: " and each file read, in the order read (as
+* many as fit: a check, at a glance, that every INCLUDE was found).
+WFILES .enter
+       LI   R0,9
+       BL   @WCLR
+       LI   R0,9
+       LI   R1,1
+       BL   @TXAT
+       LI   R1,SFILS
+       CLR  R2
+       BL   @TXSTR
+       CLR  R8
+WFI1   C    R8,@NF
+       JL  $+6
+       B    @WFI9
+       MOV  @CURCOL,R0         (room for one more name on the row?)
+       CI   R0,COLS-16
+       JLE   $+6
+       B    @WFI9
+       MOV  R8,R0
+       MPY  @DFTSIZ,R0
+       AI   R1,FTAB
+       CLR  R2
+       BL   @TXSTR
+       LI   R1,SSPC
+       CLR  R2
+       BL   @TXSTR
+       INC  R8
+       B    @WFI1
+WFI9   .leave
+       RT
+* WTOKS - row 6: "n tokens." (the last file's).
+WTOKS  MOV  R11,@WBRET2
+       LI   R0,6
+       LI   R1,1
+       BL   @TXAT
+       MOV  @LXTCNT,R0
+       CLR  R1
+       CLR  R2
+       BL   @TXDEC
+       LI   R1,STOKS
+       CLR  R2
+       BL   @TXSTR
+       MOV  @WBRET2,R11
+       RT
+
+
+SREAD1 BYTE SREA1X-SREAD1-1
+       TEXT 'Read '
+SREA1X
+SREAD2 BYTE SREA2X-SREAD2-1
+       TEXT ' lines, '
+SREA2X
+SREAD3 BYTE SREA3X-SREAD3-1
+       TEXT ' bytes.'
+SREA3X
+STOKS  BYTE STOKSX-STOKS-1
+       TEXT ' tokens.'
+STOKSX
+SLXERR BYTE SLXERX-SLXERR-1
+       TEXT 'Lexer error '
+SLXERX
+SPSERR BYTE SPSERX-SPSERR-1
+       TEXT 'Parse error '
+SPSERX
+SPARSD BYTE SPARSX-SPARSD-1
+       TEXT 'Parsed: '
+SPARSX
+STREE  BYTE STREEX-STREE-1
+       TEXT ' bytes of tree.'
+STREEX
+SLINE  BYTE SLINEX-SLINE-1
+       TEXT ' at line '
+SLINEX
+SFILES BYTE SFILEX-SFILES-1
+       TEXT ' files, '
+SFILEX
+SLINES BYTE SLINSX-SLINES-1
+       TEXT ' lines.'
+SLINSX
+SDECLS BYTE SDECLX-SDECLS-1
+       TEXT ' declarations, '
+SDECLX
+SSYMS  BYTE SSYMSX-SSYMS-1
+       TEXT ' symbols, '
+SSYMSX
+SOBJS  BYTE SOBJSX-SOBJS-1
+       TEXT ' objects.'
+SOBJSX
+SFILS  BYTE 7
+       TEXT 'Files: '
+SSPC   BYTE 1
+       TEXT ' '
+SSTORY BYTE SSTORX-SSTORY-1
+       TEXT 'Story: '
+SSTORX
+SBYTES BYTE SBYTSX-SBYTES-1
+       TEXT ' bytes in '
+SBYTSX
+SKB    BYTE SKBX-SKB-1
+       TEXT 'K in '
+SKBX
+SFILES2 BYTE SFIL2X-SFILES2-1
+       TEXT ' files on disk.'
+SFIL2X
+SERROR BYTE SERRX-SERROR-1
+       TEXT ' error '
+SERRX
+SINF   BYTE SINFX-SINF-1
+       TEXT ' in '
+SINFX
+STAGES DATA SSTLEX,SSTPAR,SSTLOD,SSTMNG
+SSTLEX BYTE 5
+       TEXT 'Lexer'
+SSTPAR BYTE 5
+       TEXT 'Parse'
+SSTLOD BYTE 4
+       TEXT 'Load'
+SSTMNG BYTE 7
+       TEXT 'Meaning'
+       EVEN

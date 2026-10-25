@@ -35,17 +35,14 @@
 * EMAP - window E onto page R0, unless it shows it already.  Keeps R1-R9.
 EMAP   C    R0,@EFPG
        JEQ  EMA9
-       MOV  R0,@EFPG
-       MOV  R11,@ERET
-       MOV  R1,@ESV1
-       MOV  R2,@ESV2
-       MOV  R3,@ESV3
-       LI   R1,>E
-       BL   @MAPPG
-       MOV  @ESV1,R1
-       MOV  @ESV2,R2
-       MOV  @ESV3,R3
-       MOV  @ERET,R11
+       MOV  R0,@EFPG           window E's register, written here (as DMAP)
+       SWPB R0
+       SOC  @EFPG,R0
+       LI   R12,AMSCRU
+       SBO  0
+       MOV  R0,@AMSREG+>1C
+       SBZ  0
+       MOV  @EFPG,R0
 EMA9   RT
 * SYMAT - R1 = window E's address of symbol R0.  Uses R0, R1.
 SYMAT  MOV  R11,@SRET4

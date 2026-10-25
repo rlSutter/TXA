@@ -42,7 +42,10 @@ OV9END
        COPY "wrun.a99"
 OV10END
        XORG >B000
-       B    @EMSHOW            overlay 11: the message in plain words
+       B    @OKERR             overlay 11: an error's screen (then its message)
+       B    @OK4               (>B004) the results of a compile that worked
+       B    @OK1E              (>B008) one file's error (the lexer's, parser's tests)
+       B    @OK1F              (>B00C) one file's results
        COPY "wemsg.a99"
 OV11END
        END
