@@ -1062,6 +1062,29 @@ M6 part 6 done (25 October 2026): errors in plain words.
 - Space: the resident part has about 18 bytes left, the kernel window 4,
   overlay 2 (the parser) about 200: new code goes in new overlays.
 
+Optimization passes (25 October 2026), at Rebecca's request: a Lamplight
+compile 37.2M -> 30.4M instructions (about 123 -> 102 s on a TI), the
+output unchanged (the link test: the image byte for byte).  Measured with
+tools/wbprof.py (counts by overlay and routine).
+- Space: the results and error screens (WL4, WLERR, WL1E/WL1F, the lines
+  they share, their strings) moved to overlay 11, the resident part
+  keeping stubs; it went from 18 bytes free to about 850.  EMAP's shorter
+  remap gave the kernel window about 20.
+- The lexer's keywords grouped by length (gen/kwlen.a99, made from
+  KWLIST): KWIN compares only those of the name's length (lexer 5.8M ->
+  4.1M).
+- The tree and token readers and writers: words in place when both bytes
+  are on the page (XW, TRW, TPUTW); no needless CLR before MOVB/SRL.
+- DMAP, EMAP, the tree reader and the parser's token reader write their
+  window's SAMS register themselves (about 10 instructions, not 23 with
+  MAPPG and the registers it needed kept).
+- The linker: IBYTE writes in place while the position stays on the page
+  shown (IPCUR, cleared wherever the position is set: the header's writes
+  once went to the wrong page), IGETB finds its page from R2:R3.
+- Next, if wanted: what is left is spread thin (tree reading near its
+  floor; source loading, KEYRD's UPPER, DMAP's check, 1-3% each).  The
+  hottest loops in scratchpad RAM would be the next real step.
+
 ## Next
 
 1. M6 part 7: the debug verbs (D5): TREE, GOTO, PURLOIN, SCOPE, ACTIONS

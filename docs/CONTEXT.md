@@ -97,6 +97,7 @@ owns it; Claude builds it. The engine comes first; the story later.
 | `src/wemsg.a99` | overlay 11: an error as "FILE line N: the message", from tools/txc/errtext.py's templates and the fields in VRAM |
 | `tools/txc/errtext.py` | the error messages as templates by TI error code (the one source of the TI's wording) |
 | `tests/errtext_test.py`, `tests/m6_words_test.py` | the templates against Python's messages; the lexer's and parser's errors worded as Python words them |
+| `tools/wbprof.py` | profiles a Lamplight compile on the workbench: instructions by overlay and routine |
 | `tests/m6_testplay_test.py` | test-play: T plays from SAMS (engine STMODE 2); FCTN = back to the workbench |
 | `tests/m5_sema_test.py` | the workbench against sema.py and codegen.py: decls, meaning, code, link (the whole image), errors |
 | `tools/fixjumps.py` | rewrites jumps xas99 reports out of range as branches |
@@ -245,12 +246,14 @@ owns it; Claude builds it. The engine comes first; the story later.
 - The workbench's overlays must not refer to each other's labels: the
   assembler accepts it, but the other overlay is not mapped in.  Shared
   code goes in wload.a99 (resident) or wsym.a99 (kernel window, nearly
-  full: about 200 bytes left).
+  full: about 22 bytes left).
 - An overlay that passes control to another branches to OVGO (resident)
   with the overlay's number in R0: OVSEL overwrites the caller.
-- The workbench's resident part (>A000->AFFF) has about 18 bytes left
-  and the kernel window after the kernel about 4 (to >2FFE): new code
-  goes in an overlay (overlay 2, the parser, has about 200 bytes left).  Overlays cost no SAMS any more (M6): overlay n is
+- The workbench's resident part (>A000->AFFF) has about 850 bytes left
+  (the results and error screens moved to overlay 11, October 2026) and
+  the kernel window after the kernel about 22 (to >2FFE): new code goes
+  in an overlay where it can (overlay 2, the parser, has about 178 bytes
+  left).  Overlays cost no SAMS any more (M6): overlay n is
   cartridge bank n, copied to >B000 by OVSEL; add one in wovl.a99 with a
   branch to its entry first, and enter it with OVSEL then OVENT.
 - The progress line (row 5 while compiling): PSTAGE (a label, a name)
