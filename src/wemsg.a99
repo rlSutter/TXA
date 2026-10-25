@@ -163,13 +163,13 @@ EMS1   MOV  R3,R3
 EMS9   MOV  @EMRET,R11
        RT
 * EMVSTR - the field at VRAM R0 (a length byte first) onto the message.
-EMVSTR MOV  R11,@EMRET
+EMVSTR MOV  R11,@EMRET3         (its own: EMSTR uses EMRET)
        LI   R1,EMTXT
        LI   R2,40
        BL   @VMBR
        LI   R1,EMTXT
        BL   @EMSTR
-       MOV  @EMRET,R11
+       MOV  @EMRET3,R11
        RT
 * EMFNAM - file R0's name (its FTAB entry) onto the message.
 EMFNAM MOV  R11,@EMRET2
@@ -203,6 +203,7 @@ EMSRC  DATA 0
 EMCNT  DATA 0
 EMTMP  DATA 0
 EMRET2 DATA 0
+EMRET3 DATA 0
 D10EM  DATA 10
 EMDIG  BSS  6
 EMTXT  BSS  40
