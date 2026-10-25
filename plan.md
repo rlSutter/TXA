@@ -1030,10 +1030,23 @@ M6 part 5 done (24 October 2026): test-play.
   does; STMODE 2 and the picture files found; no engine files written;
   FCTN = returns to the workbench on bank 0.
 
+M6 part 6 begun (24 October 2026): errors in plain words.
+- The messages as templates, by the TI's error code: tools/txc/errtext.py
+  (lexer 1-6, loading and meaning 40-82, code and link 83-90), with the
+  fields the TI's error sites must record: {n1} {n2} names or words
+  (an identifier, a word, a kind), {a} {b} numbers, {f} {l} another
+  declaration's file and line.  tests/errtext_test.py: every one of the
+  56 error cases matches its template (the Python compiler's own words).
+- Still to do: the parser's templates (codes 10-30: "expected X, found
+  Y" and the rest); each TI error site recording its fields (variables
+  beside WBERR, filled before SERR); the build generating the message
+  overlay from errtext.py; the error screen showing "FILE line N: the
+  message"; the errors stage comparing the TI's full text with Python's.
+
 ## Next
 
-1. M6 part 6: errors in plain words (E, D6): the first error with its
-   file and line, worded as the Python compiler words it.
+1. M6 part 6, the TI side: the error sites' fields, the message overlay,
+   the error screen (above).
 
 The reference used for part 6's disk writes:
    (part 6) libre99's clean-room TI disk controller DSR and its notes,
