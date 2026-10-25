@@ -91,6 +91,7 @@ def run_ti(d, main_name, max_steps=2_000_000_000):
         if hold and steps >= hold:
             m.held = None; hold = 0; free = steps + 12_000
         cpu.step(); steps += 1
+    m.cpu = cpu                                 # (for diagnostics: where it stopped)
     return m, steps
 
 def ti_files(m):
@@ -477,6 +478,7 @@ if which in ('date', 'all'):
     check('date: ENTER takes it', m.rw(sy['WBDONE']) >= 4 and bytes(m.ams[m.rw(sy['IMGPG']) * 4096 + 38:][:6]) == b'261022', scr[3])
 
 if which in ('errors', 'all'):
+    WORDS = []
     cases = [('missing include', 'INCLUDE "DSK1.NOSUCH"\nROUTINE Main\nEND\n')] + ERRS
     for case in cases:
         label, text = case[0], case[1]
@@ -491,6 +493,14 @@ if which in ('errors', 'all'):
         pfile = '?' if pe and pe.file == '<program>' else os.path.splitext(pe.file)[0].upper() if pe else '?'
         want = (code_of(pe.msg), pfile, pe.line) if pe else (0, '?', 0)
         check(f'error: {label}: {pe.msg if pe else "(none)"}', got == want, f'ti {got}, expected {want}')
+        if pe:                                  # M6 part 6: the TI words it as Python does
+            import re as _re
+            scr = R.screen(m).splitlines()
+            ti_text = (scr[6][1:80] + scr[7][1:80]).rstrip()
+            msg = _re.sub(r'([\w-]+)\.txa', lambda mm: mm.group(1).upper(), pe.msg)
+            want_text = (msg if pfile == '?' else f'{pfile} line {pe.line}: {msg}')
+            WORDS.append((label, ti_text == want_text))
+            check(f'words: {want_text}', ti_text == want_text, f'ti {ti_text!r}')
     text = 'ROUTINE F\n  RETURN SELF\nEND\nOBJECT O "o"\n  NAME "extraordinarily"\nEND\nOBJECT Q "q"\nEND\nROOM R "r"\nEND\n'
     d, ppath = stage(text, 'GAME', None)
     p = Sema([d]).run(ppath)

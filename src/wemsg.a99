@@ -1,0 +1,215 @@
+*======================================================================
+* wemsg.a99 - an error in the Python compiler's words (M6 part 6, decision
+* D6), overlay 11: "FILE line N: the message", on rows 6 and 7, from the
+* templates in gen/emsgs.a99 (made from tools/txc/errtext.py) and the
+* fields the error's site recorded (EFN1 .. in VRAM).  A code with no
+* template is shown as before: its stage, number, line and file.
+*======================================================================
+EMLEN  EQU  ULIT+50            the message's length so far
+EMRET  EQU  ULIT+52
+
+* EMSHOW - from WLERR: the message, then the menu (WL9).
+EMSHOW LI   R10,STACKT
+       CLR  @EMLEN
+       MOV  @WBERRF,R0         "FILE line N: " (none for the whole program)
+       C    R0,@NF
+       JL  $+6
+       B    @EMG1
+       MOV  @WBERRF,R0
+       BL   @EMFNAM
+       LI   R1,QLINE
+       BL   @EMSTR
+       MOV  @WBERRL,R0
+       BL   @EMDEC
+       LI   R1,QCOLON
+       BL   @EMSTR
+EMG1    MOV  @WBERR,R0          the template
+       BL   @EMFIND
+       MOV  R1,R1
+       JNE  EMG2
+       B    @EMOLD             (none: the old form)
+EMG2    MOVB *R1+,R4            its length
+       SRL  R4,8
+EMG3    MOV  R4,R4
+       JEQ  EMG8
+       DEC  R4
+       MOVB *R1+,R0
+       SRL  R0,8
+       CI   R0,6
+       JH   EMG7                a character
+       MOV  R1,@EMSRC          a field
+       MOV  R4,@EMCNT
+       CI   R0,1
+       JNE  EMG4
+       LI   R0,EFN1
+       BL   @EMVSTR
+       JMP  EMG6
+EMG4    CI   R0,2
+       JNE  EMG5
+       LI   R0,EFN2
+       BL   @EMVSTR
+       JMP  EMG6
+EMG5    MOV  R0,R5              3 a, 4 b, 5 the other file, 6 the other line
+       AI   R5,-3
+       SLA  R5,1
+       AI   R5,EFA
+       MOV  R5,R0
+       LI   R1,EMTMP
+       LI   R2,2
+       BL   @VMBR
+       MOV  @EMTMP,R0
+       CI   R5,EFF
+       JNE  EMG5A
+       BL   @EMFNAM
+       JMP  EMG6
+EMG5A   BL   @EMDEC
+EMG6    MOV  @EMSRC,R1
+       MOV  @EMCNT,R4
+       JMP  EMG3
+EMG7    BL   @EMCHR
+       JMP  EMG3
+EMG8    LI   R0,6               rows 6 and 7: 79 characters each
+       BL   @WCLR
+       LI   R0,7
+       BL   @WCLR
+       LI   R0,6*COLS+1
+       LI   R1,EMBUF
+       MOV  @EMLEN,R2
+       CI   R2,79
+       JLE  EMG9
+       LI   R2,79
+EMG9    BL   @VMBW
+       MOV  @EMLEN,R2
+       AI   R2,-79
+       JLT  EMG10
+       JEQ  EMG10
+       CI   R2,79
+       JLE  EMG9A
+       LI   R2,79
+EMG9A   LI   R0,7*COLS+1
+       LI   R1,EMBUF+79
+       BL   @VMBW
+EMG10   B    @WL9
+
+* EMOLD - no template: "<stage> error N at line L in FILE" (as before M6).
+EMOLD  LI   R0,6
+       LI   R1,1
+       BL   @TXAT
+       MOV  @WBSTAG,R1
+       SLA  R1,1
+       MOV  @STAGES-2(R1),R1
+       CLR  R2
+       BL   @TXSTR
+       LI   R1,SERROR
+       CLR  R2
+       BL   @TXSTR
+       MOV  @WBERR,R0
+       CLR  R1
+       CLR  R2
+       BL   @TXDEC
+       LI   R1,SLINE
+       CLR  R2
+       BL   @TXSTR
+       MOV  @WBERRL,R0
+       CLR  R1
+       CLR  R2
+       BL   @TXDEC
+       MOV  @WBERRF,R0
+       C    R0,@NF
+       JHE  EMO9
+       LI   R1,SINF
+       CLR  R2
+       BL   @TXSTR
+       MOV  @WBERRF,R0
+       MPY  @DFTSIZ,R0
+       AI   R1,FTAB
+       CLR  R2
+       BL   @TXSTR
+EMO9   B    @WL9
+
+* EMFIND - R1 = the template for code R0 (its length byte), or 0.
+EMFIND LI   R1,EMSGS
+EMF1   MOVB *R1+,R2            the code (0 ends the table)
+       SRL  R2,8
+       JEQ  EMF9
+       C    R2,R0
+       JEQ  EMF8
+       MOVB *R1+,R2            past it
+       SRL  R2,8
+       A    R2,R1
+       JMP  EMF1
+EMF8   RT
+EMF9   CLR  R1
+       RT
+* EMCHR - character R0 onto the message.  Uses R2.
+EMCHR  MOV  @EMLEN,R2
+       CI   R2,158
+       JHE  EMC9
+       SWPB R0
+       MOVB R0,@EMBUF(R2)
+       INC  @EMLEN
+EMC9   RT
+* EMSTR - the string at R1 (a length byte first) onto the message.
+EMSTR  MOV  R11,@EMRET
+       MOVB *R1+,R3
+       SRL  R3,8
+EMS1   MOV  R3,R3
+       JEQ  EMS9
+       MOVB *R1+,R0
+       SRL  R0,8
+       BL   @EMCHR
+       DEC  R3
+       JMP  EMS1
+EMS9   MOV  @EMRET,R11
+       RT
+* EMVSTR - the field at VRAM R0 (a length byte first) onto the message.
+EMVSTR MOV  R11,@EMRET
+       LI   R1,EMTXT
+       LI   R2,40
+       BL   @VMBR
+       LI   R1,EMTXT
+       BL   @EMSTR
+       MOV  @EMRET,R11
+       RT
+* EMFNAM - file R0's name (its FTAB entry) onto the message.
+EMFNAM MOV  R11,@EMRET2
+       MPY  @DFTSIZ,R0
+       AI   R1,FTAB
+       BL   @EMSTR
+       MOV  @EMRET2,R11
+       RT
+* EMDEC - the number R0 (0-65535) onto the message, in decimal.
+EMDEC  MOV  R11,@EMRET2
+       MOV  R0,R1
+       LI   R3,EMDIG+5
+EMD1   CLR  R0
+       DIV  @D10EM,R0          R0 = R1 / 10, R1 = the digit
+       AI   R1,'0'
+       SWPB R1
+       DEC  R3
+       MOVB R1,*R3
+       MOV  R0,R1
+       JNE  EMD1
+EMD2   CI   R3,EMDIG+5
+       JHE  EMD9
+       MOVB *R3+,R0
+       SRL  R0,8
+       BL   @EMCHR
+       JMP  EMD2
+EMD9   MOV  @EMRET2,R11
+       RT
+
+EMSRC  DATA 0
+EMCNT  DATA 0
+EMTMP  DATA 0
+EMRET2 DATA 0
+D10EM  DATA 10
+EMDIG  BSS  6
+EMTXT  BSS  40
+EMBUF  BSS  160
+QLINE  BYTE 6
+       TEXT ' line '
+QCOLON BYTE 2
+       TEXT ': '
+       EVEN
+       COPY "gen/emsgs.a99"

@@ -206,4 +206,12 @@ PTOT   EQU  GLOBRM+>66         the parser's token stream: its length
 WPFX   EQU  GLOBRM+>6C         the project's game prefix: a length byte, 6 letters
 *                              (to GLOBRM+>72; M6 part 3: the story's and the
 *                              engine's file names)
+EFN1   EQU  >3700              an error's fields, in VRAM (M6 part 6): a name or word
+EFN2   EQU  >3728              ... a second (a length byte, then the text)
+EFA    EQU  >3740              ... numbers
+EFB    EQU  >3742
+EFF    EQU  >3744              ... another declaration's file (index) and line
+EFL    EQU  >3746
+EFEND  EQU  >3748
+EFTMP  EQU  GLOBRM+>1C0        (EFNUM's word)
 WBBLD  EQU  GLOBRM+>74         after the compile: 1 Build (the engine's files), 2 test-play

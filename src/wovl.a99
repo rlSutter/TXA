@@ -41,4 +41,8 @@ OV9END
        B    @TPLAY             (>B004) test-play: the compiled game, from SAMS
        COPY "wrun.a99"
 OV10END
+       XORG >B000
+       B    @EMSHOW            overlay 11: the message in plain words
+       COPY "wemsg.a99"
+OV11END
        END
