@@ -392,6 +392,8 @@ WL6A
        LI   R1,SREAD3
        CLR  R2
        BL   @TXSTR
+       B    @WL9               (then the menu: in the resident part this fell
+*                              through into WL9)
 
 * WREADL - row 4: "Read n files, m lines."
 WREADL .enter
