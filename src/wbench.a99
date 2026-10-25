@@ -446,7 +446,16 @@ TPUT   MOV  @TKOFF,R1
 TPU1   MOV  R1,@TKOFF
        RT
 * TPUTW - R0 as a word, high byte first.
-TPUTW  MOV  R11,@LXRET2
+TPUTW  MOV  @TKOFF,R1           both bytes on this page: written here (the
+       CI   R1,4093            optimization pass), R0 left swapped as below
+       JH   TPW2
+       MOVB R0,@>F000(R1)
+       SWPB R0
+       MOVB R0,@>F001(R1)
+       INCT R1
+       MOV  R1,@TKOFF
+       RT
+TPW2   MOV  R11,@LXRET2
        MOV  R0,@LXTMP2
        BL   @TPUT
        MOV  @LXTMP2,R0

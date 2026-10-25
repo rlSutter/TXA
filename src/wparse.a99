@@ -140,18 +140,15 @@ EN.ELS EQU  4
 TRB    MOV  @RDPG,R0
        C    R0,@MAPEP
        JEQ  TRB1
-       MOV  R11,@PRET1
-       MOV  R2,@LXSV2
-       MOV  R3,@LXSV3
-       MOV  R0,@MAPEP
-       LI   R1,>E
-       BL   @MAPPG
-       MOV  @LXSV2,R2
-       MOV  @LXSV3,R3
-       MOV  @PRET1,R11
+       MOV  R0,@MAPEP          window E's register, written here (the
+       SWPB R0                 optimization pass, as DMAP)
+       SOC  @MAPEP,R0
+       LI   R12,AMSCRU
+       SBO  0
+       MOV  R0,@AMSREG+>1C
+       SBZ  0
 TRB1   MOV  @RDOF,R1
-       CLR  R0
-       MOVB @>E000(R1),R0
+       MOVB @>E000(R1),R0      (SRL shifts the old low byte out)
        SRL  R0,8
        INC  R1
        CI   R1,4096
@@ -161,7 +158,20 @@ TRB1   MOV  @RDOF,R1
 TRB2   MOV  R1,@RDOF
        RT
 * TRW - R0 = the next word.
-TRW    MOV  R11,@PRET2
+TRW    MOV  @RDPG,R0            the page in the window, both bytes on it:
+       C    R0,@MAPEP          read here (the optimization pass)
+       JNE  TRWS
+       MOV  @RDOF,R1
+       CI   R1,4093
+       JH   TRWS
+       MOVB @>E000(R1),R0
+       SWPB R0
+       MOVB @>E001(R1),R0
+       SWPB R0
+       INCT R1
+       MOV  R1,@RDOF
+       RT
+TRWS   MOV  R11,@PRET2
        BL   @TRB
        SWPB R0
        MOV  R0,@PTMPW

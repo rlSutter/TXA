@@ -630,6 +630,7 @@ IPAGE  MOV  R11,@IRET2
        LI   R2,255
        B    @SERR
 IPG1   MOV  R1,R0
+       MOV  R1,@IPCUR          (IBYTE's fast path: the page shown)
        BL   @DMAP
        MOV  @IPL,R1
        ANDI R1,>0FFF
@@ -637,7 +638,18 @@ IPG1   MOV  R1,R0
        MOV  @IRET2,R11
        RT
 * IBYTE - byte R0 (low byte) onto the image.  Uses R0, R1.
-IBYTE  MOV  R11,@IRET
+IBYTE  MOV  @IPL,R1             within the page window D shows: written here
+       ANDI R1,>0FFF           (the optimization pass; a page's first byte,
+       JEQ  IBS                or another page shown, goes through IPAGE)
+       C    @IPCUR,@DFPG
+       JNE  IBS
+       SWPB R0
+       MOVB R0,@>D000(R1)
+       INC  @IPL
+       JNC  IBF9
+       INC  @IPH
+IBF9   RT
+IBS    MOV  R11,@IRET
        MOV  R0,@ITMP
        BL   @IPAGE
        MOVB @ITMP+1,*R1
@@ -686,17 +698,18 @@ IPUTW  MOV  R11,@IRET4
        MOV  @IRET4,R11
        RT
 * IGETB - R0 = the image byte at R2:R3.  Uses R0-R3.
-IGETB  MOV  R11,@IRET4
-       MOV  @IPH,@ISVH
-       MOV  @IPL,@ISVL
-       MOV  R2,@IPH
-       MOV  R3,@IPL
-       BL   @IPAGE
-       CLR  R0
-       MOVB *R1,R0
+IGETB  MOV  R11,@IRET4         (the page from R2:R3 itself: the optimization
+       MOV  R3,R1              pass; it was IPAGE's, with IPH:IPL kept)
+       SRL  R1,12
+       MOV  R2,R0
+       SLA  R0,4
+       A    R1,R0
+       A    @IMGPG,R0
+       BL   @DMAP
+       MOV  R3,R1
+       ANDI R1,>0FFF
+       MOVB @>D000(R1),R0
        SRL  R0,8
-       MOV  @ISVH,@IPH
-       MOV  @ISVL,@IPL
        MOV  @IRET4,R11
        RT
 * LFIX - a fixup at the next byte (kind R4: 1 a routine by its symbol,

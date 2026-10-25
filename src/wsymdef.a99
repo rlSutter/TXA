@@ -167,6 +167,7 @@ FLGOFF EQU  2048               DVBPG +2048: each dictionary word's flags byte
 IMGPG  EQU  ULIT+0             the image's first page
 IPH    EQU  ULIT+2             the next byte's place, high word ...
 IPL    EQU  ULIT+4             ... and low
+IPCUR  EQU  ULIT+58            the image page IPAGE last showed (IBYTE's fast path)
 LFN    EQU  ULIT+6             the tables' fixups
 NABB   EQU  ULIT+8             substitutions chosen
 ISVH   EQU  ULIT+10
