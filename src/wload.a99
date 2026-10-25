@@ -692,9 +692,11 @@ IPUTW  MOV  R11,@IRET4
        MOV  @IPL,@ISVL
        MOV  R2,@IPH
        MOV  R3,@IPL
+       CLR  @IPCUR             (the position moved: IBYTE's fast path off)
        BL   @IWORD
        MOV  @ISVH,@IPH
        MOV  @ISVL,@IPL
+       CLR  @IPCUR             (the position moved: IBYTE's fast path off)
        MOV  @IRET4,R11
        RT
 * IGETB - R0 = the image byte at R2:R3.  Uses R0-R3.

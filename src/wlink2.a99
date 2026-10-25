@@ -731,9 +731,11 @@ JPUTB  MOV  R11,@J2
        MOV  R8,R1
        AI   R1,H.BUILD_DATE
        MOV  R1,@IPL
+       CLR  @IPCUR             (the position moved: IBYTE's fast path off)
        BL   @IBYTE
        MOV  @ISVH,@IPH
        MOV  @ISVL,@IPL
+       CLR  @IPCUR             (the position moved: IBYTE's fast path off)
        MOV  @J2,R11
        RT
 * JATTR - header byte R6 := the number of the attribute named at R1, or
@@ -751,10 +753,12 @@ JAT1   MOV  @IPH,@ISVH
        MOV  @IPL,@ISVL
        CLR  @IPH
        MOV  @J2,@IPL
+       CLR  @IPCUR             (the position moved: IBYTE's fast path off)
        MOV  R5,R0
        BL   @IBYTE
        MOV  @ISVH,@IPH
        MOV  @ISVL,@IPL
+       CLR  @IPCUR             (the position moved: IBYTE's fast path off)
        MOV  @J1,R11
        RT
 QMAIN7 BYTE 4

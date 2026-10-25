@@ -552,11 +552,13 @@ KO3    MOV  @KCUR,R0
        AI   R0,6
        A    R7,R0
        MOV  R0,@IPL
+       CLR  @IPCUR             (the position moved: IBYTE's fast path off)
        MOVB @K1,R0
        SWPB R0
        BL   @IBYTE
        MOV  @ISVH,@IPH
        MOV  @ISVL,@IPL
+       CLR  @IPCUR             (the position moved: IBYTE's fast path off)
        INC  R7
        CI   R7,6
        JL   KO3
