@@ -1,0 +1,198 @@
+! debug.txa - the standard library's debug verbs (M6 part 7, decision
+! D5).  They work only under the workbench's test-play (T), which sets the
+! story's test-play flag in its copy; in a built game each one says so.
+!
+!   TREE [object]   the object tree (from the object, or every root)
+!   GOTO room       the player to any room, by its number (TREE shows
+!                   them) or a name
+!   PURLOIN object  any object into the player's hands, by number or name
+!   SCOPE           what the parser can see just now
+!   ACTIONS ON/OFF  each action announced as it is performed
+!   TRACE ON/OFF    the parser's choices announced
+!
+! The globals dbg_actions and dbg_trace are in LIBDEFS (the parser reads
+! them); none of these verbs takes a turn (IsMeta, TURN).
+
+VERB "tree"
+  -> DebugTree
+  topic -> DebugTree
+END
+VERB "goto"
+  topic -> DebugGoto
+END
+VERB "purloin"
+  topic -> DebugPurloin
+END
+VERB "scope"
+  -> DebugScope
+END
+VERB "actions"
+  "on" -> DebugActionsOn
+  "off" -> DebugActionsOff
+END
+VERB "trace"
+  "on" -> DebugTraceOn
+  "off" -> DebugTraceOff
+END
+
+! The gate: TRUE under test-play, else the refusal.
+ROUTINE Debugging
+  IF DEBUG()
+    RETURN TRUE
+  END
+  PRINT "That is a test-play verb: it works under the workbench's T, not in a built game."
+  RETURN FALSE
+END
+
+! The object the topic names: its number (as TREE and SCOPE show it), or
+! words that are all among its names; or 0.  rooms: only objects with no
+! parent (a room's title is not a name, so rooms mostly go by number).
+ROUTINE DebugFind rooms
+  LOCAL o, k, ok
+  IF topiclen = 0
+    RETURN 0
+  END
+  IF topiclen = 1
+    o = NumberAt(topicwn)
+    IF o >= 1 AND o <= LASTOBJ
+      IF NOT rooms OR PARENT(o) = 0
+        RETURN o
+      END
+      RETURN 0
+    END
+  END
+  o = 1
+  WHILE o <= LASTOBJ
+    ok = TRUE
+    IF rooms AND PARENT(o) <> 0
+      ok = FALSE
+    END
+    k = 0
+    WHILE ok AND k < topiclen
+      IF NOT ISNAME(WordAt(topicwn + k), o)
+        ok = FALSE
+      END
+      k = k + 1
+    END
+    IF ok
+      RETURN o
+    END
+    o = o + 1
+  END
+  RETURN 0
+END
+
+ROUTINE DebugBranch o, depth
+  LOCAL c, k
+  k = 0
+  WHILE k < depth
+    WRITE "  "
+    k = k + 1
+  END
+  PRINT (name) o, " (", o, ")"
+  FOR EACH c IN o
+    DebugBranch(c, depth + 1)
+  END
+END
+
+ROUTINE DebugTreeSub
+  LOCAL o
+  IF NOT Debugging()
+    RETURN
+  END
+  IF topiclen > 0
+    o = DebugFind(FALSE)
+    IF o = 0
+      PRINT "No object has that name."
+      RETURN
+    END
+    DebugBranch(o, 0)
+    RETURN
+  END
+  o = 1
+  WHILE o <= LASTOBJ
+    IF PARENT(o) = 0
+      DebugBranch(o, 0)
+    END
+    o = o + 1
+  END
+END
+
+ROUTINE DebugGotoSub
+  LOCAL o
+  IF NOT Debugging()
+    RETURN
+  END
+  o = DebugFind(TRUE)
+  IF o = 0
+    PRINT "No room has that name."
+    RETURN
+  END
+  MOVE player TO o
+  location = o
+  MoveFloating()
+  BuildScope()
+  DescribeRoom(TRUE)
+END
+
+ROUTINE DebugPurloinSub
+  LOCAL o
+  IF NOT Debugging()
+    RETURN
+  END
+  o = DebugFind(FALSE)
+  IF o = 0 OR o = player
+    PRINT "No object has that name or number."
+    RETURN
+  END
+  MOVE o TO player
+  BuildScope()
+  PRINT "Purloined: ", (the) o, "."
+END
+
+ROUTINE DebugScopeSub
+  LOCAL k
+  IF NOT Debugging()
+    RETURN
+  END
+  BuildScope()
+  WRITE "In scope (", nscope, "):"
+  k = 0
+  WHILE k < nscope
+    WRITE " ", (name) scopes(k), " (", scopes(k), ")"
+    k = k + 1
+  END
+  PRINT ""
+END
+
+ROUTINE DebugActionsOnSub
+  IF NOT Debugging()
+    RETURN
+  END
+  dbg_actions = TRUE
+  PRINT "Actions on: each is announced."
+END
+
+ROUTINE DebugActionsOffSub
+  IF NOT Debugging()
+    RETURN
+  END
+  dbg_actions = FALSE
+  PRINT "Actions off."
+END
+
+ROUTINE DebugTraceOnSub
+  IF NOT Debugging()
+    RETURN
+  END
+  dbg_trace = TRUE
+  PRINT "Trace on: the parser's choices are announced."
+END
+
+ROUTINE DebugTraceOffSub
+  IF NOT Debugging()
+    RETURN
+  END
+  dbg_trace = FALSE
+  PRINT "Trace off."
+END

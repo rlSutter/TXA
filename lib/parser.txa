@@ -416,6 +416,11 @@ ROUTINE ParseCommand start
     noun = slotobj(2)
     second = slotobj(1)
   END
+  IF dbg_trace                  ! TRACE ON (DEBUG, test-play)
+    WRITE "[Parser: verb "
+    PrintWord(verbwn)
+    PRINT ", grammar line ", best, ", action ", action, ", noun ", noun, ", second ", second, "]"
+  END
   RunAction()
 END
 
@@ -1080,6 +1085,17 @@ ROUTINE Perform
     IF noun.BEFORE()
       RETURN
     END
+  END
+  IF dbg_actions                ! ACTIONS ON (DEBUG, test-play)
+    WRITE "[Action ", action, ": "
+    PrintWord(verbwn)
+    IF noun > 0
+      WRITE " ", (name) noun
+    END
+    IF second > 0
+      WRITE " ", (name) second
+    END
+    PRINT "]"
   END
   f = ACTSUB(action)
   f()

@@ -497,61 +497,9 @@ BL5    A    R4,R3              the next: length byte, name, two bytes
 BL8    CLR  R0
        RT
 * sema.py's BUILTINS, in its order: name, arguments, gives a value
-BUILTN BYTE 6
-       TEXT 'PARENT'
-       BYTE 1,1,5
-       TEXT 'CHILD'
-       BYTE 1,1,7
-       TEXT 'SIBLING'
-       BYTE 1,1,6
-       TEXT 'RANDOM'
-       BYTE 1,1,7
-       TEXT 'READKEY'
-       BYTE 0,1,4
-       TEXT 'SAVE'
-       BYTE 1,1,7
-       TEXT 'RESTORE'
-       BYTE 1,1,8
-       TEXT 'UNDOSAVE'
-       BYTE 0,1,4
-       TEXT 'UNDO'
-       BYTE 0,1,4
-       TEXT 'QUIT'
-       BYTE 0,0,7
-       TEXT 'RESTART'
-       BYTE 0,0,6
-       TEXT 'STATUS'
-       BYTE 3,0,5
-       TEXT 'SOUND'
-       BYTE 1,0,5
-       TEXT 'STYLE'
-       BYTE 1,0,4
-       TEXT 'READ'
-       BYTE 2,1,8
-       TEXT 'TOKENIZE'
-       BYTE 2,1,7
-       TEXT 'HASATTR'
-       BYTE 2,1,9
-       TEXT 'FRESHLINE'
-       BYTE 0,0,4
-       TEXT 'AGET'
-       BYTE 2,1,4
-       TEXT 'APUT'
-       BYTE 3,0,6
-       TEXT 'ISNAME'
-       BYTE 2,1,3
-       TEXT 'CLS'
-       BYTE 0,0,5
-       TEXT 'MUSIC'
-       BYTE 1,0,7
-       TEXT 'FILTERN'
-       BYTE 4,1,5
-       TEXT 'ACOPY'
-       BYTE 3,0,7
-       TEXT 'PROPLEN'
-       BYTE 2,1,8
-       TEXT 'PROPWORD'
-       BYTE 3,1,0
+* (GENERATED into gen/bnames.a99 by tools/build.py, like bops.a99: the two
+* tables must agree; the M6 part 7 DEBUG built-in once left this one short)
+       COPY "gen/bnames.a99"
        EVEN
 
 * ---- the progress line (row PROW, while the workbench compiles) -------------------

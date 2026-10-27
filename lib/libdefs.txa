@@ -55,6 +55,8 @@ GLOBAL sounds_on = 1          ! SOUNDS OFF sets 0
 GLOBAL title_music            ! a tune for the title page (0: none)
 GLOBAL end_music              ! a tune for the end screen (0: none)
 GLOBAL endmessage             ! a string to use instead of "You have won" / "You have died" (0: those)
+GLOBAL dbg_actions            ! test-play (DEBUG): ACTIONS ON announces each action
+GLOBAL dbg_trace              ! test-play: TRACE ON announces the parser's choices
 
 OBJECT Yourself "yourself"
   NAME "me" "myself" "self" "yourself"

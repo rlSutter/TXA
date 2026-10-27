@@ -117,6 +117,7 @@ OPS = [
     (0x61, 'SOUND',    '',  'n ->',       'Play sound effect n once, over any music (an engine without sound stays silent).'),
     (0x63, 'MUSIC',    '',  'n ->',       'Play tune n (looping if it loops); 0 stops the music; the tune already playing goes on.  An engine without sound stays silent.'),
     (0x62, 'CLS',      '',  '',           'Clear the text window (a partly written line is written first); the next line starts at its top.  An engine without a screen may just start a new line.'),
+    (0x64, 'DEBUG',    '',  '-> f',       'Push 1 if the story is running under test-play (bit 0 of the header\'s flags word, set by the workbench in its copy of the story), else 0: the library\'s debug verbs work only then.'),
 ]
 
 BY_NAME = {o[1]: o for o in OPS}

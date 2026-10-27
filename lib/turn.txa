@@ -76,7 +76,19 @@ ROUTINE IsMeta a
   IF a = ##Undo OR a = ##Restart OR a = ##Version OR a = ##Pictures
     RETURN TRUE
   END
-  RETURN a = ##Music OR a = ##Sounds
+  IF a = ##Music OR a = ##Sounds
+    RETURN TRUE
+  END
+  IF a = ##DebugTree OR a = ##DebugGoto
+    RETURN TRUE
+  END
+  IF a = ##DebugPurloin OR a = ##DebugScope
+    RETURN TRUE
+  END
+  IF a = ##DebugActionsOn OR a = ##DebugActionsOff
+    RETURN TRUE
+  END
+  RETURN a = ##DebugTraceOn OR a = ##DebugTraceOff
 END
 
 ROUTINE EndTurn

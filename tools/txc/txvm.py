@@ -530,6 +530,8 @@ class VM:
             self.music = pop(); self.music_played.append(self.music)
         elif name == 'CLS':
             pass                                      # (the screen, not the text)
+        elif name == 'DEBUG':
+            push(self.img[HDR['flags'] + 1] & 1)      # (test-play sets it; see DEBUG in opcodes.py)
         elif name == 'STATUS':
             mv = pop(); sc = pop(); r = pop()
             self.status = ('Darkness' if r == 0 else self.short_name(r), sc, mv)
@@ -537,5 +539,9 @@ class VM:
             raise VMError(f'{name} is not implemented')
         return pc
 
-def run_image(image, commands=(), seed=1, max_steps=5_000_000):
+def run_image(image, commands=(), seed=1, max_steps=5_000_000, debug=False):
+    """debug: run as under test-play (bit 0 of the header's flags set, as
+    the workbench sets it in its copy): the library's debug verbs work."""
+    if debug:
+        image = bytearray(image); image[HDR['flags'] + 1] |= 1
     return VM(image, commands, seed).run(max_steps)

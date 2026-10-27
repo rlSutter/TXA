@@ -115,7 +115,8 @@ LOCPG  EQU  124                a routine's locals
 LOCMAX EQU  56
 GRMPG  EQU  125                3 pages: GRAMTAB
 GRMMAX EQU  3072
-BPROPL EQU  26                 PROPLEN's place in BUILTN (PROPWORD follows)
+* BPROPL (PROPLEN's place in BUILTN; PROPWORD follows) is in gen/opcodes.a99,
+* generated from sema.py's BUILTINS
 SE.ASB EQU  64                 the action ... has no routine ...Sub
 SE.VWD EQU  65                 "..." is already a word of another VERB
 SE.GTK EQU  66                 ... is not a grammar token (noun, held, multi ...) or an attribute

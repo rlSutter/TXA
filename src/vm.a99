@@ -41,7 +41,7 @@ OPTAB  DATA OPNOP,OPPSHB,OPPSHW,OPPSH0,OPPSH1,OPPOP,OPDUP,OPSELF  >00
        DATA OPPRS,OPPRV,OPPRN,OPPRO,OPPRC,OPNL,OPSTYL,OPPRA
        DATA OPREAD,OPRKEY,OPTOKN,OPFRSH,BADOP,BADOP,BADOP,BADOP
        DATA OPRAND,OPQUIT,OPRST,OPSAVE,OPREST,OPUSAV,OPUNDO,OPPIC
-       DATA OPSTAT,OPSND,OPCLS,OPMUS,BADOP,BADOP,BADOP,BADOP
+       DATA OPSTAT,OPSND,OPCLS,OPMUS,OPDBG,BADOP,BADOP,BADOP
 * >68->FF: no opcodes.  A full table lets NEXT skip the range check.
        BSS  0
 OPTPAD EQU  >100-(>68)
@@ -68,6 +68,10 @@ OPPOP  DECT R6
 OPDUP  MOV  @-2(R6),*R6+
        B    @NEXT
 OPSELF MOV  R8,*R6+
+       B    @NEXT
+OPDBG  MOV  @HDRCPY+8,R0       DEBUG: the header's flags, bit 0 (test-play)
+       ANDI R0,1
+       MOV  R0,*R6+
        B    @NEXT
 * LOAD and STORE are the commonest instructions, and most name a local:
 * the operand byte is fetched inline and a local reached directly; the

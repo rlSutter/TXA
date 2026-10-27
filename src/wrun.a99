@@ -143,7 +143,11 @@ TP1A   MOV  *R1+,*R2+
        JNE  TP1A
        INC  R6
        JMP  TP1
-TP2    SETO @RSRC              the engine from the cartridge
+TP2    LI   R0,32              the story's test-play flag (header +8, bit 0:
+       LI   R1,>D              the library's debug verbs work; the checksum
+       BL   @MAPPG             covers only what follows the header)
+       SOCB @QBIT1,@>D009
+       SETO @RSRC              the engine from the cartridge
        CLR  @RFILE
        MOV  @TPENG+2,@TBANK
        CLR  @TOFF
@@ -289,6 +293,7 @@ TPENG  DATA 0,0,0
 QTPLAY BYTE 9
        TEXT 'Test-play'
 QONER  BYTE 1
+QBIT1  BYTE 1
 QSPR   BYTE ' '
        EVEN
 RTAB   BSS  6*9+2              page, address, length a file; a 0 page ends it
