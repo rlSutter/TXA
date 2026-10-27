@@ -97,6 +97,10 @@ owns it; Claude builds it. The engine comes first; the story later.
 | `src/wemsg.a99` | overlay 11: an error as "FILE line N: the message", from tools/txc/errtext.py's templates and the fields in VRAM |
 | `tools/txc/errtext.py` | the error messages as templates by TI error code (the one source of the TI's wording) |
 | `tests/errtext_test.py`, `tests/m6_words_test.py` | the templates against Python's messages; the lexer's and parser's errors worded as Python words them |
+| `tools/midi2txa/` | TXA music notation 1.0: txamusic.py (the reference compiler), midi2txa.py (MIDI import), snpreview.py (WAV preview); docs/MUSIC.md |
+| `tools/txsound.py` | music and effects for the TI build: .txm (through txamusic) or .mml into the player's events, the sound area, the reference player |
+| `tests/txm_test.py` | .txm through the player: the compiler's state at every tick |
+| `tests/m6_debug_test.py` | the debug verbs under test-play, refused in a built game |
 | `tools/wbprof.py` | profiles a Lamplight compile on the workbench: instructions by overlay and routine |
 | `tests/m6_testplay_test.py` | test-play: T plays from SAMS (engine STMODE 2); FCTN = back to the workbench |
 | `tests/m5_sema_test.py` | the workbench against sema.py and codegen.py: decls, meaning, code, link (the whole image), errors |

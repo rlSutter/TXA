@@ -43,6 +43,11 @@ The test suites are listed in `docs/CONTEXT.md`; the workbench's are
 MIT (proposed, matching The Lantern Coast; see the spec's open questions).
 The font is X11 misc-fixed 5x8, public domain.
 
+Music and sound effects are written in TXA music notation (docs/MUSIC.md;
+.txm files, three tone voices and noise, envelopes, repeats), compiled by
+tools/midi2txa/txamusic.py; tools/midi2txa/midi2txa.py converts MIDI files
+into it, and snpreview.py renders a tune to WAV to judge it by ear.
+
 ## Making a game for the TI
 
     python3 tools/txa_game.py samples/lamplight.txa --prefix LAMP --title LAMPLIGHT --cart

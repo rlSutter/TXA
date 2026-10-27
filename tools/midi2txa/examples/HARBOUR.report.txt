@@ -1,0 +1,42 @@
+Source
+  harbour.mid: format 1, 5 tracks, 225 notes
+  Track  Notes  Channels  Range      Name
+      1      0  -         -          Harbour Song
+      2     64  1         C5-A5      Melody
+      3     32  2         C3-E4      Chords
+      4     32  3         C1-G1      Bass
+      5     97  10        drums      Drums
+
+Timing
+  grid: 1/16 notes
+  61 note starts moved to the grid (largest move 0.21 of a grid step)
+  tempo: 100 from bar 1, 133 from bar 5
+
+Range
+  track 4: 32 notes folded up by octaves into A2-B7
+
+Voices
+  voices A,B,C: shared by the other tracks, highest notes first
+  track 3: 16 notes dropped (no free voice)
+  track 4: 24 notes dropped (no free voice)
+  track 4: 8 notes merged into the same pitch already sounding
+
+Drums
+  mapped to the noise voice: crash 1, hat 64, kick 16, snare 16
+  1 crash hits dropped (struck with a more important drum)
+  32 hat hits dropped (struck with a more important drum)
+
+Volume
+  tone raised 4 dB so the loudest note is full volume
+  tone volumes used: V15 x39, V14 x25, V13 x16
+  drums raised 2 dB so the loudest note is full volume
+  drums volumes used: V15 x32, V12 x32
+  39 small volume changes (1 step or less) smoothed away
+
+Ignored
+  track 4: 8 pitch-bend events (the chip has no bend; notes play at their written pitch)
+
+Output
+  HARBOUR.txm: 15 lines, 865 bytes; TI file name HARBOUR
+  16.8 seconds, 8 bars, notes per voice: A 64, B 8, C 8, N 64
+  preview written to HARBOUR.wav

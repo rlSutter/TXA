@@ -246,10 +246,58 @@ def item_bytes(loop, voices):
         out += s
     return bytes(out)
 
+def compile_txm(text, name, loop):
+    """(loop, [(channel, events)]) for a file in TXA music notation (.txm,
+    docs/MUSIC.md), compiled tick by tick by the reference compiler
+    tools/midi2txa/txamusic.py and encoded as the player's events exactly:
+    each run of ticks with one pitch and volume is a tone (a volume event
+    before it when the volume changes; holds past 255 frames), silence a
+    rest, and on the noise voice the chip's control byte gives the noise
+    type.  Envelopes, which change the volume tick by tick, become short
+    runs.  Loops as declared (MUSIC loops, SOUND plays once)."""
+    sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), 'midi2txa'))
+    import txamusic
+    try:
+        song = txamusic.compile_text(text)
+    except txamusic.MusicError as e:
+        raise MMLError(f'{name}: {e}')
+    voices = []
+    for letter in VOICES:
+        if letter not in song.voices:
+            continue
+        state = song.voices[letter]
+        ev, vol = [], None              # (None: the first sounding run states its
+        i = 0                           # volume: a looping voice keeps its last)
+        while i < len(state):
+            j = i
+            while j < len(state) and state[j] == state[i]:
+                j += 1
+            value, att = state[i]; n = j - i
+            if att >= 15 or value == 0:
+                while n:
+                    ev.append(('rest', min(n, 255))); n -= min(n, 255)
+            else:
+                if 15 - att != vol:
+                    vol = 15 - att; ev.append(('vol', vol))
+                if letter == 'N':
+                    kind, arg = 'noise', value & 7
+                else:
+                    kind, arg = 'tone', value
+                ev.append((kind, arg, min(n, 255))); n -= min(n, 255)
+                while n:
+                    ev.append(('hold', min(n, 255))); n -= min(n, 255)
+            i = j
+        voices.append((VOICES.index(letter), ev))
+    if not voices:
+        raise MMLError(f'{name}: no voices')
+    if loop and song.ticks == 0:
+        raise MMLError(f'{name}: a looping tune must take some time')
+    return loop, voices
+
 def find_file(name, dirs):
     for d in dirs:
         for cand in (name, name.lower(), name.upper()):
-            for ext in ('.mml', '.MML', '.txt'):
+            for ext in ('.txm', '.TXM', '.mml', '.MML', '.txt'):
                 p = os.path.join(d, cand + ext)
                 if os.path.exists(p):
                     return p
@@ -267,9 +315,12 @@ def sound_area(info, dirs):
     for sym in tunes + sounds:
         p = find_file(sym.decl.path, dirs)
         if p is None:
-            sys.exit(f'{sym.kind} {sym.name}: no {sym.decl.path}.mml in ' + ', '.join(dirs))
+            sys.exit(f'{sym.kind} {sym.name}: no {sym.decl.path}.txm or .mml in ' + ', '.join(dirs))
         try:
-            loop, voices = compile_text(open(p).read(), os.path.basename(p))
+            if p.lower().endswith('.txm'):
+                loop, voices = compile_txm(open(p).read(), os.path.basename(p), sym.kind == 'music')
+            else:
+                loop, voices = compile_text(open(p).read(), os.path.basename(p))
             if sym.kind == 'sound' and len(voices) > 2:
                 raise MMLError(f'{os.path.basename(p)}: an effect may use at most two voices')
             items.append(item_bytes(loop, voices))

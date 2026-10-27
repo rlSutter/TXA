@@ -1085,9 +1085,38 @@ tools/wbprof.py (counts by overlay and routine).
   floor; source loading, KEYRD's UPPER, DMAP's check, 1-3% each).  The
   hottest loops in scratchpad RAM would be the next real step.
 
+M6 part 7 done (27 October 2026): the debug verbs (D5).
+- lib/debug.txa, included by STDLIB: TREE [object], GOTO room, PURLOIN
+  object, SCOPE, ACTIONS ON/OFF, TRACE ON/OFF; objects by number (as TREE
+  and SCOPE show them: rooms have titles, not names) or by name.  Each is
+  gated by DEBUG(), bit 0 of the header's flags word: test-play sets it in
+  its SAMS copy (the checksum covers only what follows the header); a
+  built game refuses ("That is a test-play verb ...").  The parser and
+  turn code announce actions and parse choices when asked.
+- The TI's built-in names table (BUILTN) and PROPLEN's place (BPROPL) are
+  generated from sema.py's BUILTINS now (gen/bnames.a99, gen/opcodes.a99):
+  adding DEBUG had left the hand-written ones a place out (unknown name
+  DEBUG; ACOPY given PROPLEN's rule).
+- Lamplight is 33392 bytes in 9 files now (410 declarations, 373 symbols).
+- tests/m6_debug_test.py: the verbs under T as the Python VM plays them
+  with the flag; refused under R.
+
+TXA music notation 1.0 incorporated (27 October 2026), from Rebecca's
+upload: tools/midi2txa (txamusic.py the reference compiler, defining the
+notation tick by tick; midi2txa.py a MIDI converter; snpreview.py a WAV
+preview; its tests), docs/MUSIC.md the notation.  txsound.py compiles .txm
+files (preferred over .mml) through txamusic and encodes the per-tick
+state as the player's events exactly (runs of one pitch and volume; the
+first volume stated, since a looping voice keeps its last); MUSIC loops,
+SOUND plays once.  Lamplight's harbour tune is samples/sounds/harbour.txm
+now (harbour.mml kept).  tests/txm_test.py: the player's chip state is
+the compiler's at every tick, twice round; m4_sound_test: the TI engine
+writes what the reference player writes.  Still to come: the workbench
+compiling .txm on the TI (the native build: part 9's neighbour).
+
 ## Next
 
-1. M6 part 7: the debug verbs (D5): TREE, GOTO, PURLOIN, SCOPE, ACTIONS
+1. M6 part 8: RECORD and REPLAY. the debug verbs (D5): TREE, GOTO, PURLOIN, SCOPE, ACTIONS
    ON, TRACE, in the library, live only when the header's flags mark a
    test-play run.
 
