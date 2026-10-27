@@ -153,7 +153,7 @@ i = next((k for k in range(min(len(got), len(want))) if got[k] != want[k]), min(
 check(f'R ran the game B built (its engine from LAMPLI1-5; the story, pictures and music loaded by the engine): '
       f'the title page and the walkthrough\'s start as the Python VM plays them ({len(got)} characters)', got == want and why == 'waiting',
       f'{why} at {i}: python {want[max(0, i - 80):i + 60]!r}\n  ti {got[max(0, i - 80):i + 60]!r}')
-check('the engine found the picture files (PICPG 8)', m.rw(esy['PICPG']) == 8, m.rw(esy['PICPG']))
+check('the engine found the picture files (PICPG: the page after the story)', m.rw(esy['PICPG']) == (len(img) + 4095) // 4096, m.rw(esy['PICPG']))
 d2, _ = g['stage'](open('samples/lamplight.txa').read(), 'lamplight', g['LIB'])
 got2, m2, why2 = run_then_play(d2, [Rk], [])
 scr = g['R'].screen(m2).splitlines()

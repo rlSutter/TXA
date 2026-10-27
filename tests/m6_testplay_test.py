@@ -156,8 +156,8 @@ i = next((k for k in range(min(len(got), len(want))) if got[k] != want[k]), min(
 check(f'T compiled and test-played the game from SAMS: the title page and the walkthrough\'s start as the Python VM plays them '
       f'({len(got)} characters)', got == want and why == 'waiting',
       f'{why} at {i}: python {want[max(0, i - 80):i + 60]!r}\n  ti {got[max(0, i - 80):i + 60]!r}')
-check('the engine ran in test-play mode (STMODE 2) and found the picture files (PICPG 8)',
-      m.rw(esy['STMODE']) == 2 and m.rw(esy['PICPG']) == 8, (m.rw(esy['STMODE']), m.rw(esy['PICPG'])))
+check('the engine ran in test-play mode (STMODE 2) and found the picture files (PICPG: the page after the story)',
+      m.rw(esy['STMODE']) == 2 and m.rw(esy['PICPG']) == (len(img) + 4095) // 4096, (m.rw(esy['STMODE']), m.rw(esy['PICPG'])))
 after = set(os.listdir(os.path.join(d, 'DSK1')))
 new = sorted(after - before)
 check('test-play wrote nothing but the compile\'s story files (no engine files)', all(n.startswith('LAMPLIS') for n in new), new)

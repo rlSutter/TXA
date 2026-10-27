@@ -83,7 +83,9 @@ def same_as_python(got, why):
 d, ppath = g['stage'](open('samples/lamplight.txa').read(), 'lamplight', g['LIB'])
 m, steps = g['run_ti'](d, 'lamplight')
 ti = sorted(glob.glob(os.path.join(d, 'DSK1', 'LAMPLIS*')))
-check(f'the workbench wrote the story: {len(ti)} files, LAMPLIS01..', len(ti) == 8, [os.path.basename(f) for f in ti])
+img0, _ = compile_file('samples/lamplight.txa', ['lib'], title='LAMPLIGHT')
+nfiles = (len(img0) + 4095) // 4096
+check(f'the workbench wrote the story: {len(ti)} files, LAMPLIS01.. ({nfiles} needed)', len(ti) == nfiles, [os.path.basename(f) for f in ti])
 outC = tempfile.mkdtemp()
 fc = txa_game.write_game('samples/lamplight.txa', 'LAMPLI', 'LAMPLIGHT', out=outC, quiet=True)
 got, mm, why = play(outC, fc['engine'], ti + fc['picture_files'] + fc['sound_files'], walk)

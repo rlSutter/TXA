@@ -105,11 +105,12 @@ fc = txa_game.write_game('samples/lamplight.txa', 'LAMPLI', 'LAMPLIGHT', out=out
 same = [open(os.path.join(d, 'DSK1', a), 'rb').read() == open(os.path.join(outC, a), 'rb').read() for a in fc['engine']]
 check(f'the TI\'s engine files equal the PC game writer\'s, byte for byte ({len(same)} files)', all(same) and eng == fc['engine'], same)
 img, _ = compile_file('samples/lamplight.txa', ['lib'], title='LAMPLIGHT', date=g['DATE'])
-story = b''.join(open(os.path.join(d, 'DSK1', f'LAMPLIS{i:02d}'), 'rb').read() for i in range(1, 9))
+nfiles = (len(img) + 4095) // 4096                 # (the story's files: as many as its length needs)
+story = b''.join(open(os.path.join(d, 'DSK1', f'LAMPLIS{i:02d}'), 'rb').read() for i in range(1, nfiles + 1))
 check('the TI\'s story files equal the PC compiler\'s image', story == img, (len(story), len(img)))
 walk = open('samples/lamplight.walk').read().split('\n')[:-1][:12]
 want_all = run_image(img, walk)
-tifiles = [os.path.join(d, 'DSK1', n) for n in eng + [f'LAMPLIS{i:02d}' for i in range(1, 9)]]
+tifiles = [os.path.join(d, 'DSK1', n) for n in eng + [f'LAMPLIS{i:02d}' for i in range(1, nfiles + 1)]]
 for n in eng:                                   # (play() loads the engine from outC: the TI's go there)
     shutil.copy(os.path.join(d, 'DSK1', n), os.path.join(outC, n))
 got, mm, why = play(outC, eng, tifiles[len(eng):] + fc['picture_files'] + fc['sound_files'], walk)
