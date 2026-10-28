@@ -100,6 +100,8 @@ owns it; Claude builds it. The engine comes first; the story later.
 | `tools/midi2txa/` | TXA music notation 1.0: txamusic.py (the reference compiler), midi2txa.py (MIDI import), snpreview.py (WAV preview); docs/MUSIC.md |
 | `tools/txsound.py` | music and effects for the TI build: .txm (through txamusic) or .mml into the player's events, the sound area, the reference player |
 | `tests/txm_test.py` | .txm through the player: the compiler's state at every tick |
+| `tests/m6_record_test.py` | RECORD and REPLAY in a built game; the script file's records |
+| `src/script.a99` | the engine's RECORD/REPLAY helpers (kernel segment) |
 | `tests/m6_debug_test.py` | the debug verbs under test-play, refused in a built game |
 | `tools/wbprof.py` | profiles a Lamplight compile on the workbench: instructions by overlay and routine |
 | `tests/m6_testplay_test.py` | test-play: T plays from SAMS (engine STMODE 2); FCTN = back to the workbench |

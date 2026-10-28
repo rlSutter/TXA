@@ -1114,9 +1114,33 @@ the compiler's at every tick, twice round; m4_sound_test: the TI engine
 writes what the reference player writes.  Still to come: the workbench
 compiling .txm on the TI (the native build: part 9's neighbour).
 
+M6 part 8 done (28 October 2026): RECORD and REPLAY.
+- Two built-ins, RECORD(n) and REPLAY(n) (opcodes >65 and >66; n < 0
+  stops), in the Python VM (files: a dict, run_image(files=)) and the
+  engine.  A script is a DV80 file STNAME + R + n (DSK1.LAMPLIR0), one
+  command a record.  Each command is written when the next is read, so
+  RECORD and REPLAY themselves never land in it; a replayed command is
+  echoed as if typed; at the script's end the keyboard takes over.  One
+  script open at a time.
+- The engine now carries diskrec.a99 (DVOPEN, DVREAD, DVCLOS) and the
+  output flags (DVFLG: >0014 input, >0012 output); the helpers are in
+  script.a99 in the kernel segment (the resident one was full).  While a
+  script is open no DSR call re-runs the controller's power-up (DSRKEEP;
+  SAVE and RESTORE through DSKCL2), which would forget the open file.
+- lib/script.txa (included by STDLIB): RECORD [n] (again: stops), REPLAY
+  [n]; meta actions.  Lamplight: 9 files, 3770 lines, 419 declarations.
+- Found on the way: the TI applied PROPLEN's and PROPWORD's "the second
+  argument is a property" rule to every built-in after them (CI BPROPL;
+  JL only); RECORD and REPLAY, added after them, failed with a garbled
+  error 76.  Bounded above in the meaning stage and the code generator.
+- The simulator's fake controller writes DV80 records (OPEN for output,
+  WRITE).  tests/m6_record_test.py: the sequence in a built game as the
+  Python VM plays it; the file holds exactly the two commands.
+
 ## Next
 
-1. M6 part 8: RECORD and REPLAY. the debug verbs (D5): TREE, GOTO, PURLOIN, SCOPE, ACTIONS
+1. M6 part 9: picture import (needs a sample TI Artist picture), then
+   part 10, statistics and options. the debug verbs (D5): TREE, GOTO, PURLOIN, SCOPE, ACTIONS
    ON, TRACE, in the library, live only when the header's flags mark a
    test-play run.
 
