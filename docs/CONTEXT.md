@@ -11,9 +11,11 @@ keep it current when the language changes.  The six manuals still to
 write are stubbed in the Claude Doc
 https://claude.ai/artifact/VqqmmXaB3E5RBxdTcfBtU2 (one tab each).
 
-**State (24 October 2026):** M6 parts 1 (the generic engine), 2 (the
-main menu; overlays in the cartridge), 3 (Build), 4 (Run), 5
-(test-play) and 6 (errors in plain words) done.  M5 is done: the workbench loads every
+**State (28 October 2026):** M6 parts 1-8 done: the generic engine, the
+main menu (overlays in the cartridge), Build, Run, test-play, errors in
+plain words (E shows the last), the debug verbs, RECORD and REPLAY.
+TXA music notation 1.0 (.txm, docs/MUSIC.md) is in.  Next: part 9,
+picture import (needs a sample TI Artist picture), then part 10.  M5 is done: the workbench loads every
 file, lexes, parses, checks the meaning, generates the code and links
 the story image, identical to Python byte for byte on the corpus, and
 writes it to disk as 4K PROGRAM files (asking for the build date: the
