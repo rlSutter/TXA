@@ -1,0 +1,294 @@
+*======================================================================
+* wtiart.a99 - TI Artist pictures on the TI (M6 part 9), overlay 12:
+* the converter, matching tools/tiartist.py byte for byte (the reference).
+*
+* The picture's two files, NAME_P (patterns) and NAME_C (colours), 6144
+* bytes each, are kept interleaved in SAMS from page TIPG: byte 2i is P[i],
+* 2i+1 is C[i] (one mapping serves both).  The fitting (TIMODE: 0 crop,
+* 1 squeeze; TIROW: the crop's first row) gives 96 rows of 128 fat
+* pixels; two to a byte, the left in the high nybble, they go to RAWPG
+* (6144 bytes); then the record (format 4, 16 colours, the TI palette, the
+* pixels run-length packed as tools/rlepack.py does) to OUTPG, TILEN bytes.
+*
+* The rules (tiartist.py): a pixel's colour is its colour byte's high
+* nybble where its pattern bit is set, else the low; two pixels into one:
+* the first, unless it is background (0 or 1) and the second is not.
+*======================================================================
+TIPG   EQU  21                 the interleaved picture (3 pages)
+RAWPG  EQU  24                 the fitted pixels (2 pages)
+OUTPG  EQU  26                 the record (2 pages)
+TIMODE EQU  GLOBRM+>1CA        0 crop, 1 squeeze
+TIROW  EQU  GLOBRM+>1CC        the crop's first row (0-96, even)
+TILEN  EQU  GLOBRM+>1CE        the record's length
+TIY    EQU  GLOBRM+>1D0        the fitting: the row (0-95) ...
+TIX    EQU  GLOBRM+>1D2        ... the byte in it (0-63)
+TIRI   EQU  GLOBRM+>1D4        the raw byte being written / read
+TIOI   EQU  GLOBRM+>1D6        the record byte being written
+TIOPG  EQU  GLOBRM+>1D8        the page window F shows (the record)
+TILS   EQU  GLOBRM+>1DA        the packer: the literal run's start ...
+TILC   EQU  GLOBRM+>1DC        ... and length
+
+* TITEST - convert what is staged (TIMODE, TIROW, the interleaved files),
+* then the menu: the tests' way in (overlay 12, entered at OVENT).
+TITEST LI   R10,STACKT
+       BL   @TICONV
+       B    @MENUGO
+
+* TICONV - the record from the staged picture: TILEN bytes at OUTPG.
+TICONV .enter
+       CLR  @TIRI              the fitted pixels into RAWPG
+       CLR  @TIY
+TAC1    CLR  @TIX
+TAC2    MOV  @TIX,R8            the byte's two fat pixels: 2x and 2x+1
+       SLA  R8,1
+       BL   @TIFAT
+       MOV  R6,R9
+       SLA  R9,4
+       INC  R8
+       BL   @TIFAT
+       SOC  R6,R9
+       MOV  @TIRI,R1           the byte into RAWPG
+       MOV  R1,R0
+       SRL  R0,12
+       AI   R0,RAWPG
+       BL   @EMAP
+       ANDI R1,>0FFF
+       SWPB R9
+       MOVB R9,@>E000(R1)
+       INC  @TIRI
+       INC  @TIX
+       MOV  @TIX,R0
+       CI   R0,64
+       JHE   $+6
+       B    @TAC2
+       INC  @TIY
+       MOV  @TIY,R0
+       CI   R0,96
+       JHE   $+6
+       B    @TAC1
+       CLR  @TIOI              the record: its head, then the packed pixels
+       SETO @TIOPG
+       LI   R0,4
+       BL   @TIOUT
+       LI   R0,16
+       BL   @TIOUT
+       LI   R4,TIPAL
+TAC3    MOVB *R4+,R0
+       SRL  R0,8
+       BL   @TIOUT
+       CI   R4,TIPALX
+       JHE   $+6
+       B    @TAC3
+       BL   @TIPACK
+       MOV  @TIOI,@TILEN
+       SETO @XFPG              (window F was the record's: the tree reader maps
+       .leave                  its own again)
+       RT
+
+* TIFAT - R6 = fat pixel R8 (0-127) of row TIY, as TIMODE fits it.
+* Uses R0-R7.
+TIFAT  MOV  R11,@TIFRET
+       MOV  @TIMODE,R0
+       JNE  TAF2
+       MOV  @TIY,R4            crop: row TIROW + y, pixels 2x and 2x+1
+       A    @TIROW,R4
+       MOV  R8,R5
+       SLA  R5,1
+       BL   @TIPX
+       MOV  R0,R6
+       INC  R5
+       BL   @TIPX
+       MOV  R0,R7
+       BL   @TIPICK
+       MOV  @TIFRET,R11
+       RT
+TAF2    MOV  @TIY,R4            squeeze: rows 2y and 2y+1, each column first
+       SLA  R4,1
+       MOV  R8,R5
+       SLA  R5,1
+       BL   @TIPX              the left column: down, then picked
+       MOV  R0,R6
+       INC  R4
+       BL   @TIPX
+       MOV  R0,R7
+       BL   @TIPICK
+       MOV  R6,@TIFLFT
+       INC  R5                 the right column
+       BL   @TIPX
+       MOV  R0,R7
+       DEC  R4
+       BL   @TIPX
+       MOV  R0,R6
+       BL   @TIPICK            (the top first: rows 2y then 2y+1)
+       MOV  R6,R7
+       MOV  @TIFLFT,R6
+       BL   @TIPICK            left, then right
+       MOV  @TIFRET,R11
+       RT
+
+* TIPICK - R6 := the first of R6, R7, unless it is background (0, 1) and
+* R7 is not.
+TIPICK CI   R6,1
+       JH   TIPK9
+       CI   R7,1
+       JLE  TIPK9
+       MOV  R7,R6
+TIPK9  RT
+
+* TIPX - R0 = the colour of pixel (row R4, column R5).  Uses R0-R3.
+TIPX   MOV  R11,@TIXRET
+       MOV  R4,R1              the offset: (row / 8 x 32 + column / 8) x 8
+       SRL  R1,3               + row mod 8; doubled (interleaved)
+       SLA  R1,5
+       MOV  R5,R2
+       SRL  R2,3
+       A    R2,R1
+       SLA  R1,3
+       MOV  R4,R2
+       ANDI R2,7
+       A    R2,R1
+       SLA  R1,1
+       MOV  R1,R0              its page into window D
+       SRL  R0,12
+       AI   R0,TIPG
+       BL   @DMAP
+       ANDI R1,>0FFF
+       MOVB @>D000(R1),R2      the pattern byte
+       MOVB @>D001(R1),R3      the colour byte
+       MOV  R5,R1              the bit: >80 >> column mod 8 (R1: R0 cannot
+       ANDI R1,7               index)
+       CLR  R0                 (COC tests every bit of R0: the low byte clear)
+       MOVB @TIBITS(R1),R0
+       COC  R0,R2
+       JEQ  TIPX1
+       MOV  R3,R0              background: the low nybble
+       SRL  R0,8
+       ANDI R0,15
+       MOV  @TIXRET,R11
+       RT
+TIPX1  MOV  R3,R0              foreground: the high nybble
+       SRL  R0,12
+       MOV  @TIXRET,R11
+       RT
+
+* TIOUT - byte R0 (low) onto the record (window F, from OUTPG).  Uses
+* R0-R3.
+TIOUT  MOV  R11,@TIORET
+       MOV  @TIOI,R1
+       MOV  R1,R2
+       SRL  R2,12
+       AI   R2,OUTPG
+       C    R2,@TIOPG
+       JEQ  TAIO1
+       MOV  R2,@TIOPG          (MAPPG uses R0-R3: the byte and place kept)
+       MOV  R0,@TIOBYT
+       MOV  R1,@TIOTMP
+       MOV  R2,R0
+       LI   R1,>F
+       BL   @MAPPG
+       MOV  @TIOTMP,R1
+       MOV  @TIOBYT,R0
+TAIO1   ANDI R1,>0FFF
+       SWPB R0
+       MOVB R0,@>F000(R1)
+       INC  @TIOI
+       MOV  @TIORET,R11
+       RT
+
+* TIRAWB - R0 = raw byte R1 (0-6143).  Uses R0, R1.
+TIRAWB MOV  R11,@TIRRET
+       MOV  R1,R0
+       SRL  R0,12
+       AI   R0,RAWPG
+       BL   @EMAP
+       ANDI R1,>0FFF
+       MOVB @>E000(R1),R0
+       SRL  R0,8
+       MOV  @TIRRET,R11
+       RT
+
+* TIPACK - the raw 6144 bytes packed onto the record, as rlepack.pack
+* does: a run of three or more equal bytes (at most 129) a repeat (n +
+* >7D, the byte), the rest gathered into literal runs (at most 128: n - 1,
+* the bytes); >FF ends.
+TIPACK MOV  R11,@TIPRET
+       CLR  @TILC
+       CLR  R7                 i
+TAP1    CI   R7,6144
+       JHE  TAP9
+       MOV  R7,R1              the run at i: R8 = j
+       BL   @TIRAWB
+       MOV  R0,R6              (its byte)
+       MOV  R7,R8
+TAP2    CI   R8,6144
+       JHE  TAP3
+       MOV  R8,R0
+       S    R7,R0
+       CI   R0,129
+       JHE  TAP3
+       MOV  R8,R1
+       BL   @TIRAWB
+       C    R0,R6
+       JNE  TAP3
+       INC  R8
+       JMP  TAP2
+TAP3    MOV  R8,R0
+       S    R7,R0
+       CI   R0,3
+       JL   TAP4
+       BL   @TIFLSH            a repeat
+       MOV  R8,R0
+       S    R7,R0
+       AI   R0,>7D
+       BL   @TIOUT
+       MOV  R6,R0
+       BL   @TIOUT
+       MOV  R8,R7
+       B    @TAP1
+TAP4    MOV  @TILC,R0           a literal byte
+       JNE  TAP5
+       MOV  R7,@TILS
+TAP5    INC  @TILC
+       INC  R7
+       B    @TAP1
+TAP9    BL   @TIFLSH
+       LI   R0,>FF
+       BL   @TIOUT
+       MOV  @TIPRET,R11
+       RT
+* TIFLSH - the literal run (TILS, TILC) out, in pieces of at most 128.
+* Keeps R6-R8.
+TIFLSH MOV  R11,@TIFLRT
+TAFL1   MOV  @TILC,R4
+       JEQ  TAFL9
+       CI   R4,128
+       JLE  TAFL2
+       LI   R4,128
+TAFL2   S    R4,@TILC
+       MOV  R4,R0
+       DEC  R0
+       BL   @TIOUT
+TAFL3   MOV  @TILS,R1
+       BL   @TIRAWB
+       BL   @TIOUT
+       INC  @TILS
+       DEC  R4
+       JNE  TAFL3
+       JMP  TAFL1
+TAFL9   MOV  @TIFLRT,R11
+       RT
+
+TIFRET DATA 0
+TIFLFT DATA 0
+TIXRET DATA 0
+TIORET DATA 0
+TIOTMP DATA 0
+TIOBYT DATA 0
+TIRRET DATA 0
+TIPRET DATA 0
+TIFLRT DATA 0
+TIBITS BYTE >80,>40,>20,>10,>08,>04,>02,>01
+* the TI's 16 colours, 12-bit RGB, big-endian (tiartist.TI_PALETTE)
+TIPAL  DATA >0000,>0000,>02C3,>05D6,>054F,>076F,>0D54,>04EF
+       DATA >0F54,>0F76,>0DC5,>0ED8,>02B3,>0C5B,>0CCC,>0FFF
+TIPALX
