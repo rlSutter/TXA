@@ -54,6 +54,7 @@ BUILTINS = {
     'ISNAME': ('ISNAME', 2, True), 'CLS': ('CLS', 0, False), 'DEBUG': ('DEBUG', 0, True), 'MUSIC': ('MUSIC', 1, False), 'FILTERN': ('FILTERN', 4, True), 'ACOPY': ('ACOPY', 3, False),
     # the second argument of these two is a property name, not a value
     'PROPLEN': ('PROPLEN', 2, True), 'PROPWORD': ('GETPROPN', 3, True),
+    'RECORD': ('RECORD', 1, True), 'REPLAY': ('REPLAY', 1, True),
 }
 PROP_ARG = {'PROPLEN', 'PROPWORD'}
 # Arrays the compiler makes for the library's parser (their names are reserved):

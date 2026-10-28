@@ -118,6 +118,8 @@ OPS = [
     (0x63, 'MUSIC',    '',  'n ->',       'Play tune n (looping if it loops); 0 stops the music; the tune already playing goes on.  An engine without sound stays silent.'),
     (0x62, 'CLS',      '',  '',           'Clear the text window (a partly written line is written first); the next line starts at its top.  An engine without a screen may just start a new line.'),
     (0x64, 'DEBUG',    '',  '-> f',       'Push 1 if the story is running under test-play (bit 0 of the header\'s flags word, set by the workbench in its copy of the story), else 0: the library\'s debug verbs work only then.'),
+    (0x65, 'RECORD',   '',  'n -> f',     'Record the commands the player types from now on to script file n (0-9; on the TI, the game\'s prefix + R + n as a DV80 file on its device); n < 0 stops. Push 1, or 0 if the file cannot be made. Starting a recording stops a replay.'),
+    (0x66, 'REPLAY',   '',  'n -> f',     'Take the commands READ reads from script file n (as RECORD made it) instead of the keyboard, each echoed as if typed, until the file ends (then the keyboard again); n < 0 stops. Push 1, or 0 if there is no such file. Starting a replay stops a recording.'),
 ]
 
 BY_NAME = {o[1]: o for o in OPS}

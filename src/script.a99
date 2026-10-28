@@ -1,0 +1,53 @@
+*======================================================================
+* script.a99 - RECORD and REPLAY's helpers (M6 part 8), in the engine's
+* kernel segment (>2000: the resident segment is full).  The opcodes and
+* DVWRIT are in input.a99; SCRRET and SCRTMP there too.
+*======================================================================
+* SCRCLS - the open script, if any, closed.  Keeps R0.
+SCRCLS MOV  R11,@SCRRET
+       MOV  R0,@SCRTMP
+       MOV  @RECFLG,R1
+       SOC  @RPLFLG,R1
+       JEQ  SCRC9
+       BL   @DVCLOS
+       CLR  @RECFLG
+       CLR  @RPLFLG
+SCRC9  MOV  @SCRTMP,R0
+       MOV  @SCRRET,R11
+       RT
+* SCRNAM - FNBUF := STNAME + 'R' + the digit of R0 (0-9).  Uses R0-R3.
+SCRNAM SWPB R0                 the digit, as a character, kept
+       AI   R0,'0'*256
+       MOVB R0,@SCRTMP
+       LI   R1,STNAME
+       LI   R2,FNBUF
+       MOVB *R1,R3             the length, then the name's bytes
+       SRL  R3,8
+       MOV  R3,R0
+       INC  R0
+SCRN1  MOVB *R1+,*R2+
+       DEC  R0
+       JNE  SCRN1
+       LI   R0,'R'*256
+       MOVB R0,*R2+
+       MOVB @SCRTMP,*R2+
+       AI   R3,2               the length byte: two more
+       SWPB R3
+       MOVB R3,@FNBUF
+       RT
+* DVOPNW - FNBUF opened as a DV80 file for writing (DVOPEN with the
+* output flags); R0 = the DSR's error, or 0.
+DVOPNW MOV  R11,@SCRRET
+       LI   R0,>0012
+       MOV  R0,@DVFLG
+       BL   @DVOPEN
+       LI   R1,>0014
+       MOV  R1,@DVFLG
+       MOV  @SCRRET,R11
+       RT
+* DSKCL2 - DSKCAL (R0 opcode, R1 count), with no controller power-up
+* while a script file is open (it would be forgotten): SAVE and RESTORE.
+DSKCL2 MOV  @RECFLG,R2
+       SOC  @RPLFLG,R2
+       MOV  R2,@DSRKEEP
+       B    @DSKCAL

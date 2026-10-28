@@ -243,7 +243,8 @@ OSV12  BL   @SZFLSH
        JNE  OSV98              too big for one file
        LI   R0,6               the DSR's SAVE
        MOV  @SVCNT,R1
-       BL   @DSKCAL
+       BL   @DSKCL2            (a script file open: no power-up, which would
+*                              forget it)
        MOV  R0,@UTMP
        BL   @SPRZER
        BL   @PICRDW            (the disk call overwrote the picture)
@@ -422,7 +423,7 @@ OPREST DECT R6
        BL   @FNAME
        LI   R0,5               the DSR's LOAD
        LI   R1,DSKMAX
-       BL   @DSKCAL
+       BL   @DSKCL2
        MOV  R0,R0
        JEQ  ORS0
        B    @ORS98

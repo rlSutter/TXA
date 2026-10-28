@@ -1112,8 +1112,10 @@ CA3A   C    R5,R6              second is a property's name
        B    @CA9
        CI   R5,1
        JNE  CA4
-       CI   R9,BPROPL
+       CI   R9,BPROPL          (PROPLEN and PROPWORD only)
        JL   CA4
+       CI   R9,BPROPL+1
+       JH   CA4
        BL   @XB
        BL   @XB
        MOV  R0,R4

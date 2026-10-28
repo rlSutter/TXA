@@ -744,3 +744,8 @@ LFA1   INC  @LFN
        MOV  R5,*R1
        MOV  @IRET4,R11
        RT
+
+* The built-ins' names (BLOOK, wsym.a99), generated from sema.py's BUILTINS:
+* here in the resident part, where there is room.
+       COPY "gen/bnames.a99"
+       EVEN

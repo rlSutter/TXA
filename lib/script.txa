@@ -1,0 +1,70 @@
+! script.txa - RECORD and REPLAY (M6 part 8): command scripts on disk, for
+! regression testing on the console.  They work in every game, not only
+! under test-play.
+!
+!   RECORD [n]   from now on, each command typed goes to script file n
+!                (0-9; file 0 if no number): on the TI, the game's prefix
+!                + R + n on its device (DSK1.LAMPLIR0), one command a
+!                record (DIS/VAR 80).  RECORD again stops.
+!   REPLAY [n]   the commands come from script file n, each shown as if
+!                typed, until the file ends; then the keyboard again.
+!
+! One script is open at a time: RECORD stops a replay, REPLAY a recording.
+! Neither takes a turn.
+
+VERB "record"
+  -> Record
+  number -> RecordN
+END
+VERB "replay"
+  -> Replay
+  number -> ReplayN
+END
+
+GLOBAL recording              ! -1: not recording, else the file being written
+                              ! (Main sets it)
+
+ROUTINE RecordSub
+  DoRecord(0)
+END
+ROUTINE RecordNSub
+  DoRecord(parsednum)
+END
+ROUTINE ReplaySub
+  DoReplay(0)
+END
+ROUTINE ReplayNSub
+  DoReplay(parsednum)
+END
+
+ROUTINE DoRecord n
+  IF recording >= 0
+    RECORD(-1)
+    PRINT "Recording to script ", recording, " stopped."
+    recording = -1
+    RETURN
+  END
+  IF n > 9
+    PRINT "A script is numbered 0 to 9."
+    RETURN
+  END
+  IF RECORD(n)
+    recording = n
+    PRINT "Recording your commands to script ", n, " (RECORD again stops)."
+  ELSE
+    PRINT "The script file could not be made."
+  END
+END
+
+ROUTINE DoReplay n
+  IF n > 9
+    PRINT "A script is numbered 0 to 9."
+    RETURN
+  END
+  IF REPLAY(n)
+    recording = -1
+    PRINT "Replaying script ", n, "."
+  ELSE
+    PRINT "There is no script ", n, "."
+  END
+END

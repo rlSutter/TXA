@@ -19,6 +19,7 @@
        COPY "save.a99"
        COPY "fast.a99"
        COPY "stload.a99"
+       COPY "diskrec.a99"
        COPY "gen/storysrc.a99"
 * ENGND: first free byte of the resident window
 ENGND
@@ -33,6 +34,7 @@ KENTRY B    @START             the entry: E/A 5 and the cartridge start here
        COPY "disk.a99"
        COPY "picture.a99"
        COPY "sound.a99"
+       COPY "script.a99"
 * KERNND: first free byte of the kernel window
 KERNND
 

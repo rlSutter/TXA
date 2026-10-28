@@ -345,12 +345,19 @@ class Machine:
                 data[20] ^= 0xFF; self.dsr_corrupt = False   # a test: spoil one save
             open(path, 'wb').write(bytes(data))
             return True
-        if op in (0, 1, 2):                           # OPEN, CLOSE, READ: DIS/VAR files, kept
-            files = self.__dict__.setdefault('dsr_files', {})   # as text, a record a line
+        if op in (0, 1, 2, 3):                        # OPEN, CLOSE, READ, WRITE: DIS/VAR files,
+            files = self.__dict__.setdefault('dsr_files', {})   # kept as text, a record a line
             if op == 0:
+                if (self.vram[pab + 1] & 6) == 2:     # output: a new file (M6 part 8, RECORD)
+                    os.makedirs(os.path.dirname(path), exist_ok=True)
+                    open(path, 'wb').write(b'')
+                    files[pab] = [[], 0, path]
+                    if self.vram[pab + 4] == 0:
+                        self.vram[pab + 4] = 80
+                    return True
                 if not os.path.exists(path):
                     fail(7); return True
-                files[pab] = [open(path, 'rb').read().split(b'\n'), 0]
+                files[pab] = [open(path, 'rb').read().split(b'\n'), 0, None]
                 if files[pab][0] and files[pab][0][-1] == b'':
                     files[pab][0].pop()               # (a last newline ends the last record)
                 if self.vram[pab + 4] == 0:
@@ -358,6 +365,13 @@ class Machine:
                 return True
             if op == 1:
                 files.pop(pab, None); return True
+            if op == 3:                               # WRITE: the record (its count at +5) appended
+                f = files.get(pab)
+                if f is None or f[2] is None:
+                    fail(7); return True
+                rec = bytes(self.vram[buf: buf + self.vram[pab + 5]])
+                open(f[2], 'ab').write(rec + b'\n')
+                return True
             f = files.get(pab)
             if f is None:
                 fail(7); return True

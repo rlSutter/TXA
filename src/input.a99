@@ -135,7 +135,31 @@ RDA2   MOV  @RDTARR,R14
 * RDLINE - show the line so far, take the player's typing into IBUF
 * (ILEN), then echo it through CHOUT and end the line.
 RDLINE .enter
-       CLR  @MORECT            the player is reading: no [MORE] soon
+       MOV  @RECFLG,R0         recording: the last line typed (in IBUF still)
+       JEQ  RDL0A              goes to the script now (an error ends the
+       MOV  @PENDFL,R0         recording)
+       JEQ  RDL0A
+       CLR  @PENDFL
+       BL   @DVWRIT
+       MOV  R0,R0
+       JEQ  RDL0A
+       BL   @DVCLOS
+       CLR  @RECFLG
+RDL0A  MOV  @RPLFLG,R0         replaying a script: the next record is the
+       JEQ  RDL0K              line, echoed as if typed (RDL6); at its end
+       BL   @DVREAD            the keyboard again
+       MOV  R0,R0
+       JLT  RDL0E
+       MOV  R0,@ILEN
+       JEQ  RDL0R
+       LI   R0,FBUF
+       LI   R1,IBUF
+       MOV  @ILEN,R2
+       BL   @VMBR
+RDL0R  B    @RDL6
+RDL0E  BL   @DVCLOS
+       CLR  @RPLFLG
+RDL0K  CLR  @MORECT            the player is reading: no [MORE] soon
        BL   @KEYFRE            a key let go of while the game was busy
        BL   @ROWFIT
        MOV  @ROWS,R0           two rows for typing: scroll if the prompt
@@ -250,8 +274,69 @@ RDL7   MOV  @VT3,R1
        JMP  RDL7
 RDL8   LI   R0,10
        BL   @CHOUT
+       MOV  @RECFLG,R0         recording: this line, when the next is read
+       JEQ  RDL9
+       SETO @PENDFL
+RDL9   .leave
+       RT
+
+* ---- RECORD and REPLAY (M6 part 8): command scripts on disk ----------------
+* A script is a DV80 file, STNAME + R + a digit (DSK1.LAMPLIR0), one
+* command a record.  One script is open at a time: RECORD stops a replay,
+* REPLAY a recording.
+* OPRECD - RECORD n: n < 0 stops; else the file made and recorded to.
+OPRECD DECT R6
+       MOV  *R6,R0
+       CLR  @PENDFL            (the RECORD command itself is not recorded)
+       BL   @SCRCLS            whatever was open
+       MOV  R0,R0
+       JLT  OPRC1
+       BL   @SCRNAM
+       BL   @DVOPNW
+       MOV  R0,R0
+       JNE  OPRC0
+       SETO @RECFLG
+OPRC1  LI   R0,1
+       MOV  R0,*R6+
+       B    @NEXT
+OPRC0  CLR  *R6+
+       B    @NEXT
+* OPRPLY - REPLAY n: n < 0 stops; else the file opened and read from.
+OPRPLY DECT R6
+       MOV  *R6,R0
+       CLR  @PENDFL
+       BL   @SCRCLS
+       MOV  R0,R0
+       JLT  OPRC1
+       BL   @SCRNAM
+       BL   @DVOPEN
+       MOV  R0,R0
+       JNE  OPRC0
+       SETO @RPLFLG
+       JMP  OPRC1
+* (SCRCLS, SCRKP, SCRNAM, DVOPNW and DSKCL2 are in script.a99, in the
+* kernel segment: this one is full.)
+* DVWRIT - IBUF (ILEN bytes) written as the next record; R0 = the DSR's
+* error, or 0.
+DVWRIT .enter
+       LI   R0,FBUF
+       LI   R1,IBUF
+       MOV  @ILEN,R2
+       JEQ  DVW1
+       BL   @VMBW
+DVW1   LI   R0,PABADR+5        the character count
+       MOV  @ILEN,R1
+       SWPB R1
+       BL   @VSBW
+       LI   R0,PABADR          opcode 3: WRITE
+       LI   R1,>0300
+       BL   @VSBW
+       SETO @DSRKEEP
+       BL   @DVCALL
        .leave
        RT
+SCRRET DATA 0
+SCRTMP DATA 0
 
 * ---- the command history ----------------------------------------------
 * HISMAX entries of HISLEN bytes in SAMS page HISPG, oldest first: a

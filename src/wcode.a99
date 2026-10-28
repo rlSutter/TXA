@@ -1426,8 +1426,10 @@ GC6A   .pop R1                 a built-in function
        BL   @XB                its arguments
        BL   @XW
        MOV  R0,R9
-       CI   R6,BPROPL          PROPLEN, PROPWORD: the second is a property
-       JL   GC9
+       CI   R6,BPROPL          PROPLEN, PROPWORD (those two only: built-ins
+       JL   GC9                added after them, RECORD and REPLAY, are
+       CI   R6,BPROPL+1        plain): the second is a property
+       JH   GC9
        .push R6
        BL   @GEXPR
        BL   @XB                (the property: a Name node, not a bare string)

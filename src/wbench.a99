@@ -136,6 +136,8 @@ WS2    LI   R0,30              80 columns, 30 rows, the font, colours
        CLR  R2
        BL   @TXSTR
 
+       LI   R0,>0014           DVOPEN: DV80 input (the engine writes too)
+       MOV  R0,@DVFLG
        LI   R1,SDEFLT          the default source file
        LI   R2,WBNAME
        MOVB *R1+,R0

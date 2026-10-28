@@ -20,7 +20,8 @@ DVRB   SWPB R0
 * The PAB stays at PABADR while the file is open; records arrive at FBUF.
 DVOPEN .enter
        LI   R2,ROWBUF          the PAB: OPEN, DIS/VAR input, 80-byte records
-       LI   R0,>0014           opcode 0, flags >14 (variable, input)
+       MOV  @DVFLG,R0          opcode 0, flags: >14 (variable, input), or
+*                              >12 (output: the engine's DVOPNW)
        MOVB R0,*R2+
        SWPB R0
        MOVB R0,*R2+

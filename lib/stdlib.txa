@@ -9,8 +9,10 @@ INCLUDE "DSK1.VERBS"
 INCLUDE "DSK1.VERBS2"
 INCLUDE "DSK1.TURN"
 INCLUDE "DSK1.DEBUG"
+INCLUDE "DSK1.SCRIPT"
 
 ROUTINE Main
+  recording = -1
   Initialise()
   MOVE player TO location
   MoveFloating()

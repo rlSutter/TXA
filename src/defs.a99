@@ -187,6 +187,12 @@ TKL    EQU  RAMVAR+>23A        TOKENIZE: this word's length
 DLO    EQU  RAMVAR+>23C        LOOKUP: binary search bounds
 DHI    EQU  RAMVAR+>23E
 DMID   EQU  RAMVAR+>240
+RECFLG EQU  RAMVAR+>316        RECORD: nonzero while a script file is open for writing
+RPLFLG EQU  RAMVAR+>318        REPLAY: nonzero while one is open for reading
+PENDFL EQU  RAMVAR+>31C        RECORD: the last line typed (still in IBUF) is to be
+*                              written when the next is read (so a RECORD or REPLAY
+*                              command is never in the script)
+DVFLG  EQU  RAMVAR+>31A        DVOPEN's PAB opcode and flags: >0014 (input) or >0012 (output)
 KEYBUF EQU  RAMVAR+>250        12 bytes: the word being looked up
 IBUF   EQU  RAMVAR+>260        160 bytes: the line being typed
 FLW    EQU  RAMVAR+>300        FILTERN: the word

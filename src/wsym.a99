@@ -499,7 +499,8 @@ BL8    CLR  R0
 * sema.py's BUILTINS, in its order: name, arguments, gives a value
 * (GENERATED into gen/bnames.a99 by tools/build.py, like bops.a99: the two
 * tables must agree; the M6 part 7 DEBUG built-in once left this one short)
-       COPY "gen/bnames.a99"
+* (gen/bnames.a99 is copied into wload.a99, in the resident part: the
+* kernel window is full.)
        EVEN
 
 * ---- the progress line (row PROW, while the workbench compiles) -------------------

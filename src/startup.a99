@@ -22,6 +22,8 @@ STR0   MOV  *R1+,*R2+
 STR1   CLR  *R1+
        DEC  R2
        JNE  STR1
+       LI   R0,>0014           DVOPEN: DV80 input (RECORD sets >0012)
+       MOV  R0,@DVFLG
        BL   @F18UNL
        BL   @F18DET
        BL   @AMSDET

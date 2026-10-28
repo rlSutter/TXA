@@ -21,13 +21,15 @@ def s16(v):
     return v - 0x10000 if v > 0x7FFF else v
 
 class VM:
-    def __init__(self, image, commands=(), seed=1):
+    def __init__(self, image, commands=(), seed=1, files=None):
         if image[:4] != MAGIC:
             raise VMError('not a TXA story image')
         self.img = bytearray(image)
         self.orig = bytes(image)
         self.out = []
         self.commands = list(commands)
+        self.files = files if files is not None else {}   # script files: 'R0' -> [commands] (RECORD, REPLAY)
+        self.record, self.replay, self.pending = None, None, None   # pending: the last line, written at the next READ
         self.seed = seed or 1
         self.stack, self.frames = [], []
         self.self_ = 0
@@ -468,10 +470,15 @@ class VM:
             self.write(art + nm)
         elif name == 'READ':
             parr = pop(); tarr = pop()
-            if not self.commands:
+            if self.replay is not None and not self.replay:
+                self.replay = None                  # the script's end: the keyboard again
+            if self.replay is None and not self.commands:
                 raise Quit()
             ts, tl = self.array(tarr)
-            line = self.commands.pop(0).lower()[:min(tl - 1, 160)]
+            if self.record is not None and self.pending is not None:
+                self.files[self.record].append(self.pending)
+            line = (self.replay if self.replay is not None else self.commands).pop(0).lower()[:min(tl - 1, 160)]
+            self.pending = line
             self.write(line + '\n')
             self.ww(ts, len(line))
             for i, ch in enumerate(line):
@@ -481,6 +488,20 @@ class VM:
             parr = pop(); tarr = pop()
             push(self.tokenize(tarr, parr))
         elif name == 'READKEY': push(13)
+        elif name == 'RECORD':
+            n = pop(); self.pending = None           # (the RECORD command itself is not recorded)
+            if n < 0:
+                self.record = None; push(1)
+            else:
+                self.record = f'R{n}'; self.files[self.record] = []; self.replay = None; push(1)
+        elif name == 'REPLAY':
+            n = pop(); self.pending = None
+            if n < 0:
+                self.replay = None; push(1)
+            elif f'R{n}' in self.files:
+                self.replay = list(self.files[f'R{n}']); self.record = None; push(1)
+            else:
+                push(0)
         elif name == 'RANDOM':
             n = pop()
             if n <= 0:
@@ -539,9 +560,10 @@ class VM:
             raise VMError(f'{name} is not implemented')
         return pc
 
-def run_image(image, commands=(), seed=1, max_steps=5_000_000, debug=False):
+def run_image(image, commands=(), seed=1, max_steps=5_000_000, debug=False, files=None):
     """debug: run as under test-play (bit 0 of the header's flags set, as
-    the workbench sets it in its copy): the library's debug verbs work."""
+    the workbench sets it in its copy): the library's debug verbs work.
+    files: the script files RECORD writes and REPLAY reads ('R0' -> lines)."""
     if debug:
         image = bytearray(image); image[HDR['flags'] + 1] |= 1
-    return VM(image, commands, seed).run(max_steps)
+    return VM(image, commands, seed, files).run(max_steps)

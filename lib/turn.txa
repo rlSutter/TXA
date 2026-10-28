@@ -79,6 +79,12 @@ ROUTINE IsMeta a
   IF a = ##Music OR a = ##Sounds
     RETURN TRUE
   END
+  IF a = ##Record OR a = ##Replay
+    RETURN TRUE
+  END
+  IF a = ##RecordN OR a = ##ReplayN
+    RETURN TRUE
+  END
   IF a = ##DebugTree OR a = ##DebugGoto
     RETURN TRUE
   END
