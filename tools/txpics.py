@@ -3,8 +3,9 @@
 
 A story declares pictures by name and file (PICTURE Harbour "HARBOUR");
 the story image itself holds only their numbers (portability rule 3).
-This tool, part of the TI build, converts each picture's PNG and lays the
-results out as the picture area, which the engine finds in SAMS right
+This tool, part of the TI build, converts each picture's PNG (or TI Artist
+picture, NAME_P and NAME_C: tools/tiartist.py) and lays the results out as
+the picture area, which the engine finds in SAMS right
 after the story.
 
 Formats (the F18A bitmap layer, 96 rows high, 256 screen pixels wide):
@@ -99,9 +100,14 @@ def picture_area(info, dirs):
     for sym in sorted(pics, key=lambda s: s.number):
         fname = sym.decl.path
         p = find_png(fname, dirs)
-        if p is None:
-            sys.exit(f'picture {sym.name}: no {fname}.png in ' + ', '.join(dirs))
-        recs.append(record(p))
+        if p is not None:
+            recs.append(record(p))
+            continue
+        import tiartist                       # M6 part 9: a TI Artist picture
+        f = tiartist.find(fname, dirs)
+        if f is None:
+            sys.exit(f'picture {sym.name}: no {fname}.png, nor {fname}_P and _C (TI Artist), in ' + ', '.join(dirs))
+        recs.append(tiartist.record(tiartist.read_file(f[0]), tiartist.read_file(f[1]), tiartist.settings(f[2])))
     off = 2 + 4 * len(recs)
     out = bytearray(len(recs).to_bytes(2, 'big'))
     offs = []

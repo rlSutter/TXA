@@ -1,0 +1,16 @@
+! birdgame.txa - a one-room game whose title picture is a TI Artist picture
+! (BIRD_P, BIRD_C beside it; BIRD.TIA: crop 20): M6 part 9's test.
+INCLUDE "DSK1.STDLIB"
+
+PICTURE Bird "BIRD"
+
+ROOM Garden "Garden"
+  DESC "Flowers, and a hummingbird among them."
+  HAS light
+END
+
+ROUTINE Initialise
+  location = Garden
+  title_picture = Bird
+  TitlePage("BIRDS", "A TI Artist test", "The title picture is a TI Artist picture, imported.")
+END
