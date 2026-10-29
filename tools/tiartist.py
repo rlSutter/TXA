@@ -23,8 +23,9 @@ for the TI:
 The palette is the TI's own 16 colours (12-bit), transparent shown black;
 the pixels are packed with tools/rlepack.py.
 
-A picture's choice is kept in NAME.TIA beside it, one line: "crop 48" or
-"squeeze"; with none, crop 48 (the middle).
+A picture's choice is kept in NAME_T beside it (a TI file name cannot hold
+a full stop), one line: "crop 48" or "squeeze"; with none, crop 48 (the
+middle).  On the TI it is a DIS/VAR 80 file; on a PC, plain text.
 
   python3 tools/tiartist.py NAME [crop ROW | squeeze]   writes NAME.png, the preview
 """
@@ -91,8 +92,8 @@ def record(pat, col, how=DEFAULT):
     return bytes(out + pack(data))
 
 def settings(base):
-    """NAME.TIA's choice, or the default."""
-    for ext in ('.TIA', '.tia'):
+    """NAME_T's choice, or the default."""
+    for ext in ('_T', '_t', '-T'):
         p = base + ext
         if os.path.exists(p):
             words = open(p).read().split()

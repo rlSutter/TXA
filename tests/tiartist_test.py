@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """tiartist_test.py - TI Artist pictures (M6 part 9, tools/tiartist.py):
 decoding, the two fittings, the record (packed, unpacking to the pixels),
-txpics finding NAME_P/NAME_C with NAME.TIA's choice.  tests/data/BIRD_P
+txpics finding NAME_P/NAME_C with NAME_T's choice.  tests/data/BIRD_P
 and BIRD_C are Rebecca's sample (a hummingbird), with TIFILES headers.
 
   python3 tests/tiartist_test.py"""
@@ -43,10 +43,10 @@ except ValueError:
 check('a band must start at an even row from 0 to 96', bad)
 d = tempfile.mkdtemp()
 shutil.copy('tests/data/BIRD_P', os.path.join(d, 'BIRD_P')); shutil.copy('tests/data/BIRD_C', os.path.join(d, 'BIRD_C'))
-check('no BIRD.TIA: crop 48', tiartist.settings(os.path.join(d, 'BIRD')) == ('crop', 48))
-open(os.path.join(d, 'BIRD.TIA'), 'w').write('squeeze\n')
-check('BIRD.TIA "squeeze": squeeze', tiartist.settings(os.path.join(d, 'BIRD')) == ('squeeze', 0))
-open(os.path.join(d, 'BIRD.TIA'), 'w').write('crop 20\n')
+check('no BIRD_T: crop 48', tiartist.settings(os.path.join(d, 'BIRD')) == ('crop', 48))
+open(os.path.join(d, 'BIRD_T'), 'w').write('squeeze\n')
+check('BIRD_T "squeeze": squeeze', tiartist.settings(os.path.join(d, 'BIRD')) == ('squeeze', 0))
+open(os.path.join(d, 'BIRD_T'), 'w').write('crop 20\n')
 f = tiartist.find('BIRD', [d])
 check('find: BIRD_P and BIRD_C', f is not None and f[0].endswith('BIRD_P'))
 class Sym:
@@ -54,7 +54,7 @@ class Sym:
 info = {'program': type('P', (), {'pictures': [Sym()]})()}
 area = txpics.picture_area(info, [d])
 recs = txpics.read_area(area)
-check('txpics builds the picture area from the TI Artist files with BIRD.TIA\'s crop 20',
+check('txpics builds the picture area from the TI Artist files with BIRD_T\'s crop 20',
       len(recs) == 1 and area[6:] == tiartist.record(pat, col, ('crop', 20)), (len(recs), len(area)))
 print('ALL PASS' if not fails else f'{fails} FAILED')
 sys.exit(1 if fails else 0)

@@ -1,5 +1,5 @@
 ! birdgame.txa - a one-room game whose title picture is a TI Artist picture
-! (BIRD_P, BIRD_C beside it; BIRD.TIA: crop 20): M6 part 9's test.
+! (BIRD_P, BIRD_C beside it; BIRD_T: crop 20): M6 part 9's test.
 INCLUDE "DSK1.STDLIB"
 
 PICTURE Bird "BIRD"

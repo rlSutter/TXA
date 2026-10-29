@@ -189,6 +189,9 @@ DHI    EQU  RAMVAR+>23E
 DMID   EQU  RAMVAR+>240
 RECFLG EQU  RAMVAR+>316        RECORD: nonzero while a script file is open for writing
 RPLFLG EQU  RAMVAR+>318        REPLAY: nonzero while one is open for reading
+DKBUF  EQU  RAMVAR+>31E        DSKCAL's VRAM buffer: 0 FBUF (the usual), else this
+*                              (the workbench's TI Artist import loads 6144 bytes
+*                              at >1800, over the font, which FBUF's room lacks)
 PENDFL EQU  RAMVAR+>31C        RECORD: the last line typed (still in IBUF) is to be
 *                              written when the next is read (so a RECORD or REPLAY
 *                              command is never in the script)
