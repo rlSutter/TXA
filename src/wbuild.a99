@@ -76,7 +76,11 @@ BD8    BL   @PCLEAR            a disk error: said on row 8
        CLR  R2
        BL   @TXSTR
        B    @MENUGO
-BD9    BL   @PCLEAR            done: row 8 says how to play it
+BD9    LI   R0,12              the engine and story written: the pictures next
+       B    @OVGO4             (overlay 12, TIBLD), which comes back to BDFIN
+* BDFIN - (overlay 9's second entry) row 8 says how to play the game.
+BDFIN  LI   R10,STACKT
+       BL   @PCLEAR
        LI   R0,8
        LI   R1,1
        BL   @TXAT

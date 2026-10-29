@@ -27,6 +27,12 @@ TIOI   EQU  GLOBRM+>1D6        the record byte being written
 TIOPG  EQU  GLOBRM+>1D8        the page window F shows (the record)
 TILS   EQU  GLOBRM+>1DA        the packer: the literal run's start ...
 TILC   EQU  GLOBRM+>1DC        ... and length
+AREAPG EQU  28                 Build's picture area (4 pages: 16K)
+TINPIC EQU  ULIT+100           Build: how many pictures
+TIK    EQU  ULIT+102           ... the one being made (from 0)
+TIAP   EQU  ULIT+104           ... the area's next byte
+TIDX   EQU  ULIT+106           ... its declaration
+TIWF   EQU  ULIT+108           ... the file being written
 TIRES  EQU  GLOBRM+>1DE        TIFILE: 0, or the DSR's error loading the picture
 TINAME EQU  ULIT+66            the picture's name, a length byte first ("DSK1.BIRD":
 *                              its files are DSK1.BIRD_P, _C, _T); 0: none
@@ -159,6 +165,281 @@ TIS3   MOV  R5,R5
        JMP  TIS3
 TIS4   MOV  R3,@TIROW
 TIS9   .leave
+       RT
+
+* TIBLD - Build's pictures (from overlay 9, the engine and story written):
+* each PICTURE the program declares, in order, from its TI Artist files on
+* the source's device (NAME_P, NAME_C; NAME_T's choice), converted and
+* laid out as the picture area (a count, an offset each, the records: as
+* tools/txpics.py lays it out), written as PREFIXP01 .. and the next one
+* deleted.  If the first picture has no TI Artist files, the picture files
+* are left as they are (made on the PC); a later one missing is an error.
+* Then Build's message (overlay 9, BDFIN), or the error on row 8.
+TIBLD  LI   R10,STACKT
+       CLR  @TINPIC            how many pictures
+       CLR  R3
+TB1    C    R3,@DXN
+       JHE  TB2
+       BL   @DXINF
+       CI   R4,NT.PIC
+       JNE  TB1A
+       MOV  R5,R5              (not a dropped one)
+       JLT  TB1A
+       INC  @TINPIC
+TB1A   INC  R3
+       JMP  TB1
+TB2    MOV  @TINPIC,R0
+       JEQ  TB99               none: nothing to do
+       SLA  R0,2               the records start after the count and offsets
+       INCT R0
+       MOV  R0,@TIAP
+       MOV  @TINPIC,R0         the count
+       CLR  R1
+       BL   @TIAPUT
+       CLR  @TIK               the picture being made (from 0)
+       CLR  R3
+TB3    C    R3,@DXN
+       JHE  TB8
+       BL   @DXINF
+       CI   R4,NT.PIC
+       JNE  TB7
+       MOV  R5,R5
+       JLT  TB7
+       MOV  R3,@TIDX
+       BL   @DXSEEK            its name, then its file's name (NAMB)
+       BL   @KEYRD
+       BL   @KEYRD
+       BL   @TIPNAM            TINAME := the device + that name
+       LI   R0,TIPROG          (the progress line: "Picture DSK1.BIRD")
+       MOV  R0,R1
+       LI   R2,TINAME
+       BL   @PSTAGE
+       BL   @TIFILE
+       MOV  @TIRES,R0
+       JEQ  TB4
+       MOV  @TIK,R0            not there: the first, so none (the PC's kept)
+       JEQ  TB99
+       B    @TBMISS            a later one: said, and the build stops
+TB4    BL   @TICONV
+       MOV  @TIK,R1            its offset: the area's position now
+       SLA  R1,2
+       INCT R1
+       MOV  @TIAP,R0
+       BL   @TIAPW2
+       BL   @TICOPY            the record onto the area
+       MOV  @TIDX,R3
+       INC  @TIK
+TB7    INC  R3
+       JMP  TB3
+TB8    BL   @TIWRIT            the area as PREFIXP01 ..
+TB99   BL   @PCLEAR
+       LI   R0,9               Build's message
+       B    @OVGO4
+TBMISS BL   @PCLEAR            row 8: which picture has no files
+       LI   R0,8
+       BL   @WCLR
+       LI   R0,8
+       LI   R1,1
+       BL   @TXAT
+       LI   R1,QTIMIS
+       CLR  R2
+       BL   @TXSTR
+       LI   R1,TINAME
+       CLR  R2
+       BL   @TXSTR
+       LI   R1,QTIMS2
+       CLR  R2
+       BL   @TXSTR
+       B    @MENUGO
+
+* TIPNAM - TINAME := the source's device (WBNAME up to its last '.') and
+* the picture's file name (NAMB, KEYL long).  Uses R0-R4.
+TIPNAM LI   R4,TINAME+1
+       MOV  @WBNLEN,R0
+       CLR  R1
+       CLR  R2
+TPN1   C    R2,R0
+       JHE  TPN2
+       CB   @WBNAME(R2),@QTIDOT
+       JNE  TPN1A
+       MOV  R2,R1
+       INC  R1
+TPN1A  INC  R2
+       JMP  TPN1
+TPN2   CLR  R2
+TPN3   C    R2,R1
+       JHE  TPN4
+       MOVB @WBNAME(R2),*R4+
+       INC  R2
+       JMP  TPN3
+TPN4   CLR  R2
+TPN5   C    R2,@KEYL
+       JHE  TPN6
+       MOVB @NAMB(R2),*R4+
+       INC  R2
+       JMP  TPN5
+TPN6   MOV  R4,R0
+       AI   R0,-TINAME-1
+       SWPB R0
+       MOVB R0,@TINAME
+       RT
+
+* TIAPUT - the area's word at offset R0 := R1.  TIAPW2 - the word pair
+* (a 32-bit offset, high word 0) at area offset R1 := R0.  Use R0-R2.
+TIAPW2 MOV  R11,@TIARET
+       MOV  R0,R2              the low word at R1 + 2, the high (0) at R1
+       MOV  R1,R0
+       CLR  R1
+       MOV  R2,@TIAPV
+       BL   @TIAWD
+       INCT R0
+       MOV  @TIAPV,R1
+       BL   @TIAWD
+       MOV  @TIARET,R11
+       RT
+TIAPUT MOV  R11,@TIARET         (R0 the value, R1 the offset)
+       MOV  R0,R2
+       MOV  R1,R0
+       MOV  R2,R1
+       BL   @TIAWD
+       MOV  @TIARET,R11
+       RT
+* TIAWD - the area's word at offset R0 := R1 (bytes high then low).  Keeps
+* R0, R1.  TIAWD0: R1 the value, R0 the offset (the same).
+TIAWD
+TIAWD0 MOV  R11,@TIAWRT
+       MOV  R0,@TIAWO
+       MOV  R1,@TIAWV
+       MOV  R1,R2
+       SWPB R2
+       BL   @TIABYT            (the high byte: R2's low after the swap)
+       MOV  @TIAWO,R0
+       INC  R0
+       MOV  @TIAWV,R2
+       BL   @TIABYT
+       MOV  @TIAWO,R0
+       MOV  @TIAWV,R1
+       MOV  @TIAWRT,R11
+       RT
+* TIABYT - the area's byte at offset R0 := R2's low byte.  Uses R0-R2.
+TIABYT MOV  R11,@TIABRT
+       MOV  R0,R1
+       SRL  R0,12
+       AI   R0,AREAPG
+       BL   @EMAP
+       ANDI R1,>0FFF
+       SWPB R2
+       MOVB R2,@>E000(R1)
+       MOV  @TIABRT,R11
+       RT
+* TICOPY - the record (OUTPG, TILEN bytes) onto the area at TIAP.
+TICOPY MOV  R11,@TICRET
+       CLR  R4
+TCP1   C    R4,@TILEN
+       JHE  TCP9
+       MOV  R4,R1              the record's byte (window F)
+       MOV  R1,R0
+       SRL  R0,12
+       AI   R0,OUTPG
+       MOV  R1,@TICTMP
+       LI   R1,>F
+       BL   @MAPPG
+       MOV  @TICTMP,R1
+       ANDI R1,>0FFF
+       MOVB @>F000(R1),R2
+       SRL  R2,8
+       MOV  @TIAP,R0           onto the area
+       BL   @TIABYT
+       INC  @TIAP
+       INC  R4
+       JMP  TCP1
+TCP9   SETO @XFPG
+       MOV  @TICRET,R11
+       RT
+* TIWRIT - the area (TIAP bytes) written as PREFIXP01, P02 .. (4K each,
+* through FBUF), then the next one deleted (a file left from an earlier
+* build would be loaded after these).
+TIWRIT MOV  R11,@TIWRET
+       CLR  @TIWF              the file (from 0)
+TW1    MOV  @TIWF,R4           its bytes: 4096, or what is left
+       SLA  R4,12
+       MOV  @TIAP,R5
+       S    R4,R5
+       JLT  TW8
+       JEQ  TW8
+       CI   R5,4096
+       JLE  TW2
+       LI   R5,4096
+TW2    MOV  @TIWF,R0           the area's page into window E, to FBUF
+       AI   R0,AREAPG
+       BL   @EMAP
+       LI   R0,FBUF
+       LI   R1,>E000
+       MOV  R5,R2
+       BL   @VMBW
+       MOV  @TIWF,R0
+       BL   @TIPFN             FNBUF: device, prefix, P, two digits
+       LI   R0,6               the DSR's SAVE
+       MOV  R5,R1
+       BL   @DSKCAL
+       MOV  R0,R0
+       JNE  TW9
+       INC  @TIWF
+       JMP  TW1
+TW8    MOV  @TIWF,R0           the next one deleted (an error, none there,
+       BL   @TIPFN             is fine)
+       LI   R0,7
+       CLR  R1
+       BL   @DSKCAL
+TW9    MOV  @TIWRET,R11
+       RT
+* TIPFN - FNBUF := the source's device, the prefix (WPFX), 'P' and file R0
+* + 1 in two digits.  Uses R0-R4.
+TIPFN  MOV  R0,R3
+       INC  R3
+       LI   R4,FNBUF+1
+       MOV  @WBNLEN,R0
+       CLR  R1
+       CLR  R2
+TQF1   C    R2,R0
+       JL  $+6
+       B    @TQF2
+       CB   @WBNAME(R2),@QTIDOT
+       JNE  TQF1A
+       MOV  R2,R1
+       INC  R1
+TQF1A  INC  R2
+       B    @TQF1
+TQF2   CLR  R2
+TQF3   C    R2,R1
+       JHE  TQF4
+       MOVB @WBNAME(R2),*R4+
+       INC  R2
+       B    @TQF3
+TQF4   MOVB @WPFX,R0
+       SRL  R0,8
+       CLR  R2
+TQF5   C    R2,R0
+       JHE  TQF6
+       MOVB @WPFX+1(R2),*R4+
+       INC  R2
+       JMP  TQF5
+TQF6   LI   R0,'P'*256
+       MOVB R0,*R4+
+       CLR  R2                 two digits
+       MOV  R3,R1
+       CLR  R0
+       DIV  @D10TI,R0          R0 tens, R1 ones
+       AI   R0,'0'
+       SWPB R0
+       MOVB R0,*R4+
+       AI   R1,'0'
+       SWPB R1
+       MOVB R1,*R4+
+       MOV  R4,R0
+       AI   R0,-FNBUF-1
+       SWPB R0
+       MOVB R0,@FNBUF
        RT
 
 * TICONV - the record from the staged picture: TILEN bytes at OUTPG.
@@ -406,6 +687,23 @@ TAFL9   MOV  @TIFLRT,R11
        RT
 
 TIPAR  DATA 0
+TIARET DATA 0
+TIAPV  DATA 0
+TIAWRT DATA 0
+TIAWO  DATA 0
+TIAWV  DATA 0
+TIABRT DATA 0
+TICRET DATA 0
+TICTMP DATA 0
+TIWRET DATA 0
+TIPROG BYTE 8
+       TEXT 'Picture '
+QTIMIS BYTE 9
+       TEXT 'Picture: '
+QTIMS2 BYTE 25
+       TEXT ' has no _P and _C files. '
+QTIDOT BYTE '.'
+       EVEN
 TIBUF  BSS  16
 D10TI  DATA 10
 TIFRET DATA 0

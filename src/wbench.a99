@@ -152,6 +152,9 @@ MENUGO LI   R0,8
 * branches here: OVSEL overwrites the caller).
 OVGO   BL   @OVSEL
        B    @OVENT
+* OVGO4 - the same, entered at OVENT+4 (an overlay's second entry).
+OVGO4  BL   @OVSEL
+       B    @OVENT+4
 
 * ---- an error's fields (M6 part 6): what its message names, in VRAM at
 * EFN1 .. (below the PAB; nothing else uses it), for overlay 11 ---------------

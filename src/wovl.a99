@@ -34,6 +34,7 @@ OV7END
 OV8END
        XORG >B000
        B    @BUILD             overlay 9: Build, the engine's files
+       B    @BDFIN             (>B004) the message, after the pictures
        COPY "wbuild.a99"
 OV9END
        XORG >B000
@@ -50,6 +51,7 @@ OV10END
 OV11END
        XORG >B000
        B    @TITEST            overlay 12: TI Artist pictures (the converter)
+       B    @TIBLD             (>B004) Build's pictures
        COPY "wtiart.a99"
 OV12END
        END
