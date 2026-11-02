@@ -36,5 +36,10 @@ acts = {a for a, _, _ in gendocs.lib_verbs()}
 check(f'every action the grammar names ({len(acts)}) has a row', all(f'`{a}`' in lib for a in acts))
 tut = open('docs/TUTORIAL.md').read()
 check('docs/TUTORIAL.md is what gendocs.py makes from the chapters now (its code and transcript included)', tut == gendocs.generate_tutorial())
+eng = open('docs/ENGINE-GUIDE.md').read()
+check('docs/ENGINE-GUIDE.md is what gendocs.py makes now', eng == gendocs.generate_engine_guide())
+named = set(gendocs.IO_OPS) | set(gendocs.OPTIONAL_OPS)
+core_io = [n for c, n, *_ in O.OPS if c >= 0x48 and n not in named]
+check('every input/output and system opcode (>48 on) is in the guide\'s tables', not core_io, core_io)
 print('ALL PASS' if not fails else f'{fails} FAILED')
 sys.exit(1 if fails else 0)
