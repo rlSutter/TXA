@@ -60,7 +60,7 @@ lines) takes a little over a minute. When it is done the screen says
 what it read and made:
 
 ```
-Read 9 files, 3752 lines.
+Read 9 files, 3802 lines.
 ... declarations, ... symbols, 48 objects.
 Story: 34068 bytes in 9 files on disk.
 ```
