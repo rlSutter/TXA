@@ -138,12 +138,12 @@ HDR = {
     'magic': 0,            # 4 bytes 'TXA1'
     'version': 4,          # format version
     'release': 6,          # the game's release number
-    'flags': 8,
+    'flags': 8,            # bit 0: running under test-play (the workbench sets it in its copy; DEBUG reads it)
     'image_len_hi': 10,    # image length in bytes, high and low words
-    'image_len_lo': 12,
+    'image_len_lo': 12,    # (the low word of the image's length)
     'dynamic_len': 14,     # bytes from 0 to the end of the dynamic area
     'objects': 16,         # offset of the object table
-    'object_count': 18,
+    'object_count': 18,    # the number of objects
     'props_start': 20,     # offset of the first property table
     'globals': 22,         # offset of the globals (240 words)
     'arrays': 24,          # offset of the array directory

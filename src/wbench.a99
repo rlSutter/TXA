@@ -567,15 +567,19 @@ WBEND
 * ---- the overlays: each runs at >B000 (XORG), staged from >4000 ----------
        AORG >4000
        XORG >B000
+* overlay 1: the lexer (wlex.a99)
        COPY "wlex.a99"
 OV1END
        XORG >B000
+* overlay 2: the parser (wparse.a99)
        COPY "wparse.a99"
 OV2END
        XORG >B000
+* overlay 3: the meaning stage, first half (wsema.a99)
        COPY "wsema.a99"
 OV3END
        XORG >B000
+* overlay 4: the meaning stage, second half (wsema2.a99)
        COPY "wsema2.a99"
 OV4END
 * (overlays 5 on are assembled apart, in wovl.a99: these four already
