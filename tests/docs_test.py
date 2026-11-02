@@ -41,5 +41,7 @@ check('docs/ENGINE-GUIDE.md is what gendocs.py makes now', eng == gendocs.genera
 named = set(gendocs.IO_OPS) | set(gendocs.OPTIONAL_OPS)
 core_io = [n for c, n, *_ in O.OPS if c >= 0x48 and n not in named]
 check('every input/output and system opcode (>48 on) is in the guide\'s tables', not core_io, core_io)
+card = open('docs/PLAYERS-CARD.md').read()
+check('docs/PLAYERS-CARD.md is what the game writer\'s card generator makes for Lamplight now', card == gendocs.generate_card())
 print('ALL PASS' if not fails else f'{fails} FAILED')
 sys.exit(1 if fails else 0)
