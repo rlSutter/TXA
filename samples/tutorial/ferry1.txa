@@ -1,0 +1,12 @@
+! ferry1.txa - "The Ferry House", the tutorial's game: chapter 1.
+INCLUDE "DSK1.STDLIB"
+
+ROOM Landing "Landing Stage"
+  DESC "Weathered planks stand out over a slow brown river. A path climbs north to the ferry house."
+  HAS light
+END
+
+ROUTINE Initialise
+  location = Landing
+  TitlePage("THE FERRY HOUSE", "A TXA tutorial", "A river, a ferryman, and a penny for the crossing.")
+END

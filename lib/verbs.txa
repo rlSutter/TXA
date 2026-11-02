@@ -513,7 +513,27 @@ ROUTINE EmptySub
   END
 END
 
+! HeldFirst(o): o in the player's hands, taken first if it can be
+! ("(first taking the coin)"), as an action with a held slot needs; FALSE,
+! said why, if it cannot be.
+ROUTINE HeldFirst o
+  IF o IN player
+    RETURN TRUE
+  END
+  IF o HAS static OR o HAS scenery OR o HAS animate OR o = player
+    PRINT "You aren't holding ", (the) o, "."
+    RETURN FALSE
+  END
+  PRINT "(first taking ", (the) o, ")"
+  MOVE o TO player
+  GIVE o moved
+  RETURN TRUE
+END
+
 ROUTINE GiveSub
+  IF NOT HeldFirst(noun)    ! (a held slot: take it first, or say why not)
+    RETURN
+  END
   IF second.LIFE()
     RETURN
   END

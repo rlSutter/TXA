@@ -1,0 +1,33 @@
+! ferry2.txa - "The Ferry House", the tutorial's game: chapter 2.
+INCLUDE "DSK1.STDLIB"
+
+ROOM Landing "Landing Stage"
+  DESC "Weathered planks stand out over a slow brown river. A path climbs north to the ferry house."
+  HAS light
+  N Porch
+END
+ROOM Porch "Porch"
+  DESC "A sagging porch. The ferry house's door is east; the landing stage is back down the path to the south."
+  HAS light
+  S Landing
+END
+
+OBJECT Bench "bench" IN Landing
+  NAME "bench" "wooden"
+  HAS static supporter
+  DESC "A bench for waiting passengers, polished by years of them."
+END
+OBJECT Coin "copper coin" IN Bench
+  NAME "copper" "coin" "penny"
+  DESC "A worn copper penny: the ferry's fare."
+END
+OBJECT River "river" IN Landing
+  NAME "river" "water"
+  HAS scenery
+  DESC "Too wide and too deep to wade."
+END
+
+ROUTINE Initialise
+  location = Landing
+  TitlePage("THE FERRY HOUSE", "A TXA tutorial", "A river, a ferryman, and a penny for the crossing.")
+END

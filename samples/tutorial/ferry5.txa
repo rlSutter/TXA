@@ -1,0 +1,141 @@
+! ferry5.txa - "The Ferry House", the tutorial's game: chapter 5 (complete).
+INCLUDE "DSK1.STDLIB"
+
+GLOBAL bell_turns = 4      ! turns until the bell rings again
+
+ROOM Landing "Landing Stage"
+  DESC "Weathered planks stand out over a slow brown river. A path climbs north to the ferry house."
+  HAS light
+  N Porch
+END
+ROOM Porch "Porch"
+  DESC "A sagging porch. The ferry house's door is east; the landing stage is back down the path to the south."
+  HAS light
+  S Landing
+  E FrontDoor
+END
+ROOM Parlour "Parlour"
+  DESC "A dim parlour smelling of river mud. The door out is west."
+  HAS light
+  W FrontDoor
+  OUTSIDE FrontDoor
+END
+ROOM FarBank "Far Bank"
+  DESC "Reeds and willows. The ferry house is a grey shape across the water."
+  HAS light
+END
+
+OBJECT Bench "bench" IN Landing
+  NAME "bench" "wooden"
+  HAS static supporter
+  DESC "A bench for waiting passengers, polished by years of them."
+END
+OBJECT Coin "copper coin" IN Bench
+  NAME "copper" "coin" "penny"
+  DESC "A worn copper penny: the ferry's fare."
+END
+OBJECT River "river"
+  NAME "river" "water"
+  HAS scenery
+  FOUND_IN Landing FarBank
+  DESC "Too wide and too deep to wade."
+END
+OBJECT FrontDoor "front door"
+  NAME "front" "door"
+  HAS door openable lockable locked static scenery
+  WITH_KEY Key
+  DOOR_TO Porch Parlour
+  FOUND_IN Porch Parlour
+END
+OBJECT Mat "doormat" IN Porch
+  NAME "mat" "doormat"
+  HAS static
+  INITIAL "A doormat lies in front of the door, curled at one corner."
+  DESC "Its curled corner hides something."
+  BEFORE
+    Take, Pull, Turn, Search:
+      IF Key HAS general
+        PRINT "Nothing else under there."
+      ELSE
+        GIVE Key general
+        MOVE Key TO location
+        PRINT "You lift the corner. Underneath lies an iron key."
+      END
+      RETURN TRUE
+  END
+END
+OBJECT Key "iron key"
+  NAME "iron" "key"
+  DESC "Heavy and cold."
+END
+OBJECT Box "tin box" IN Parlour
+  NAME "tin" "box"
+  HAS container openable
+  DESC "A tin box with a stiff lid."
+END
+OBJECT Ticket "ferry ticket" IN Box
+  NAME "ferry" "ticket"
+  DESC "A stub stamped OUTWARD."
+END
+OBJECT Ferryman "ferryman" IN Landing
+  NAME "ferryman" "old" "man"
+  HAS animate male
+  INITIAL "The ferryman leans on his pole, waiting for a fare."
+  DESC "Patient as the river."
+  LIFE
+    Ask, Tell:
+      IF WordIs('river') OR WordIs('ferry')
+        PRINT "~One penny across. No penny, no crossing.~"
+      ELSE
+        PRINT "He shrugs."
+      END
+      RETURN TRUE
+    Give:
+      IF noun = Coin
+        MOVE Coin TO self
+        score = score + 5
+        PRINT "He bites the coin, nods, and poles you across."
+        GoTo(FarBank)
+        deadflag = 2
+      ELSE
+        PRINT "~That's not the fare.~"
+      END
+      RETURN TRUE
+  END
+END
+OBJECT Bell "bell"
+  NAME "bell"
+  DAEMON
+    bell_turns = bell_turns - 1
+    IF bell_turns <= 0
+      bell_turns = 4
+      IF location = Landing OR location = Porch
+        PRINT "Across the water, a bell rings for the ferry."
+      END
+    END
+  END
+END
+
+! a new verb: LIFT means the same as PULL
+VERB "lift" "raise"
+  noun -> Pull
+END
+
+! was word w in the topic of ASK or TELL?  (topicwn, topiclen: the parser's)
+ROUTINE WordIs w
+  LOCAL k
+  WHILE k < topiclen
+    IF WordAt(topicwn + k) = w
+      RETURN TRUE
+    END
+    k = k + 1
+  END
+  RETURN FALSE
+END
+
+ROUTINE Initialise
+  location = Landing
+  max_score = 5
+  StartDaemon(Bell)
+  TitlePage("THE FERRY HOUSE", "A TXA tutorial", "A river, a ferryman, and a penny for the crossing.")
+END

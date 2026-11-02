@@ -346,6 +346,7 @@ The routines a game is most likely to call or replace (daemons and timers, pictu
 | `InvList(obj, depth)` | verbs.txa | one line an object, indented by depth; what is in or on it below it |
 | `IsInside(a, b)` | verbs.txa | is a somewhere inside b (in it, or in something in it ...)? |
 | `Full(c)` | verbs.txa | has container c as many things as its CAPACITY allows?  (no CAPACITY: never full) |
+| `HeldFirst(o)` | verbs.txa | HeldFirst(o): o in the player's hands, taken first if it can be ("(first taking the coin)"), as an action with a held slot needs; FALSE, said why, if it cannot be. |
 | `ExitOf(r, d)` | verbs.txa | The exit in direction d (1-12, the compass objects' DIR) of the room: run, so an exit routine decides, an exit string prints itself. |
 | `GoTo(dest)` | verbs.txa | Through door d (or to room dest if it is not a door): a closed door stops the player; otherwise DOOR_TO says where it leads. |
 | `DoorLeads(d)` | verbs.txa | where door d leads from here: DOOR_TO with two rooms gives the one the player is not in; one room, or a routine, says itself |

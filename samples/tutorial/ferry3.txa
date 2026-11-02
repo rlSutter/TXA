@@ -1,0 +1,82 @@
+! ferry3.txa - "The Ferry House", the tutorial's game: chapter 3.
+INCLUDE "DSK1.STDLIB"
+
+ROOM Landing "Landing Stage"
+  DESC "Weathered planks stand out over a slow brown river. A path climbs north to the ferry house."
+  HAS light
+  N Porch
+END
+ROOM Porch "Porch"
+  DESC "A sagging porch. The ferry house's door is east; the landing stage is back down the path to the south."
+  HAS light
+  S Landing
+  E FrontDoor
+END
+ROOM Parlour "Parlour"
+  DESC "A dim parlour smelling of river mud. The door out is west."
+  HAS light
+  W FrontDoor
+  OUTSIDE FrontDoor
+END
+
+OBJECT Bench "bench" IN Landing
+  NAME "bench" "wooden"
+  HAS static supporter
+  DESC "A bench for waiting passengers, polished by years of them."
+END
+OBJECT Coin "copper coin" IN Bench
+  NAME "copper" "coin" "penny"
+  DESC "A worn copper penny: the ferry's fare."
+END
+OBJECT River "river" IN Landing
+  NAME "river" "water"
+  HAS scenery
+  DESC "Too wide and too deep to wade."
+END
+OBJECT FrontDoor "front door"
+  NAME "front" "door"
+  HAS door openable lockable locked static scenery
+  WITH_KEY Key
+  DOOR_TO Porch Parlour
+  FOUND_IN Porch Parlour
+END
+OBJECT Mat "doormat" IN Porch
+  NAME "mat" "doormat"
+  HAS static
+  INITIAL "A doormat lies in front of the door, curled at one corner."
+  DESC "Its curled corner hides something."
+  BEFORE
+    Take, Pull, Turn, Search:
+      IF Key HAS general
+        PRINT "Nothing else under there."
+      ELSE
+        GIVE Key general
+        MOVE Key TO location
+        PRINT "You lift the corner. Underneath lies an iron key."
+      END
+      RETURN TRUE
+  END
+END
+OBJECT Key "iron key"
+  NAME "iron" "key"
+  DESC "Heavy and cold."
+END
+OBJECT Box "tin box" IN Parlour
+  NAME "tin" "box"
+  HAS container openable
+  DESC "A tin box with a stiff lid."
+END
+OBJECT Ticket "ferry ticket" IN Box
+  NAME "ferry" "ticket"
+  DESC "A stub stamped OUTWARD."
+END
+
+! a new verb: LIFT means the same as PULL
+VERB "lift" "raise"
+  noun -> Pull
+END
+
+ROUTINE Initialise
+  location = Landing
+  TitlePage("THE FERRY HOUSE", "A TXA tutorial", "A river, a ferryman, and a penny for the crossing.")
+END

@@ -201,6 +201,9 @@ ROUTINE ReadSub
 END
 
 ROUTINE EatSub
+  IF NOT HeldFirst(noun)    ! (a held slot: take it first, or say why not)
+    RETURN
+  END
   IF noun HASNT edible
     PRINT "That's hardly something to eat."
   ELSE
@@ -217,6 +220,9 @@ ROUTINE DrinkSub
 END
 
 ROUTINE WearSub
+  IF NOT HeldFirst(noun)    ! (a held slot: take it first, or say why not)
+    RETURN
+  END
   IF noun HASNT wearable
     PRINT "You can't wear that."
   ELSEIF noun HAS worn
@@ -297,6 +303,9 @@ ROUTINE TasteSub
 END
 
 ROUTINE ThrowAtSub
+  IF NOT HeldFirst(noun)    ! (a held slot: take it first, or say why not)
+    RETURN
+  END
   IF second HAS animate
     PRINT "Throwing things at people seldom helps."
   ELSE
@@ -305,6 +314,9 @@ ROUTINE ThrowAtSub
 END
 
 ROUTINE ShowSub
+  IF NOT HeldFirst(noun)    ! (a held slot: take it first, or say why not)
+    RETURN
+  END
   IF second.LIFE()
     RETURN
   END
