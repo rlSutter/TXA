@@ -37,6 +37,11 @@ MIT (see LICENSE). The 80-column font is derived from X11 misc-fixed
 5x8 (public domain). The assembler, xdt99 (Ralph Benzinger), is used to
 build but not included.
 
+Two sample files are public domain: the hummingbird picture used as
+TI Artist test data and in the bird sample disk (`tests/data/BIRD_P`,
+`BIRD_C`), and the MIDI file behind Lamplight's harbour tune
+(`tools/midi2txa/examples/harbour.mid`).
+
 ## Building and testing
 
     git clone https://github.com/endlos99/xdt99 ../xdt99     # the assembler, next to this repo
