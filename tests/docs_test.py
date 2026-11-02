@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 """docs_test.py - the generated manuals cannot drift from the source (M7):
-docs/TECHNICAL-REFERENCE.md is exactly what tools/gendocs.py makes now,
-and it names every opcode, every header field and every overlay.
+docs/TECHNICAL-REFERENCE.md and docs/LIBRARY-REFERENCE.md are exactly what
+tools/gendocs.py makes now; every opcode, header field, overlay, library
+attribute, property and action is there.
 
   python3 tests/docs_test.py"""
 import os, sys, subprocess, re
@@ -26,5 +27,12 @@ while f'OV{n}END' in sy:
     n += 1
 rows = re.findall(r'^\| (\d+) \| [^|]+ \| ', text.split('## 5. The workbench')[1].split('## 6.')[0], re.M)
 check(f'every overlay the build knows ({n - 1}) has its row', sorted(map(int, rows)) == list(range(1, n)), rows)
+lib = open('docs/LIBRARY-REFERENCE.md').read()
+check('docs/LIBRARY-REFERENCE.md is what gendocs.py makes from the library now', lib == gendocs.generate_library())
+nodesc = [n for n, d in gendocs.lib_props() if not d]
+check(f'every library property has a description ({len(gendocs.lib_props())})', not nodesc, nodesc)
+check(f'every library attribute has a description ({len(gendocs.lib_attrs())})', all(a in gendocs.ATTR_DESC for a in gendocs.lib_attrs()))
+acts = {a for a, _, _ in gendocs.lib_verbs()}
+check(f'every action the grammar names ({len(acts)}) has a row', all(f'`{a}`' in lib for a in acts))
 print('ALL PASS' if not fails else f'{fails} FAILED')
 sys.exit(1 if fails else 0)
