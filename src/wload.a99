@@ -203,7 +203,12 @@ LF0    LI   R1,QREAD           "Reading DSK1.NAME"
        BL   @DVOPEN
        MOV  R0,R0
        JEQ  LF1
-       SETO R0
+       MOVB @OPLSTR,R0         not there: the library devices (the options)
+       JEQ  LF0N
+       BL   @LFLIB
+       MOV  R0,R0
+       JEQ  LF1
+LF0N   SETO R0
        B    @LF99
 LF1    CLR  @WBLNS
        CLR  @WBLENL

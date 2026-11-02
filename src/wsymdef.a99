@@ -226,3 +226,9 @@ TINAME EQU  GLOBRM+>100        22 bytes: a TI Artist picture's name, a length
 LKTEND EQU  GLOBRM+>118        the statistics (S): the tables' end (where the
 *                              routines start), 0 until a compile links
 LKIPG  EQU  GLOBRM+>11A        ... and the image's first page
+OPCOL  EQU  GLOBRM+>11C        the options (O, overlay 14; DSK1.TXAOPT): the colour
+*                              scheme, 0-4 (0 gray on black, as at first)
+OPFNT  EQU  GLOBRM+>11E        ... the font: 0 normal, 1 bold
+OPLSTR EQU  GLOBRM+>120        ... 22 bytes: the library devices, a length byte, then
+*                              up to 20 characters ("DSK2. DSK3."): where an INCLUDE's
+*                              file is looked for when its own device lacks it

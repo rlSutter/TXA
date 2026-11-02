@@ -90,17 +90,17 @@ check('C alone compiles the project as it stands (DSK1.LAMPLIGHT at start-up)', 
 m6 = run([C, C])                            # compiled twice
 check('C again compiles again, the results replaced', m6.rw(sy['WBDONE']) == 3 and m6.rw(sy['WBLNS']) == len(lines)
       and R.screen(m6).splitlines()[4].strip() == f'Read {len(lines)} lines, {len(want)} bytes.', R.screen(m6).splitlines()[:12])
-SOON = {'s': 'Statistics: not built yet (M6 part 10).', 'o': 'Options: not built yet (M6 part 10).'}
-for k, msg in SOON.items():                 # each key of a part still to come says so (Rebecca found O silent)
-    mk = run([('key', k)])
-    check(f'{k.upper()} says "{msg}"', R.screen(mk).splitlines()[11].strip() == msg, R.screen(mk).splitlines()[10:12])
+ms = run([('key', 's')])                    # S (M6 part 10) before a full compile: nothing to show
+check('S before a compile that links: "No statistics yet ..."', R.screen(ms).splitlines()[4].strip().startswith('No statistics yet'),
+      R.screen(ms).splitlines()[3:6])
+mo = run([('key', 'o')])                    # O (M6 part 10): the options
+check('O shows the options (colours, font, library devices)', R.screen(mo).splitlines()[5].strip().startswith('C  Colours:')
+      and R.screen(mo).splitlines()[7].strip().startswith('L  Library devices:'), R.screen(mo).splitlines()[3:10])
 mi = run([('key', 'i')])                    # I (M6 part 9): asks for the picture, offering the device
 check('I asks for a picture: "Picture: DSK1." on row 6, the hint on row 11', R.screen(mi).splitlines()[6].strip().startswith('Picture: DSK1.')
       and 'NAME_P and NAME_C' in R.screen(mi).splitlines()[11], R.screen(mi).splitlines()[5:12])
 me = run([('key', 'e')])                    # E with no compile yet
 check('E with no error says so: "No error in the last compile."', R.screen(me).splitlines()[11].strip() == 'No error in the last compile.',
       R.screen(me).splitlines()[10:12])
-mx = run([('key', 'o'), ('key', 'x')])
-check('another key (X) leaves the message and the menu as they were', R.screen(mx).splitlines()[11].strip() == SOON['o'], R.screen(mx).splitlines()[10:12])
 print('ALL PASS' if not fails else f'{fails} FAILED')
 sys.exit(1 if fails else 0)

@@ -1,0 +1,401 @@
+*======================================================================
+* wopts.a99 - the options (O, M6 part 10), overlay 14: the spec's "font,
+* colours, library path", kept on disk in DSK1.TXAOPT, a DIS/VAR 80 file
+* of short lines: "colours N" (0-4), "font normal" or "font bold",
+* "library DSK2. DSK3." (Rebecca approved the design, 2 November 2026).
+*   colours: the workbench's own (palette 14 the text, 1 the ground):
+*            gray on black (as at first), white on dark blue, green on
+*            black, amber on black, black on white.  Games keep theirs.
+*   font:    the 80-column font, or a bold one made from it (WBOLD).
+*   library: devices where an INCLUDE's file is looked for when the device
+*            it names lacks it (LFLIB, in LOADF).
+*======================================================================
+* OPLOAD - (>B004) at start-up: DSK1.TXAOPT read, if there is one, and
+* applied; then the menu.
+OPLOAD LI   R10,STACKT
+       CLR  @OPCOL
+       CLR  @OPFNT
+       CLR  R0
+       MOVB R0,@OPLSTR
+       BL   @OPFN
+       BL   @DVOPEN
+       MOV  R0,R0
+       JNE  OPL9
+OPL1   BL   @DVREAD            each line
+       MOV  R0,R5
+       JLT  OPL8
+       JEQ  OPL1
+       CI   R5,40
+       JLE  OPL2
+       LI   R5,40
+OPL2   LI   R0,FBUF
+       LI   R1,OPLINE
+       MOV  R5,R2
+       BL   @VMBR
+       MOVB @OPLINE,R0         its first letter says which
+       ANDI R0,>DF00
+       CI   R0,'C'*256         colours N
+       JNE  OPL3
+       CI   R5,9
+       JL   OPL1
+       MOVB @OPLINE+8,R0
+       SRL  R0,8
+       AI   R0,-'0'
+       JLT  OPL1
+       CI   R0,4
+       JH   OPL1
+       MOV  R0,@OPCOL
+       JMP  OPL1
+OPL3   CI   R0,'F'*256         font bold / normal
+       JNE  OPL4
+       CLR  @OPFNT
+       CI   R5,6
+       JL   OPL1
+       MOVB @OPLINE+5,R0
+       ANDI R0,>DF00
+       CI   R0,'B'*256
+       JNE  OPL1
+       INC  @OPFNT
+       JMP  OPL1
+OPL4   CI   R0,'L'*256         library DSK2. ...
+       JNE  OPL1
+       MOV  R5,R2
+       AI   R2,-8
+       JLE  OPL1
+       CI   R2,20
+       JLE  OPL5
+       LI   R2,20
+OPL5   MOV  R2,R0
+       SWPB R0
+       MOVB R0,@OPLSTR
+       LI   R1,OPLINE+8
+       LI   R3,OPLSTR+1
+OPL6   MOVB *R1+,*R3+
+       DEC  R2
+       JNE  OPL6
+       JMP  OPL1
+OPL8   BL   @DVCLOS
+OPL9   BL   @OPAPPL            the colours, and the font (bold, if so)
+       MOV  @OPFNT,R0
+       JEQ  OPL9A
+       BL   @WBOLD
+OPL9A  B    @MENUGO
+
+* OPTS - the O key: rows 3-9 show the options; C, F and L change them (and
+* are seen at once), ENTER saves them to DSK1.TXAOPT, FCTN 9 puts back what
+* they were.
+OPTS   LI   R10,STACKT
+       MOV  @OPCOL,@OPCOL0     what they were, for FCTN 9
+       MOV  @OPFNT,@OPFNT0
+       LI   R1,OPLSTR
+       LI   R2,OPLS0
+       LI   R3,22
+OPT0   MOVB *R1+,*R2+
+       DEC  R3
+       JNE  OPT0
+OPT1   BL   @OPDRAW
+OPT2   BL   @WKEY
+       CI   R0,'a'
+       JL   OPT3
+       CI   R0,'z'
+       JH   OPT3
+       AI   R0,-32
+OPT3   CI   R0,'C'             the next colours
+       JNE  OPT4
+       INC  @OPCOL
+       MOV  @OPCOL,R0
+       CI   R0,5
+       JL   OPT3A
+       CLR  @OPCOL
+OPT3A  BL   @OPAPPL
+       JMP  OPT1
+OPT4   CI   R0,'F'             the other font
+       JNE  OPT5
+       MOV  @OPFNT,R0
+       INV  R0
+       ANDI R0,1
+       MOV  R0,@OPFNT
+       BL   @WFONT
+       JMP  OPT1
+OPT5   CI   R0,'L'             the library devices, typed
+       JNE  OPT6
+       BL   @OPLED
+       JMP  OPT1
+OPT6   CI   R0,13              ENTER: saved
+       JNE  OPT7
+       BL   @OPSAVE
+       B    @MENUGO
+OPT7   CI   R0,15              FCTN 9: as they were
+       JNE  OPT2
+       MOV  @OPCOL0,@OPCOL
+       MOV  @OPFNT0,@OPFNT
+       LI   R1,OPLS0
+       LI   R2,OPLSTR
+       LI   R3,22
+OPT7A  MOVB *R1+,*R2+
+       DEC  R3
+       JNE  OPT7A
+       BL   @OPAPPL
+       BL   @WFONT
+       B    @MENUGO
+
+* OPAPPL - the colour scheme into palette 14 (the text) and 1 (the ground).
+OPAPPL MOV  R11,@OPRET
+       MOV  @OPCOL,R4
+       SLA  R4,2
+       LI   R0,14
+       LI   R1,OPSCH
+       A    R4,R1
+       LI   R2,1
+       BL   @F18PAL
+       LI   R0,1
+       LI   R1,OPSCH+2
+       A    R4,R1
+       LI   R2,1
+       BL   @F18PAL
+       MOV  @OPRET,R11
+       RT
+* the schemes: the text, the ground (12-bit RGB)
+OPSCH  DATA >0AAA,>0000        gray on black
+       DATA >0FFF,>0008        white on dark blue
+       DATA >03D3,>0000        green on black
+       DATA >0FA0,>0000        amber on black
+       DATA >0000,>0FFF        black on white
+
+* OPDRAW - rows 3-9.
+OPDRAW .enter
+       LI   R4,3
+OPD0   MOV  R4,R0
+       BL   @WCLR
+       INC  R4
+       CI   R4,11
+       JL   OPD0
+       LI   R0,3
+       LI   R1,QOTTL
+       BL   @OPLINE1
+       LI   R0,5
+       LI   R1,QOCOL
+       BL   @OPLINE1
+       MOV  @OPCOL,R1          the scheme's name
+       SLA  R1,1
+       MOV  @OPCNM(R1),R1
+       CLR  R2
+       BL   @TXSTR
+       LI   R0,6
+       LI   R1,QOFNT
+       BL   @OPLINE1
+       LI   R1,QONRM
+       MOV  @OPFNT,R0
+       JEQ  OPD1
+       LI   R1,QOBLD
+OPD1   CLR  R2
+       BL   @TXSTR
+       LI   R0,7
+       LI   R1,QOLIB
+       BL   @OPLINE1
+       LI   R1,OPLSTR
+       MOVB @OPLSTR,R0
+       JNE  OPD2
+       LI   R1,QONONE
+OPD2   CLR  R2
+       BL   @TXSTR
+       LI   R0,9
+       LI   R1,QOKEYS
+       BL   @OPLINE1
+       .leave
+       RT
+* OPLINE1 - row R0, column 1: the string at R1.
+OPLINE1 MOV R11,@OPRET2
+       MOV  R1,@OPTMP
+       LI   R1,1
+       BL   @TXAT
+       MOV  @OPTMP,R1
+       CLR  R2
+       BL   @TXSTR
+       MOV  @OPRET2,R11
+       RT
+
+* OPLED - the library devices typed on row 7 (up to 20 characters: letters,
+* digits, '.', spaces between devices); FCTN S rubs out, ENTER ends.
+OPLED  MOV  R11,@OPRET
+OPLE1  LI   R0,7
+       BL   @WCLR
+       LI   R0,7
+       LI   R1,QOLIB
+       BL   @OPLINE1
+       LI   R1,OPLSTR
+       CLR  R2
+       BL   @TXSTR
+       LI   R1,QOCUR
+       CLR  R2
+       BL   @TXSTR
+       LI   R0,8
+       BL   @WCLR
+       LI   R0,8
+       LI   R1,QOLHNT
+       BL   @OPLINE1
+       BL   @WKEY
+       CI   R0,13
+       JEQ  OPLE9
+       CI   R0,8
+       JNE  OPLE2
+       MOVB @OPLSTR,R0
+       JEQ  OPLE1
+       AI   R0,->0100
+       MOVB R0,@OPLSTR
+       JMP  OPLE1
+OPLE2  CI   R0,' '
+       JL   OPLE1
+       CI   R0,'a'
+       JL   OPLE3
+       CI   R0,'z'
+       JH   OPLE3
+       AI   R0,-32
+OPLE3  MOVB @OPLSTR,R1
+       SRL  R1,8
+       CI   R1,20
+       JHE  OPLE1
+       SWPB R0
+       MOVB R0,@OPLSTR+1(R1)
+       INC  R1
+       SWPB R1
+       MOVB R1,@OPLSTR
+       JMP  OPLE1
+OPLE9  MOV  @OPRET,R11
+       RT
+
+* OPSAVE - DSK1.TXAOPT written: the colours, the font, the library.
+OPSAVE .enter
+       BL   @OPFN
+       LI   R0,>0012           a DV80 file for output
+       MOV  R0,@DVFLG
+       BL   @DVOPEN
+       LI   R1,>0014
+       MOV  R1,@DVFLG
+       MOV  R0,R0
+       JNE  OPS9
+       LI   R1,QWCOL           "colours N"
+       BL   @OPCPY
+       MOV  @OPCOL,R0
+       AI   R0,'0'
+       SWPB R0
+       MOVB R0,*R4+
+       BL   @OPWREC
+       LI   R1,QWFNT           "font normal" or "font bold"
+       BL   @OPCPY
+       LI   R1,QWNRM
+       MOV  @OPFNT,R0
+       JEQ  OPS1
+       LI   R1,QWBLD
+OPS1   BL   @OPCAT
+       BL   @OPWREC
+       MOVB @OPLSTR,R0         "library ...", if any
+       JEQ  OPS8
+       LI   R1,QWLIB
+       BL   @OPCPY
+       LI   R1,OPLSTR
+       BL   @OPCAT
+       BL   @OPWREC
+OPS8   BL   @DVCLOS
+OPS9   .leave
+       RT
+* OPCPY - the line (OPLINE, R4 its end) := the string at R1.  OPCAT - the
+* string at R1 added.  Use R1-R4.
+OPCPY  LI   R4,OPLINE
+OPCAT  MOVB *R1+,R2
+       SRL  R2,8
+       JEQ  OPCT9
+OPCT1  MOVB *R1+,*R4+
+       DEC  R2
+       JNE  OPCT1
+OPCT9  RT
+* OPWREC - the line (OPLINE to R4) written as the next record.
+OPWREC MOV  R11,@OPRET2
+       MOV  R4,R5
+       AI   R5,-OPLINE
+       LI   R0,FBUF
+       LI   R1,OPLINE
+       MOV  R5,R2
+       BL   @VMBW
+       LI   R0,PABADR+5        the character count
+       MOV  R5,R1
+       SWPB R1
+       BL   @VSBW
+       LI   R0,PABADR          opcode 3: WRITE (the file is open: no power-up)
+       LI   R1,>0300
+       BL   @VSBW
+       SETO @DSRKEEP
+       BL   @DVCALL
+       MOV  @OPRET2,R11
+       RT
+* OPFN - FNBUF := DSK1.TXAOPT.
+OPFN   LI   R1,QOFILE
+       LI   R2,FNBUF
+       LI   R3,12
+OPFN1  MOVB *R1+,*R2+
+       DEC  R3
+       JNE  OPFN1
+       RT
+
+OPRET  DATA 0
+OPRET2 DATA 0
+OPTMP  DATA 0
+OPCOL0 DATA 0
+OPFNT0 DATA 0
+OPLS0  BSS  22
+OPLINE BSS  40
+QOFILE BYTE 11
+       TEXT 'DSK1.TXAOPT'
+OPCNM  DATA QC0,QC1,QC2,QC3,QC4
+QC0    BYTE QC0X-QC0-1
+       TEXT 'gray on black'
+QC0X
+QC1    BYTE QC1X-QC1-1
+       TEXT 'white on dark blue'
+QC1X
+QC2    BYTE QC2X-QC2-1
+       TEXT 'green on black'
+QC2X
+QC3    BYTE QC3X-QC3-1
+       TEXT 'amber on black'
+QC3X
+QC4    BYTE QC4X-QC4-1
+       TEXT 'black on white'
+QC4X
+QOTTL  BYTE QOTTLX-QOTTL-1
+       TEXT 'Options (kept in DSK1.TXAOPT):'
+QOTTLX
+QOCOL  BYTE QOCOLX-QOCOL-1
+       TEXT 'C  Colours: '
+QOCOLX
+QOFNT  BYTE QOFNTX-QOFNT-1
+       TEXT 'F  Font: '
+QOFNTX
+QONRM  BYTE 6
+       TEXT 'normal'
+QOBLD  BYTE 4
+       TEXT 'bold'
+QOLIB  BYTE QOLIBX-QOLIB-1
+       TEXT 'L  Library devices: '
+QOLIBX
+QONONE BYTE 4
+       TEXT 'none'
+QOCUR  BYTE 1
+       TEXT '_'
+QOKEYS BYTE QOKEYX-QOKEYS-1
+       TEXT 'ENTER: save and leave   FCTN 9: leave without saving'
+QOKEYX
+QOLHNT BYTE QOLHNX-QOLHNT-1
+       TEXT 'Devices for library files, spaces apart (DSK2. DSK3.): ENTER ends.'
+QOLHNX
+QWCOL  BYTE 8
+       TEXT 'colours '
+QWFNT  BYTE 5
+       TEXT 'font '
+QWNRM  BYTE 6
+       TEXT 'normal'
+QWBLD  BYTE 4
+       TEXT 'bold'
+QWLIB  BYTE 8
+       TEXT 'library '
+       EVEN

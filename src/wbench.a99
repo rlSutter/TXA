@@ -106,7 +106,7 @@ WS2    LI   R0,30              80 columns, 30 rows, the font, colours
        MOV  R0,@ROWS
        BL   @T80ON
        BL   @TXCLS
-       BL   @FONTLD
+       BL   @WFONT
        BL   @TIPISC            a TIPI's CRU base (tipi.a99)
        BL   @WPTEST            every SAMS page the workbench uses answers
        MOV  R0,R0
@@ -173,6 +173,8 @@ WSOK
 WS3    MOVB *R1+,*R2+
        DEC  R0
        JNE  WS3
+       LI   R0,14              the options from DSK1.TXAOPT (overlay 14), then
+       B    @OVGO4             the menu
 * MENUGO - the main menu (overlay 8): at start-up, and after each compile.
 MENUGO LI   R0,8
 * OVGO - overlay R0, entered at OVENT (an overlay passing control to another
@@ -547,6 +549,43 @@ SNOPNX
        EVEN
        COPY "wload.a99"
        COPY "tipi.a99"
+* WFONT - the font loaded (FONTLD), in bold when the options say so.
+WFONT  MOV  R11,@WFRET
+       BL   @FONTLD
+       MOV  @OPFNT,R0
+       JEQ  WFN9
+       BL   @WBOLD
+WFN9   MOV  @WFRET,R11
+       RT
+* WBOLD - the bold font: each glyph's rows ORed with themselves a pixel to
+* the right, written over the normal glyphs (32-126) and, inverted, over
+* the reverse ones (160-254), as FONTLD lays them out.  Uses R0-R4.
+WBOLD  MOV  R11,@WBORET
+       LI   R0,PATTAB+(32*8)
+       CLR  R5
+WBO0   BL   @VWAD
+       LI   R1,FONT
+       LI   R2,95*8
+WBO1   MOVB *R1+,R3
+       MOVB R3,R4
+       SRL  R4,1
+       ANDI R4,>7F00
+       SOCB R4,R3
+       MOV  R5,R5
+       JEQ  WBO2
+       INV  R3
+WBO2   MOVB R3,@VDPWD
+       DEC  R2
+       JNE  WBO1
+       MOV  R5,R5
+       JNE  WBO9
+       SETO R5                 then the inverted copy
+       LI   R0,PATTAB+(160*8)
+       JMP  WBO0
+WBO9   MOV  @WBORET,R11
+       RT
+WFRET  DATA 0
+WBORET DATA 0
 * WPTEST - every SAMS page the workbench uses (16-127) answers: a word
 * written at each page's start and its inverse at its end read back, after
 * all are written (so pages that alias each other, a card under 512K, or
@@ -621,6 +660,78 @@ WENTRY B    @WSTART
        COPY "text80.a99"
        COPY "disk.a99"
        COPY "diskrec.a99"
+* LFLIB - the file FNBUF names would not open: the same name on each of
+* the library devices (OPLSTR, words apart), until one opens.  R0 = 0 and
+* FNBUF the name that opened, or nonzero.  Uses R0-R7.
+LFLIB  MOV  R11,@LFLRET
+       MOVB @FNBUF,R4          the name's own part: after its last '.'
+       SRL  R4,8
+       LI   R5,FNBUF+1
+       MOV  R5,R6
+LFL1   MOV  R4,R4
+       JEQ  LFL2
+       CB   *R5+,@QLDOT
+       JNE  LFL1A
+       MOV  R5,R6
+LFL1A  DEC  R4
+       JMP  LFL1
+LFL2   LI   R1,LFBASE          kept in LFBASE (a length byte first)
+       MOVB @FNBUF,R4
+       SRL  R4,8
+       AI   R4,FNBUF+1
+       S    R6,R4
+       MOV  R4,R0
+       SWPB R0
+       MOVB R0,*R1+
+LFL2A  MOV  R4,R4
+       JEQ  LFL3
+       MOVB *R6+,*R1+
+       DEC  R4
+       JMP  LFL2A
+LFL3   LI   R6,OPLSTR+1        the devices, one word at a time
+       MOVB @OPLSTR,R7
+       SRL  R7,8
+LFL4   MOV  R7,R7              (none left: not found)
+       JEQ  LFL9N
+       CB   *R6,@QLSPC
+       JNE  LFL5
+       INC  R6
+       DEC  R7
+       JMP  LFL4
+LFL5   LI   R1,FNBUF+1         FNBUF := the word, then the name's own part
+LFL6   MOVB *R6+,*R1+
+       DEC  R7
+       JEQ  LFL7
+       CB   *R6,@QLSPC
+       JNE  LFL6
+LFL7   LI   R2,LFBASE
+       MOVB *R2+,R3
+       SRL  R3,8
+       JEQ  LFL7B
+LFL7A  MOVB *R2+,*R1+
+       DEC  R3
+       JNE  LFL7A
+LFL7B  AI   R1,-FNBUF-1
+       SWPB R1
+       MOVB R1,@FNBUF
+       MOV  R6,@LFLP
+       MOV  R7,@LFLN
+       BL   @DVOPEN
+       MOV  R0,R0
+       JEQ  LFL9
+       MOV  @LFLP,R6
+       MOV  @LFLN,R7
+       JMP  LFL4
+LFL9N  SETO R0
+LFL9   MOV  @LFLRET,R11
+       RT
+LFLRET DATA 0
+LFLP   DATA 0
+LFLN   DATA 0
+LFBASE BSS  12
+QLDOT  BYTE '.'
+QLSPC  BYTE ' '
+       EVEN
        COPY "wsym.a99"
 WKEND
        AORG >3000

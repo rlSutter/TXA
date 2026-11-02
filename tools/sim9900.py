@@ -80,15 +80,16 @@ class Machine:
         self.cpu_sound = []     # bytes the game itself writes to the sound chip (effects)
         self.chip_log = []      # both, in order: (source, instruction count, byte)
         # a fake disk controller DSR at CRU >1100: ROM header, a DSR list
-        # entry "DSK1" whose code is the trap opcode >0180, and a no-op
-        # power-up routine.  File I/O goes to disk_dir/DSK1/<name>.
+        # entries "DSK1" and "DSK2" whose code is the trap opcode >0180, and a
+        # no-op power-up routine.  File I/O goes to disk_dir/DSKn/<name>.
         self.dsr_on = False
         self.disk_dir = None
         self.tifdc = None       # a tools/tifdc.TIFDC: the real TI controller's DSR in place of the stand-in
         rom = bytearray(0x2000)
         rom[0:4] = b'\xAA\x01\x00\x00'
         rom[4:6] = (0x4020).to_bytes(2, 'big'); rom[8:10] = (0x4010).to_bytes(2, 'big')
-        rom[0x10:0x12] = b'\x00\x00'; rom[0x12:0x14] = (0x4030).to_bytes(2, 'big'); rom[0x14:0x19] = b'\x04DSK1'
+        rom[0x10:0x12] = (0x4060).to_bytes(2, 'big'); rom[0x12:0x14] = (0x4030).to_bytes(2, 'big'); rom[0x14:0x19] = b'\x04DSK1'
+        rom[0x60:0x62] = b'\x00\x00'; rom[0x62:0x64] = (0x4030).to_bytes(2, 'big'); rom[0x64:0x69] = b'\x04DSK2'   # (disk_dir/DSK2: the options' library tests)
         rom[0x20:0x22] = b'\x00\x00'; rom[0x22:0x24] = (0x4040).to_bytes(2, 'big'); rom[0x24] = 0
         for i, w in enumerate((0x0180, 0x1302, 0x05CB, 0x045B, 0x045B)):
             rom[0x30 + 2 * i: 0x32 + 2 * i] = w.to_bytes(2, 'big')
@@ -336,9 +337,9 @@ class Machine:
         # a caller must not find the PAB through >8356 afterwards
         if getattr(self, 'dsr_moves_ptr', True):
             p = self.rw(0x8356) + 1; self.scratch[0x56] = (p >> 8) & 0xFF; self.scratch[0x57] = p & 0xFF
-        if self.disk_dir is None or dev != 'DSK1':
+        if self.disk_dir is None or dev not in ('DSK1', 'DSK2'):
             return fail(0)
-        path = os.path.join(self.disk_dir, 'DSK1', fname)
+        path = os.path.join(self.disk_dir, dev, fname)
         if op == 6:                                   # SAVE
             os.makedirs(os.path.dirname(path), exist_ok=True)
             data = bytearray(self.vram[buf: buf + count])

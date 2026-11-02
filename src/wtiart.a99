@@ -69,7 +69,7 @@ TIFILE .enter
        LI   R0,'C'             the colours: the odd
        LI   R1,1
        BL   @TILOAD
-TIF9   BL   @FONTLD            the font back, the sprite patterns cleared
+TIF9   BL   @WFONT             the font back (bold, if so), the sprites cleared
        BL   @SPRZER
        MOV  @TIRES,R0
        JNE  TIF99

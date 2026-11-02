@@ -62,7 +62,11 @@ MN2T   CI   R0,'B'             B: compile, then the engine's files (overlay 9)
        LI   R0,1
        MOV  R0,@WBBLD
        JMP  MCOMP
-MN2A   CI   R0,'S'             S: the last compile's statistics (overlay 13)
+MN2A   CI   R0,'O'             O: the options (overlay 14)
+       JNE  MN2O
+       LI   R0,14
+       B    @OVGO
+MN2O   CI   R0,'S'             S: the last compile's statistics (overlay 13)
        JNE  MN2S
        LI   R0,13
        B    @OVGO
@@ -422,10 +426,6 @@ QASKX
 * the keys still to come: the key, then its message (a length byte the
 * assembler counts, and the text)
 QSOON
-       BYTE 'O'
-QS5    BYTE QS5X-QS5-1
-       TEXT 'Options: not built yet (M6 part 10).'
-QS5X
        BYTE 0
        EVEN
 

@@ -59,4 +59,9 @@ OV12END
        B    @STATS             overlay 13: the statistics (S)
        COPY "wstat.a99"
 OV13END
+       XORG >B000
+       B    @OPTS              overlay 14: the options (O)
+       B    @OPLOAD            (>B004) at start-up: DSK1.TXAOPT read
+       COPY "wopts.a99"
+OV14END
        END
