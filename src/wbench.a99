@@ -182,6 +182,9 @@ OVGO   BL   @OVSEL
 * OVGO4 - the same, entered at OVENT+4 (an overlay's second entry).
 OVGO4  BL   @OVSEL
        B    @OVENT+4
+* OVGO8 - entered at OVENT+8 (its third).
+OVGO8  BL   @OVSEL
+       B    @OVENT+8
 
 * ---- an error's fields (M6 part 6): what its message names, in VRAM at
 * EFN1 .. (below the PAB; nothing else uses it), for overlay 11 ---------------
@@ -428,16 +431,25 @@ WK6    A    R0,R2
        SRL  R0,8               the key's character (letters in capitals)
        JEQ  WK1
        MOV  R5,R1
-       ANDI R1,>1000           FCTN S: the rub-out
-       JEQ  WK7
-       CI   R0,'S'
-       JNE  WK1                (other FCTN keys: nothing, for now)
-       LI   R0,8
+       ANDI R1,>1000           FCTN: S the rub-out (8); E, X the arrows up and
+       JEQ  WK7                down (11, 12); 9 BACK (15), as the engine's
+       LI   R1,WKFTAB          KEYGT2 reports them; others nothing
+WKF1   MOVB *R1+,R2
+       JEQ  WK1
+       SRL  R2,8
+       MOVB *R1+,R3
+       C    R0,R2
+       JNE  WKF1
+       MOV  R3,R0
+       SRL  R0,8
 WK7    C    R0,@WKLST          still the same press?
        JEQ  WK1
        MOV  R0,@WKLST
        MOV  @WBRET2,R11
        RT
+
+WKFTAB BYTE 'S',8,'E',11,'X',12,'9',15,0
+       EVEN
 
 * WCLR - row R0 blank, in normal colours.  Uses R0-R2.
 WCLR   MOV  R11,@WBRET

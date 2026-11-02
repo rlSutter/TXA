@@ -52,6 +52,7 @@ OV11END
        XORG >B000
        B    @TITEST            overlay 12: TI Artist pictures (the converter)
        B    @TIBLD             (>B004) Build's pictures
+       B    @TIPREV            (>B008) the I key: the preview
        COPY "wtiart.a99"
 OV12END
        END

@@ -219,3 +219,7 @@ EFTMP  EQU  GLOBRM+>1C0        (EFNUM's word)
 EFRET  EQU  GLOBRM+>1C2        (EFNAMB's return)
 EFSAV  EQU  GLOBRM+>1C4        (EFNAMB: R1-R3, 6 bytes)
 WBBLD  EQU  GLOBRM+>74         after the compile: 1 Build (the engine's files), 2 test-play
+TINAME EQU  GLOBRM+>100        22 bytes: a TI Artist picture's name, a length
+*                              byte first ("DSK1.BIRD": its files are DSK1.BIRD_P,
+*                              _C and _T; overlays 8 and 12); 0: none.  (GLOBRM
+*                              holds a story's globals only in the engine)

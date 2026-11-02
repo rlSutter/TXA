@@ -62,7 +62,15 @@ MN2T   CI   R0,'B'             B: compile, then the engine's files (overlay 9)
        LI   R0,1
        MOV  R0,@WBBLD
        JMP  MCOMP
-MN2A
+MN2A   CI   R0,'I'             I: a TI Artist picture, previewed (overlay 12,
+       JNE  MN2I               >B008)
+       BL   @MPIC
+       MOVB @TINAME,R0
+       JNE  MN2J
+       B    @MENU              (no name: the menu again)
+MN2J   LI   R0,12
+       B    @OVGO8
+MN2I
        LI   R1,QSOON           a key of a part still to come: say which
 MN3    MOVB *R1+,R2
        JEQ  MN1                (not a menu key)
@@ -89,8 +97,9 @@ MN4    MOV  R1,R4
 MPROJ  BL   @MNAME
        BL   @MPDEF
        MOV  @WBONLY,R0
-       JNE  MENU
-       BL   @WDPROM
+       JEQ  MPRJ1
+       B    @MENU
+MPRJ1  BL   @WDPROM
        BL   @MPFX
        B    @MENU
 * C: compile the project (the date asked first if none is set yet).
@@ -282,6 +291,89 @@ MNM7   MOV  @WBNLEN,R1
        INC  @WBNLEN
        JMP  MNM2
 
+* MPIC - row 6: the picture's name typed into TINAME (a length byte, then
+* up to 20 characters), offered as the source's device (DSK1.) the first
+* time.  ENTER keeps it; BACK (FCTN 9) empties it.
+MPIC   MOV  R11,@MRET2
+       MOVB @TINAME,R0
+       JNE  MPI2
+       LI   R1,WBNAME          the source's device: up to its last '.'
+       CLR  R2
+       CLR  R3
+MPI1   C    R2,@WBNLEN
+       JHE  MPI1C
+       CB   @WBNAME(R2),@QDOT
+       JNE  MPI1B
+       MOV  R2,R3
+       INC  R3
+MPI1B  INC  R2
+       JMP  MPI1
+MPI1C  CLR  R2
+MPI1D  C    R2,R3
+       JHE  MPI1E
+       MOVB @WBNAME(R2),@TINAME+1(R2)
+       INC  R2
+       JMP  MPI1D
+MPI1E  SWPB R3
+       MOVB R3,@TINAME
+MPI2   LI   R1,QHPIC           row 11: what to type
+       BL   @MHINT
+MPI3   LI   R0,6               row 6: Picture: NAME_
+       BL   @WCLR
+       LI   R0,6
+       LI   R1,1
+       BL   @TXAT
+       LI   R1,QPICNM
+       CLR  R2
+       BL   @TXSTR
+       LI   R1,TINAME
+       CLR  R2
+       BL   @TXSTR
+       MOVB @TINAME,R0
+       SRL  R0,8
+       AI   R0,6*COLS+11
+       BL   @MCURS
+       BL   @WKEY
+       CI   R0,13
+       JEQ  MPI9
+       CI   R0,15              BACK: no picture
+       JNE  MPI4
+       CLR  R0
+       MOVB R0,@TINAME
+       JMP  MPI9
+MPI4   CI   R0,8
+       JNE  MPI5
+       MOVB @TINAME,R0         rub out
+       JEQ  MPI3
+       AI   R0,->0100
+       MOVB R0,@TINAME
+       JMP  MPI3
+MPI5   CI   R0,' '
+       JLE  MPI3
+       CI   R0,'a'
+       JL   MPI6
+       CI   R0,'z'
+       JH   MPI6
+       AI   R0,-32
+MPI6   MOVB @TINAME,R1
+       SRL  R1,8
+       CI   R1,20
+       JHE  MPI3
+       SWPB R0
+       MOVB R0,@TINAME+1(R1)
+       AI   R1,>0001
+       SWPB R1
+       MOVB R1,@TINAME
+       JMP  MPI3
+MPI9   MOV  @MRET2,R11
+       RT
+QPICNM BYTE 9
+       TEXT 'Picture: '
+QHPIC  BYTE QHPICX-QHPIC-1
+       TEXT 'The picture: DSK1.NAME for NAME_P and NAME_C.  ENTER: see it.  FCTN 9: back.'
+QHPICX
+       EVEN
+
 QKEYS  BYTE QKEYSX-QKEYS-1     (76 columns, from column 1: the row is 80)
        TEXT 'P Project C Compile T Test R Run B Build E Errors S Stats I Import O Options'
 QKEYSX
@@ -330,10 +422,6 @@ QSOON
 QS3    BYTE QS3X-QS3-1
        TEXT 'Statistics: not built yet (M6 part 10).'
 QS3X
-       BYTE 'I'
-QS4    BYTE QS4X-QS4-1
-       TEXT 'Picture import: not built yet (M6 part 9).'
-QS4X
        BYTE 'O'
 QS5    BYTE QS5X-QS5-1
        TEXT 'Options: not built yet (M6 part 10).'

@@ -33,9 +33,15 @@ TIK    EQU  ULIT+102           ... the one being made (from 0)
 TIAP   EQU  ULIT+104           ... the area's next byte
 TIDX   EQU  ULIT+106           ... its declaration
 TIWF   EQU  ULIT+108           ... the file being written
+TINROW EQU  ULIT+110           TIFIT: how many rows ...
+TIFPG  EQU  ULIT+112           ... into which pages
+TISQOK EQU  ULIT+114           the preview: the squeeze made yet?
+TIM0   EQU  ULIT+116           ... NAME_T's choice, kept while the crop is made
+TIR0   EQU  ULIT+118
+FULLPG EQU  24                 the preview: all 192 rows, cropped (3 pages)
+SQPG   EQU  27                 ... the squeeze (2 pages)
 TIRES  EQU  GLOBRM+>1DE        TIFILE: 0, or the DSR's error loading the picture
-TINAME EQU  ULIT+66            the picture's name, a length byte first ("DSK1.BIRD":
-*                              its files are DSK1.BIRD_P, _C, _T); 0: none
+* TINAME (wsymdef.a99): the picture's name
 
 * TITEST - convert what is staged (TIMODE, TIROW, the interleaved files),
 * then the menu: the tests' way in (overlay 12, entered at OVENT).
@@ -442,11 +448,299 @@ TQF6   LI   R0,'P'*256
        MOVB R0,@FNBUF
        RT
 
+* TIPREV - the I key (overlay 12, >B008; overlay 8 has put the name in
+* TINAME): the picture loaded and shown on the bitmap layer as a game shows
+* it, cropped or squeezed as NAME_T says (or crop 48).  FCTN E and X move
+* the crop's band by two rows, S switches crop and squeeze, ENTER writes
+* the choice to NAME_T, FCTN 9 leaves without.  All 192 rows are cropped
+* once at the start, so moving the band only copies them to VRAM; the
+* squeeze is made the first time it is wanted.  The bitmap is at VRAM
+* >2000 (over FBUF, the PAB and the bottom of the controller's buffers,
+* which the next disk call's power-up makes again).
+TIPREV LI   R10,STACKT
+       LI   R4,1               rows 1-14 cleared
+TPV0   MOV  R4,R0
+       BL   @WCLR
+       INC  R4
+       CI   R4,15
+       JL   TPV0
+       LI   R1,QTPLD
+       BL   @TIMSG
+       BL   @TIFILE
+       MOV  @TIRES,R0
+       JEQ  TPV1
+       LI   R1,QTPBAD          not loaded: say so, a key, the menu
+       BL   @TIMSG
+       LI   R1,TINAME
+       CLR  R2
+       BL   @TXSTR
+       BL   @WKEY
+       B    @MENUGO
+TPV1   LI   R1,QTPCV
+       BL   @TIMSG
+       MOV  @TIMODE,@TIM0      NAME_T's choice kept
+       MOV  @TIROW,@TIR0
+       CLR  @TIMODE            all 192 rows, cropped
+       CLR  @TIROW
+       LI   R0,192
+       MOV  R0,@TINROW
+       LI   R0,FULLPG
+       MOV  R0,@TIFPG
+       BL   @TIFIT
+       CLR  @TISQOK
+       MOV  @TIR0,@TIROW
+       MOV  @TIM0,@TIMODE
+       JEQ  TPV1A
+       BL   @TISQZ
+TPV1A  LI   R0,32              the TI's colours into palette entries 32-47
+       LI   R1,TIPAL
+       LI   R2,16
+       BL   @F18PAL
+TPV2   BL   @TISHOW
+       BL   @TISTAT
+TPV2K  BL   @TIREL             (a key let go while the picture was copied)
+       BL   @WKEY
+       CI   R0,11              FCTN E: the band up
+       JNE  TPV3
+       MOV  @TIMODE,R1
+       JNE  TPV2K
+       MOV  @TIROW,R1
+       JEQ  TPV2K
+       DECT @TIROW
+       JMP  TPV2
+TPV3   CI   R0,12              FCTN X: down
+       JNE  TPV4
+       MOV  @TIMODE,R1
+       JNE  TPV2K
+       MOV  @TIROW,R1
+       CI   R1,96
+       JHE  TPV2K
+       INCT @TIROW
+       JMP  TPV2
+TPV4   CI   R0,'S'             S: crop or squeeze
+       JEQ  TPV4S
+       CI   R0,'s'
+       JNE  TPV5
+TPV4S  MOV  @TIMODE,R1
+       JEQ  TPV4A
+       CLR  @TIMODE
+       JMP  TPV2
+TPV4A  MOV  @TISQOK,R1
+       JNE  TPV4B
+       LI   R1,QTPCV
+       BL   @TIMSG
+       BL   @TISQZ
+TPV4B  LI   R0,1
+       MOV  R0,@TIMODE
+       JMP  TPV2
+TPV5   CI   R0,13              ENTER: saved
+       JNE  TPV6
+       BL   @TISAVE
+       JMP  TPV9
+TPV6   CI   R0,15              FCTN 9: left
+       JNE  TPV2K
+TPV9   LI   R0,>9F00           the layer off
+       BL   @VDPWR
+       B    @MENUGO
+
+* TIREL - one look at the keyboard: nothing pressed now, the last key is
+* forgotten, as WKEY forgets it when it sees the keys let go.  (A key let
+* go while the preview was busy would otherwise make the same key, pressed
+* again, look like the same press still held.)  Uses R0-R5.
+TIREL  MOV  R11,@TIRRT2
+       BL   @KSCAN
+       LI   R1,KEYMAP
+       LI   R3,6
+TIRL1  MOVB *R1+,R4
+       INV  R4
+       ANDI R4,>FF00
+       CI   R3,6               column 0: = SPACE ENTER only
+       JNE  TIRL2
+       ANDI R4,>0700
+TIRL2  MOV  R4,R4
+       JNE  TIRL9              something held: the same press
+       DEC  R3
+       JNE  TIRL1
+       CLR  @WKLST
+TIRL9  MOV  @TIRRT2,R11
+       RT
+TIRRT2 DATA 0
+
+* TISQZ - the squeeze, 96 rows into SQPG.  TIMODE is left 1.
+TISQZ  MOV  R11,@TISRET
+       LI   R0,1
+       MOV  R0,@TIMODE
+       LI   R0,96
+       MOV  R0,@TINROW
+       LI   R0,SQPG
+       MOV  R0,@TIFPG
+       BL   @TIFIT
+       SETO @TISQOK
+       MOV  @TISRET,R11
+       RT
+
+* TISHOW - the fitting shown: its 6144 bytes (the crop's band from all 192
+* rows, or the squeeze) copied to VRAM >2000, and the layer on: 96 rows
+* under the top row, 16 colours, palette 32-47, as the engine shows it.
+TISHOW .enter
+       MOV  @TIMODE,R0
+       JNE  TSH1
+       MOV  @TIROW,R4          the band's first byte
+       SLA  R4,6
+       LI   R5,FULLPG
+       JMP  TSH2
+TSH1   CLR  R4
+       LI   R5,SQPG
+TSH2   LI   R6,>2000
+       LI   R7,6144
+TSH3   MOV  R4,R0              this page's part
+       SRL  R0,12
+       A    R5,R0
+       BL   @EMAP
+       MOV  R4,R1
+       ANDI R1,>0FFF
+       LI   R2,4096
+       S    R1,R2
+       C    R2,R7
+       JLE  TSH4
+       MOV  R7,R2
+TSH4   MOV  R2,R8
+       AI   R1,>E000
+       MOV  R6,R0
+       BL   @VMBW
+       A    R8,R6
+       A    R8,R4
+       S    R8,R7
+       JNE  TSH3
+       LI   R4,TILAYR          the layer's registers
+TSH5   MOV  *R4+,R0
+       JEQ  TSH9
+       BL   @VDPWR
+       JMP  TSH5
+TSH9   .leave
+       RT
+TILAYR DATA >A080,>A100,>A208,>A300,>A460,>9FD8,0
+
+* TISTAT - rows 13 and 14: the fitting, and the keys.
+TISTAT .enter
+       LI   R0,13
+       BL   @WCLR
+       LI   R0,13
+       LI   R1,1
+       BL   @TXAT
+       MOV  @TIMODE,R0
+       JNE  TST1
+       LI   R1,QTPCR           Crop: rows N to N+95 of the 192.
+       CLR  R2
+       BL   @TXSTR
+       MOV  @TIROW,R0
+       CLR  R2
+       BL   @TXDEC
+       LI   R1,QTPTO
+       CLR  R2
+       BL   @TXSTR
+       MOV  @TIROW,R0
+       AI   R0,95
+       CLR  R2
+       BL   @TXDEC
+       LI   R1,QTPOF
+       JMP  TST2
+TST1   LI   R1,QTPSQ
+TST2   CLR  R2
+       BL   @TXSTR
+       LI   R0,14
+       BL   @WCLR
+       LI   R0,14
+       LI   R1,1
+       BL   @TXAT
+       LI   R1,QTPKEY
+       CLR  R2
+       BL   @TXSTR
+       .leave
+       RT
+
+* TIMSG - row 13: the message at R1.
+TIMSG  .enter
+       MOV  R1,R4
+       LI   R0,13
+       BL   @WCLR
+       LI   R0,13
+       LI   R1,1
+       BL   @TXAT
+       MOV  R4,R1
+       CLR  R2
+       BL   @TXSTR
+       .leave
+       RT
+
+* TISAVE - NAME_T written: one record, "crop N" or "squeeze".
+TISAVE .enter
+       LI   R0,'T'
+       BL   @TIFNAM
+       LI   R0,>0012           a DV80 file for output
+       MOV  R0,@DVFLG
+       BL   @DVOPEN
+       LI   R1,>0014
+       MOV  R1,@DVFLG
+       MOV  R0,R0
+       JNE  TSV9
+       LI   R4,TIBUF           the line
+       MOV  @TIMODE,R0
+       JEQ  TSV1
+       LI   R1,QTSQZ
+       JMP  TSV3
+TSV1   LI   R1,QTCROP          "crop " and the row
+TSV3   MOVB *R1+,R2
+       SRL  R2,8
+TSV4   MOVB *R1+,*R4+
+       DEC  R2
+       JNE  TSV4
+       MOV  @TIMODE,R0
+       JNE  TSV6
+       MOV  @TIROW,R3
+       CLR  R2
+       DIV  @D10TI,R2          R2 tens, R3 ones
+       MOV  R2,R2
+       JEQ  TSV5
+       AI   R2,'0'
+       SWPB R2
+       MOVB R2,*R4+
+TSV5   AI   R3,'0'
+       SWPB R3
+       MOVB R3,*R4+
+TSV6   MOV  R4,R5              its length
+       AI   R5,-TIBUF
+       LI   R0,FBUF
+       LI   R1,TIBUF
+       MOV  R5,R2
+       BL   @VMBW
+       LI   R0,PABADR+5        the character count
+       MOV  R5,R1
+       SWPB R1
+       BL   @VSBW
+       LI   R0,PABADR          opcode 3: WRITE (the file is open: no power-up)
+       LI   R1,>0300
+       BL   @VSBW
+       SETO @DSRKEEP
+       BL   @DVCALL
+       BL   @DVCLOS
+TSV9   .leave
+       RT
+
 * TICONV - the record from the staged picture: TILEN bytes at OUTPG.
 TICONV .enter
-       CLR  @TIRI              the fitted pixels into RAWPG
+       LI   R0,96              the fitted pixels into RAWPG
+       MOV  R0,@TINROW
+       LI   R0,RAWPG
+       MOV  R0,@TIFPG
+       BL   @TIFIT
+       B    @TAC9
+* TIFIT - TINROW rows of the fitting (TIMODE, TIROW), 64 bytes each, from
+* page TIFPG on.  (TICONV: 96 into RAWPG; the preview: all 192, crop.)
+TIFIT  .enter
+       CLR  @TIRI
        CLR  @TIY
-TAC1    CLR  @TIX
+TAC1   CLR  @TIX
 TAC2    MOV  @TIX,R8            the byte's two fat pixels: 2x and 2x+1
        SLA  R8,1
        BL   @TIFAT
@@ -455,10 +749,10 @@ TAC2    MOV  @TIX,R8            the byte's two fat pixels: 2x and 2x+1
        INC  R8
        BL   @TIFAT
        SOC  R6,R9
-       MOV  @TIRI,R1           the byte into RAWPG
+       MOV  @TIRI,R1           the byte into its page
        MOV  R1,R0
        SRL  R0,12
-       AI   R0,RAWPG
+       A    @TIFPG,R0
        BL   @EMAP
        ANDI R1,>0FFF
        SWPB R9
@@ -471,10 +765,12 @@ TAC2    MOV  @TIX,R8            the byte's two fat pixels: 2x and 2x+1
        B    @TAC2
        INC  @TIY
        MOV  @TIY,R0
-       CI   R0,96
-       JHE   $+6
+       C    R0,@TINROW
+       JHE  $+6
        B    @TAC1
-       CLR  @TIOI              the record: its head, then the packed pixels
+       .leave
+       RT
+TAC9   CLR  @TIOI              the record: its head, then the packed pixels
        SETO @TIOPG
        LI   R0,4
        BL   @TIOUT
@@ -687,6 +983,38 @@ TAFL9   MOV  @TIFLRT,R11
        RT
 
 TIPAR  DATA 0
+TISRET DATA 0
+QTPLD  BYTE QTPLDX-QTPLD-1
+       TEXT 'Loading the picture ...'
+QTPLDX
+QTPBAD BYTE QTPBADX-QTPBAD-1
+       TEXT 'Could not load _P and _C (any key): '
+QTPBADX
+QTPCV  BYTE QTPCVX-QTPCV-1
+       TEXT 'Converting it: about ten seconds ...'
+QTPCVX
+QTPCR  BYTE QTPCRX-QTPCR-1
+       TEXT 'Crop: rows '
+QTPCRX
+QTPTO  BYTE QTPTOX-QTPTO-1
+       TEXT ' to '
+QTPTOX
+QTPOF  BYTE QTPOFX-QTPOF-1
+       TEXT ' of the 192.'
+QTPOFX
+QTPSQ  BYTE QTPSQX-QTPSQ-1
+       TEXT 'Squeeze: the whole picture at half height.'
+QTPSQX
+QTPKEY BYTE QTPKEYX-QTPKEY-1
+       TEXT 'FCTN E/X: move the band  S: crop or squeeze  ENTER: save NAME_T  FCTN 9: back'
+QTPKEYX
+QTCROP BYTE QTCROPX-QTCROP-1
+       TEXT 'crop '
+QTCROPX
+QTSQZ  BYTE QTSQZX-QTSQZ-1
+       TEXT 'squeeze'
+QTSQZX
+       EVEN
 TIARET DATA 0
 TIAPV  DATA 0
 TIAWRT DATA 0
