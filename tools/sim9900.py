@@ -312,7 +312,8 @@ class Machine:
         # reaches the VDP and GROM through that workspace's R15 (>8C02) and R13
         # (>9800). Called any other way its VDP traffic goes astray: it does
         # nothing useful, yet still returns as if it had handled the call.
-        if cpu.pc - 2 == 0x4040:                      # the power-up routine (M6: Rebecca's js99er,
+        if cpu.pc - 2 == 0x4040:
+            self.powerups = getattr(self, 'powerups', 0) + 1   # (counted: tests/tipi_test.py)                      # the power-up routine (M6: Rebecca's js99er,
             self.__dict__['dsr_files'] = {}           # with a real controller, found the workbench's
             return True                               # DSRLNK forgetting its open file)
         if getattr(self, 'dsr_strict_ws', True) and (cpu.wp != 0x83E0 or self.rw(0x83FE) != 0x8C02 or self.rw(0x83FA) != 0x9800):

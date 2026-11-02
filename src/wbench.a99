@@ -107,6 +107,33 @@ WS2    LI   R0,30              80 columns, 30 rows, the font, colours
        BL   @T80ON
        BL   @TXCLS
        BL   @FONTLD
+       BL   @TIPISC            a TIPI's CRU base (tipi.a99)
+       BL   @WPTEST            every SAMS page the workbench uses answers
+       MOV  R0,R0
+       JEQ  WSOK
+       MOV  R0,@WPBAD          refused: which page (kept: TXSTR uses R0-R5),
+       LI   R0,2               and what is needed
+       LI   R1,2
+       BL   @TXAT
+       LI   R1,QPGBAD
+       CLR  R2
+       BL   @TXSTR
+       MOV  @WPBAD,R0
+       CLR  R2
+       BL   @TXDEC
+       LI   R1,QPGBD2
+       CLR  R2
+       BL   @TXSTR
+       LI   R0,4
+       LI   R1,2
+       BL   @TXAT
+       LI   R1,QPGBD3
+       CLR  R2
+       BL   @TXSTR
+WSPIN  LIMI 2                  (the console's QUIT key still works)
+       LIMI 0
+       JMP  WSPIN
+WSOK
        LI   R0,ATRTAB
        LI   R1,ATNORM*256
        LI   R2,30*COLS
@@ -506,6 +533,54 @@ SNOPNX
        EVEN
        EVEN
        COPY "wload.a99"
+       COPY "tipi.a99"
+* WPTEST - every SAMS page the workbench uses (16-127) answers: a word
+* written at each page's start and its inverse at its end read back, after
+* all are written (so pages that alias each other, a card under 512K, or
+* no card, are caught too).  From the SAMS Kernel's AMSTST.  Destructive:
+* at start-up, before anything is in SAMS.  R0 = 0, or the first page that
+* failed.  Window E is given its own page back.
+WPTEST .enter
+       LI   R4,16
+WPT1   MOV  R4,R0
+       LI   R1,>E
+       BL   @MAPPG
+       MOV  R4,@>E000
+       MOV  R4,R5
+       INV  R5
+       MOV  R5,@>EFFE
+       INC  R4
+       CI   R4,128
+       JL   WPT1
+       LI   R4,16
+WPT2   MOV  R4,R0
+       LI   R1,>E
+       BL   @MAPPG
+       C    @>E000,R4
+       JNE  WPT8
+       MOV  R4,R5
+       INV  R5
+       C    @>EFFE,R5
+       JNE  WPT8
+       INC  R4
+       CI   R4,128
+       JL   WPT2
+       CLR  R4
+WPT8   LI   R0,>E
+       LI   R1,>E
+       BL   @MAPPG
+       MOV  R4,R0
+       .leave
+       RT
+WPBAD  DATA 0
+QPGBAD BYTE 10
+       TEXT 'SAMS page '
+QPGBD2 BYTE 18
+       TEXT ' did not answer.  '
+QPGBD3 BYTE 63
+       TEXT 'The workbench needs a working SAMS card of 512K or more.'
+       TEXT '       '
+       EVEN
 WBEND
 * ---- the overlays: each runs at >B000 (XORG), staged from >4000 ----------
        AORG >4000

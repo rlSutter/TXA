@@ -6,12 +6,12 @@
 * SCRCLS - the open script, if any, closed.  Keeps R0.
 SCRCLS MOV  R11,@SCRRET
        MOV  R0,@SCRTMP
-       MOV  @RECFLG,R1
-       SOC  @RPLFLG,R1
+       MOV  @SCRFLG,R1
        JEQ  SCRC9
        BL   @DVCLOS
        CLR  @RECFLG
        CLR  @RPLFLG
+       CLR  @SCRFLG
 SCRC9  MOV  @SCRTMP,R0
        MOV  @SCRRET,R11
        RT
@@ -47,7 +47,5 @@ DVOPNW MOV  R11,@SCRRET
        RT
 * DSKCL2 - DSKCAL (R0 opcode, R1 count), with no controller power-up
 * while a script file is open (it would be forgotten): SAVE and RESTORE.
-DSKCL2 MOV  @RECFLG,R2
-       SOC  @RPLFLG,R2
-       MOV  R2,@DSRKEEP
+DSKCL2 MOV  @SCRFLG,@DSRKEEP
        B    @DSKCAL

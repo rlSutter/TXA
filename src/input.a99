@@ -145,6 +145,7 @@ RDLINE .enter
        JEQ  RDL0A
        BL   @DVCLOS
        CLR  @RECFLG
+       CLR  @SCRFLG
 RDL0A  MOV  @RPLFLG,R0         replaying a script: the next record is the
        JEQ  RDL0K              line, echoed as if typed (RDL6); at its end
        BL   @DVREAD            the keyboard again
@@ -159,6 +160,7 @@ RDL0A  MOV  @RPLFLG,R0         replaying a script: the next record is the
 RDL0R  B    @RDL6
 RDL0E  BL   @DVCLOS
        CLR  @RPLFLG
+       CLR  @SCRFLG
 RDL0K  CLR  @MORECT            the player is reading: no [MORE] soon
        BL   @KEYFRE            a key let go of while the game was busy
        BL   @ROWFIT
@@ -296,7 +298,9 @@ OPRECD DECT R6
        MOV  R0,R0
        JNE  OPRC0
        SETO @RECFLG
-OPRC1  LI   R0,1
+OPRC2  SETO @SCRFLG            a script open: the picture off until it closes
+       BL   @PICOFF            (it would overwrite the controller's buffers for
+OPRC1  LI   R0,1               the open file: VRAM >2800-3FFF)
        MOV  R0,*R6+
        B    @NEXT
 OPRC0  CLR  *R6+
@@ -313,7 +317,7 @@ OPRPLY DECT R6
        MOV  R0,R0
        JNE  OPRC0
        SETO @RPLFLG
-       JMP  OPRC1
+       JMP  OPRC2
 * (SCRCLS, SCRKP, SCRNAM, DVOPNW and DSKCL2 are in script.a99, in the
 * kernel segment: this one is full.)
 * DVWRIT - IBUF (ILEN bytes) written as the next record; R0 = the DSR's

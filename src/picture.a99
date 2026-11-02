@@ -25,6 +25,8 @@
 
 OPPIC  DECT R6
        MOV  *R6,R0
+       MOV  @SCRFLG,R1         a script open: no picture until it closes
+       JNE  OPP9               (its buffers in VRAM: input.a99, OPRECD)
        C    R0,@CURPIC
        JEQ  OPP9               showing already
        MOV  R0,R0

@@ -189,6 +189,10 @@ DHI    EQU  RAMVAR+>23E
 DMID   EQU  RAMVAR+>240
 RECFLG EQU  RAMVAR+>316        RECORD: nonzero while a script file is open for writing
 RPLFLG EQU  RAMVAR+>318        REPLAY: nonzero while one is open for reading
+TIPCRU EQU  RAMVAR+>328        a TIPI's CRU base, or 0 (TIPISC at start-up): DSRLNK
+*                              never runs its power-up, which only resets the Pi
+*                              (found by the SAMS Kernel, 1.16.1)
+SCRFLG EQU  RAMVAR+>32A        nonzero while a RECORD or REPLAY script is open
 DKBUF  EQU  RAMVAR+>31E        DSKCAL's VRAM buffer: 0 FBUF (the usual), else this
 *                              (the workbench's TI Artist import loads 6144 bytes
 *                              at >1800, over the font, which FBUF's room lacks)

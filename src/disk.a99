@@ -138,9 +138,11 @@ DLNM1  CB   *R6+,*R2+          ... and every character
 * a record file open across calls (READ, CLOSE): no power-up, which would
 * forget it (M6: found on js99er with a real controller; the engine never
 * sets DSRKEEP)
+       C    R12,@TIPCRU        a TIPI: never its power-up (it only resets the
+       JEQ  DLKP               Pi: tipi.a99)
        MOV  @DSRKEEP,R0
        JEQ  DLPU0
-       B    @DLCALL
+DLKP   B    @DLCALL
 DLPU0
 *                              (every call: the engine's own VRAM use, the
 *                               picture pane, overwrites the controller's buffers)

@@ -112,5 +112,19 @@ check('leaving the cave hides it', not snaps2[10]['vr'][31] & 0x80 and snaps2[10
 ok, d = shows(snaps2[11], 2)
 check('UNDO brings it back', ok, d)
 R.render(m2, os.path.join(ROOT, 'build/shots/pic-cave-undo.png'))
+# RECORD while a picture shows (M6 part 8 with the SAMS Kernel's lesson): the
+# picture's VRAM (>2800-3FFF) holds the disk controller's buffers, so an open
+# script file would be overwritten by it: pictures are off while a script is open
+rec = ['n', 'take lantern', 's', 's', 'w', 'turn on lantern', 'record', 'look', 'record', 'look']
+got3, m3, snaps3 = run(rec, snap_after={5, 6, 7, 9}, disk=tempfile.mkdtemp())
+ok, d = shows(snaps3[5], 2)
+check('the lit cave shows its picture', ok, d)
+s6 = snaps3[6]
+check('RECORD turns the picture off (the controller keeps the open script\'s buffers in its VRAM)',
+      not s6['vr'][31] & 0x80 and s6['curpic'] == 0 and s6['txttop'] == 1, (hex(s6['vr'][31]), s6['curpic'], s6['txttop']))
+s7 = snaps3[7]
+check('while recording, LOOK in the cave shows no picture', not s7['vr'][31] & 0x80 and s7['curpic'] == 0, (hex(s7['vr'][31]), s7['curpic']))
+ok, d = shows(snaps3[9], 2)
+check('RECORD again (stopped): LOOK shows the cave picture again', ok, d)
 print('ALL PASS' if not fails else f'{fails} FAILED')
 sys.exit(1 if fails else 0)
