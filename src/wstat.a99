@@ -1,0 +1,260 @@
+*======================================================================
+* wstat.a99 - the statistics (S, M6 part 10), overlay 13: the last
+* compile's object, word and string counts, the image's size and the free
+* space in each of its sections, as the spec asks.  The lines are
+* tools/txc/stats.py's, word for word (tests/m6_stats_test.py).
+*======================================================================
+* STATS - rows 3-10: the figures, then any key, the menu.  Without an
+* error-free compile that linked: a line saying so.
+STATS  LI   R10,STACKT
+       LI   R4,3               rows 3-10 cleared
+STA0   MOV  R4,R0
+       BL   @WCLR
+       INC  R4
+       CI   R4,11
+       JL   STA0
+       MOV  @WBERR,R0
+       JNE  STANO
+       MOV  @LKTEND,R0
+       JNE  STA1
+STANO  LI   R0,4
+       LI   R1,QSTNO
+       BL   @STLINE
+       B    @STA9
+STA1   LI   R0,3
+       LI   R1,QSTTL
+       BL   @STLINE
+       LI   R0,H.OBJECT_COUNT  line 1: the counts
+       BL   @STHW
+       MOV  R0,@STOBJ
+       LI   R0,H.DICTIONARY
+       BL   @STHW
+       BL   @STHW              (the dictionary's first word: its count)
+       MOV  R0,@STWDS
+       LI   R0,4
+       LI   R1,QSOBJ
+       BL   @STLINE
+       MOV  @STOBJ,R0
+       BL   @STDEC
+       LI   R1,QSWDS
+       BL   @STSTR
+       MOV  @STWDS,R0
+       BL   @STDEC
+       LI   R1,QSRTS
+       BL   @STSTR
+       MOV  @RN,R0
+       BL   @STDEC
+       LI   R1,QSSTR
+       BL   @STSTR
+       MOV  @STRN,R0
+       BL   @STDEC
+       LI   R1,QSDOT
+       BL   @STSTR
+       LI   R0,H.IMAGE_LEN_HI  line 2: the image
+       BL   @STHW
+       MOV  R0,@STSZH
+       LI   R0,H.IMAGE_LEN_LO
+       BL   @STHW
+       MOV  R0,@STSZL
+       LI   R0,5
+       LI   R1,QSIMG
+       BL   @STLINE
+       MOV  @STSZH,R0
+       MOV  @STSZL,R1
+       BL   @STD32
+       LI   R1,QSOF2
+       BL   @STSTR
+       LI   R0,4               262144 - the size
+       CLR  R1
+       S    @STSZL,R1
+       JOC  STA2               (no borrow: carry set)
+       DEC  R0
+STA2   S    @STSZH,R0
+       BL   @STD32
+       LI   R1,QSFREE
+       BL   @STSTR
+       LI   R0,H.DYNAMIC_LEN   line 3: the dynamic area (kept in memory: TXSTR
+       BL   @STHW              uses R0-R5)
+       MOV  R0,@STDYN
+       LI   R0,6
+       LI   R1,QSDYN
+       BL   @STLINE
+       MOV  @STDYN,R0
+       BL   @STDEC
+       LI   R1,QSOF16
+       BL   @STSTR
+       LI   R0,16384
+       S    @STDYN,R0
+       BL   @STDEC
+       LI   R1,QSFREE
+       BL   @STSTR
+       LI   R0,7               line 4: the tables
+       LI   R1,QSTAB
+       BL   @STLINE
+       MOV  @LKTEND,R0
+       BL   @STDEC
+       LI   R1,QSOF64
+       BL   @STSTR
+       CLR  R0                 65536 - the end
+       S    @LKTEND,R0
+       BL   @STDEC
+       LI   R1,QSFREE
+       BL   @STSTR
+       LI   R0,8               line 5: routines and strings
+       LI   R1,QSRAS
+       BL   @STLINE
+       MOV  @STSZH,R0          the size - the tables' end
+       MOV  @STSZL,R1
+       S    @LKTEND,R1
+       JOC  STA3
+       DEC  R0
+STA3   BL   @STD32
+       LI   R1,QSBYT
+       BL   @STSTR
+       LI   R0,10
+       LI   R1,QSKEY
+       BL   @STLINE
+STA9   BL   @WKEY
+       B    @MENUGO
+
+* STHW - R0 = the image's word at offset R0 (bytes, high first), from its
+* pages (LKIPG on).  Uses R0-R2.
+STHW   MOV  R11,@STRET
+       MOV  R0,R1
+       MOV  R1,R0
+       SRL  R0,12
+       A    @LKIPG,R0
+       BL   @EMAP
+       MOV  R1,R2
+       ANDI R2,>0FFF
+       MOVB @>E000(R2),R0      the high byte ...
+       INC  R1                 ... and the low, perhaps on the next page
+       MOV  R0,@STTMP
+       MOV  R1,R0
+       SRL  R0,12
+       A    @LKIPG,R0
+       BL   @EMAP
+       ANDI R1,>0FFF
+       MOV  @STTMP,R0
+       MOVB @>E000(R1),@STTMP+1
+       MOV  @STTMP,R0
+       MOV  @STRET,R11
+       RT
+* STLINE - row R0 cleared, the cursor at its column 1, the string at R1.
+STLINE MOV  R11,@STRET
+       MOV  R1,@STTMP
+       MOV  R0,@STROW
+       BL   @WCLR
+       MOV  @STROW,R0
+       LI   R1,1
+       BL   @TXAT
+       MOV  @STTMP,R1
+       CLR  R2
+       BL   @TXSTR
+       MOV  @STRET,R11
+       RT
+* STSTR - the string at R1 at the cursor.  STDEC - R0 in decimal.
+STSTR  MOV  R11,@STRET2
+       CLR  R2
+       BL   @TXSTR
+       MOV  @STRET2,R11
+       RT
+STDEC  MOV  R11,@STRET2
+       CLR  R2
+       BL   @TXDEC
+       MOV  @STRET2,R11
+       RT
+* STD32 - R0:R1 (32 bits) in decimal at the cursor.  Uses R0-R6.
+STD32  MOV  R11,@STRET2
+       MOV  R0,R4              high
+       MOV  R1,R5              low
+       LI   R6,STDBUF+12       the digits, from the right
+STD1   CLR  R2                 high / 10
+       MOV  R4,R3
+       DIV  @D10ST,R2
+       MOV  R2,R4
+       MOV  R3,R2              (the remainder : low) / 10
+       MOV  R5,R3
+       DIV  @D10ST,R2
+       MOV  R2,R5
+       AI   R3,'0'
+       SWPB R3
+       DEC  R6
+       MOVB R3,*R6
+       MOV  R4,R0
+       SOC  R5,R0
+       JNE  STD1
+       LI   R0,STDBUF+12       its length, before it
+       S    R6,R0
+       SWPB R0
+       DEC  R6
+       MOVB R0,*R6
+       MOV  R6,R1
+       CLR  R2
+       BL   @TXSTR
+       MOV  @STRET2,R11
+       RT
+
+STRET  DATA 0
+STRET2 DATA 0
+STTMP  DATA 0
+STROW  DATA 0
+STOBJ  DATA 0
+STWDS  DATA 0
+STSZH  DATA 0
+STSZL  DATA 0
+STDYN  DATA 0
+D10ST  DATA 10
+STDBUF BSS  13
+       EVEN
+QSTNO  BYTE QSTNOX-QSTNO-1
+       TEXT 'No statistics yet: compile first (C), without errors.  Any key: the menu.'
+QSTNOX
+QSTTL  BYTE QSTTLX-QSTTL-1
+       TEXT 'Statistics of the last compile:'
+QSTTLX
+QSOBJ  BYTE QSOBJX-QSOBJ-1
+       TEXT 'Objects: '
+QSOBJX
+QSWDS  BYTE QSWDSX-QSWDS-1
+       TEXT '.  Dictionary words: '
+QSWDSX
+QSRTS  BYTE QSRTSX-QSRTS-1
+       TEXT '.  Routines: '
+QSRTSX
+QSSTR  BYTE QSSTRX-QSSTR-1
+       TEXT '.  Strings: '
+QSSTRX
+QSDOT  BYTE 1
+       TEXT '.'
+QSIMG  BYTE QSIMGX-QSIMG-1
+       TEXT 'Story image: '
+QSIMGX
+QSOF2  BYTE QSOF2X-QSOF2-1
+       TEXT ' bytes of 262144 ('
+QSOF2X
+QSFREE BYTE QSFREX-QSFREE-1
+       TEXT ' free).'
+QSFREX
+QSDYN  BYTE QSDYNX-QSDYN-1
+       TEXT 'Dynamic area: '
+QSDYNX
+QSOF16 BYTE QSO16X-QSOF16-1
+       TEXT ' bytes of 16384 ('
+QSO16X
+QSTAB  BYTE QSTABX-QSTAB-1
+       TEXT 'Tables (to the routines): '
+QSTABX
+QSOF64 BYTE QSO64X-QSOF64-1
+       TEXT ' bytes of 65536 ('
+QSO64X
+QSRAS  BYTE QSRASX-QSRAS-1
+       TEXT 'Routines and strings: '
+QSRASX
+QSBYT  BYTE QSBYTX-QSBYT-1
+       TEXT ' bytes.'
+QSBYTX
+QSKEY  BYTE QSKEYX-QSKEY-1
+       TEXT 'Any key: the menu.'
+QSKEYX
+       EVEN

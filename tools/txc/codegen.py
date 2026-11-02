@@ -523,6 +523,7 @@ def link(prog, gen, title='TXA GAME', release=1, date=None):
         img.set_word(tab + 2 * i, len(img.b) - tab); img.b += t.encode('latin-1') + b'\0'
     if len(img.b) > 0xFFFF:
         raise TxaError('<program>', 0, 'the tables before the routines pass 64K')
+    tables_end = len(img.b)                           # (statistics: tools/txc/stats.py)
     # routines, then strings, each on a 4-byte boundary
     where = {}
     for c in gen.codes:
@@ -550,7 +551,8 @@ def link(prog, gen, title='TXA GAME', release=1, date=None):
         s = p.sym(attr)
         img.b[HDR[field]] = s.number if s and s.kind == 'attribute' else 255
     img.set_hdr('checksum', sum(img.b[HEADER_SIZE:]) & 0xFFFF)
-    return bytes(img.b), {'abbrevs': abbrevs, 'where': where}
+    return bytes(img.b), {'abbrevs': abbrevs, 'where': where,
+                          'stats': {'routines': len(gen.codes), 'strings': len(gen.strings), 'tables_end': tables_end}}
 
 
 def compile_file(path, libpath=(), title=None, release=1, date=None):

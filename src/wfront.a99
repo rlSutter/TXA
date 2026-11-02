@@ -62,7 +62,11 @@ MN2T   CI   R0,'B'             B: compile, then the engine's files (overlay 9)
        LI   R0,1
        MOV  R0,@WBBLD
        JMP  MCOMP
-MN2A   CI   R0,'I'             I: a TI Artist picture, previewed (overlay 12,
+MN2A   CI   R0,'S'             S: the last compile's statistics (overlay 13)
+       JNE  MN2S
+       LI   R0,13
+       B    @OVGO
+MN2S   CI   R0,'I'             I: a TI Artist picture, previewed (overlay 12,
        JNE  MN2I               >B008)
        BL   @MPIC
        MOVB @TINAME,R0
@@ -418,10 +422,6 @@ QASKX
 * the keys still to come: the key, then its message (a length byte the
 * assembler counts, and the text)
 QSOON
-       BYTE 'S'
-QS3    BYTE QS3X-QS3-1
-       TEXT 'Statistics: not built yet (M6 part 10).'
-QS3X
        BYTE 'O'
 QS5    BYTE QS5X-QS5-1
        TEXT 'Options: not built yet (M6 part 10).'

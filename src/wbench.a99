@@ -277,6 +277,7 @@ WL1A   MOV  R14,R0
        CLR  @NF
        CLR  @DXN
        CLR  @WBLTOT
+       CLR  @LKTEND            (no statistics until it links)
        CLR  @WBERR
        CLR  @WBSTAG
        CLR  @XFPG

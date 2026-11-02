@@ -57,7 +57,9 @@ LJ1    CLR  *R0+
        LI   R2,255
        LI   R0,SE.TAB
        B    @SERR
-LJ2    BL   @JROUTS
+LJ2    MOV  @IPL,@LKTEND       (the statistics: the tables' end, the image's
+       MOV  @IMGPG,@LKIPG      first page; S, overlay 13)
+       BL   @JROUTS
        BL   @JSTRS
        LI   R2,3
        BL   @IALIGN

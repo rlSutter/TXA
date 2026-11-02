@@ -55,4 +55,8 @@ OV11END
        B    @TIPREV            (>B008) the I key: the preview
        COPY "wtiart.a99"
 OV12END
+       XORG >B000
+       B    @STATS             overlay 13: the statistics (S)
+       COPY "wstat.a99"
+OV13END
        END
