@@ -207,7 +207,7 @@ LIB_FILES = ['lib/libdefs.txa', 'lib/parser.txa', 'lib/verbs.txa', 'lib/verbs2.t
              'lib/debug.txa', 'lib/script.txa', 'lib/stdlib.txa']
 ATTR_DESC = {
     'light': 'gives light (a lamp, a sunlit room); a room without it is dark unless something lit is there',
-    'lit': 'giving light just now (a lantern switched on); SWITCH ON and OFF set and clear it on switchable lights',
+    'lit': 'reserved for the game: the library declares it but does not use it (a lamp that is on gives light through `light`, as Lamplight\'s lantern does with AFTER rules)',
     'open': 'open (a door, a box)', 'openable': 'can be opened and closed', 'locked': 'locked: it will not open',
     'lockable': 'can be locked and unlocked (with its WITH_KEY)', 'container': 'things can be put inside it',
     'supporter': 'things can be put on it', 'transparent': 'its contents can be seen when it is closed',

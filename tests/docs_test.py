@@ -43,5 +43,17 @@ core_io = [n for c, n, *_ in O.OPS if c >= 0x48 and n not in named]
 check('every input/output and system opcode (>48 on) is in the guide\'s tables', not core_io, core_io)
 card = open('docs/PLAYERS-CARD.md').read()
 check('docs/PLAYERS-CARD.md is what the game writer\'s card generator makes for Lamplight now', card == gendocs.generate_card())
+import tempfile
+from txc.codegen import compile_file
+lang = open('docs/LANGUAGE-REFERENCE.md').read()
+full = [b for b in re.findall(r'```\n(.*?)```', lang, re.S) if 'ROUTINE Initialise' in b]
+bad = []
+for b in full:
+    f = os.path.join(tempfile.mkdtemp(), 'g.txa'); open(f, 'w').write(b)
+    try:
+        compile_file(f, ['lib'], title='G')
+    except Exception as e:
+        bad.append(str(e))
+check(f'the Language Reference\'s complete programs compile ({len(full)})', full and not bad, bad)
 print('ALL PASS' if not fails else f'{fails} FAILED')
 sys.exit(1 if fails else 0)
