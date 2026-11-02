@@ -34,5 +34,7 @@ check(f'every library property has a description ({len(gendocs.lib_props())})', 
 check(f'every library attribute has a description ({len(gendocs.lib_attrs())})', all(a in gendocs.ATTR_DESC for a in gendocs.lib_attrs()))
 acts = {a for a, _, _ in gendocs.lib_verbs()}
 check(f'every action the grammar names ({len(acts)}) has a row', all(f'`{a}`' in lib for a in acts))
+tut = open('docs/TUTORIAL.md').read()
+check('docs/TUTORIAL.md is what gendocs.py makes from the chapters now (its code and transcript included)', tut == gendocs.generate_tutorial())
 print('ALL PASS' if not fails else f'{fails} FAILED')
 sys.exit(1 if fails else 0)
