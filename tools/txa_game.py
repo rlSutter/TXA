@@ -29,6 +29,58 @@ sys.path.insert(0, os.path.join(ROOT, 'tools'))
 import build, txpics, txsound
 from txc.codegen import compile_file
 
+def player_card(title, prefix, device='DSK1', pictures=False, music=False):
+    """The game's player's card (M7): a page of Markdown with its title,
+    how to load it, and how to play.  Written beside the game's files as
+    PREFIX-CARD.md; docs/PLAYERS-CARD.md is Lamplight's."""
+    extras = []
+    if pictures:
+        extras.append('PICTURES OFF and PICTURES ON hide and show the pictures.')
+    if music:
+        extras.append('MUSIC OFF and SOUNDS OFF silence the music and the sound effects (ON brings them back).')
+    return f"""# {title}
+
+*An interactive story for the TI-99/4A, made with TXA.*
+
+## Starting
+
+You need a TI-99/4A with 32K memory expansion, an F18A (or PICO9918) and
+a SAMS card of 512K or more. Put the game's disk in {device}, then load
+`{device}.{prefix}1` with Editor/Assembler option 5, or choose it from a
+FinalGROM or TIPI menu.
+
+## Playing
+
+You read what happens and type what you do, then press ENTER:
+
+```
+> look            > take the lamp     > open the door with the key
+> go north        > put coin on table > ask the keeper about the tide
+```
+
+Directions: N, S, E, W, NE, NW, SE, SW, UP, DOWN, IN, OUT (just N works).
+Shortcuts: L look, X examine, I inventory, Z wait, G again. Several
+commands go on one line with THEN or full stops: TAKE KEY. GO NORTH.
+If a word is misspelt, OOPS and the right word corrects it.
+
+## Keys
+
+- **FCTN S** rubs out; **FCTN E** and **FCTN X** bring back earlier
+  commands.
+- **FCTN 9** (BACK) at the prompt shows what has scrolled away: FCTN E
+  and X move through it, ENTER returns.
+
+## Saving
+
+- **SAVE** and **RESTORE** keep and bring back a game on disk.
+- **UNDO** takes back your last move (again for the one before).
+- **RESTART** starts over; **QUIT** ends; **SCORE** shows how you are
+  doing.
+- **VERBOSE** describes every room every time; **BRIEF** only the first.
+{chr(10).join('- ' + e for e in extras)}
+"""
+
+
 def write_game(source, prefix, title=None, lib=None, out=None, cart=False, device='DSK1', quiet=False):
     prefix = prefix.upper()
     if not (1 <= len(prefix) <= 6 and prefix.isalnum() and prefix[0].isalpha()):
@@ -92,54 +144,3 @@ if __name__ == '__main__':
     a.add_argument('--cart', action='store_true'); a.add_argument('--device', default='DSK1')
     o = a.parse_args()
     write_game(o.source, o.prefix, o.title, o.lib, o.out, o.cart, o.device)
-
-def player_card(title, prefix, device='DSK1', pictures=False, music=False):
-    """The game's player's card (M7): a page of Markdown with its title,
-    how to load it, and how to play.  Written beside the game's files as
-    PREFIX-CARD.md; docs/PLAYERS-CARD.md is Lamplight's."""
-    extras = []
-    if pictures:
-        extras.append('PICTURES OFF and PICTURES ON hide and show the pictures.')
-    if music:
-        extras.append('MUSIC OFF and SOUNDS OFF silence the music and the sound effects (ON brings them back).')
-    return f"""# {title}
-
-*An interactive story for the TI-99/4A, made with TXA.*
-
-## Starting
-
-You need a TI-99/4A with 32K memory expansion, an F18A (or PICO9918) and
-a SAMS card of 512K or more. Put the game's disk in {device}, then load
-`{device}.{prefix}1` with Editor/Assembler option 5, or choose it from a
-FinalGROM or TIPI menu.
-
-## Playing
-
-You read what happens and type what you do, then press ENTER:
-
-```
-> look            > take the lamp     > open the door with the key
-> go north        > put coin on table > ask the keeper about the tide
-```
-
-Directions: N, S, E, W, NE, NW, SE, SW, UP, DOWN, IN, OUT (just N works).
-Shortcuts: L look, X examine, I inventory, Z wait, G again. Several
-commands go on one line with THEN or full stops: TAKE KEY. GO NORTH.
-If a word is misspelt, OOPS and the right word corrects it.
-
-## Keys
-
-- **FCTN S** rubs out; **FCTN E** and **FCTN X** bring back earlier
-  commands.
-- **FCTN 9** (BACK) at the prompt shows what has scrolled away: FCTN E
-  and X move through it, ENTER returns.
-
-## Saving
-
-- **SAVE** and **RESTORE** keep and bring back a game on disk.
-- **UNDO** takes back your last move (again for the one before).
-- **RESTART** starts over; **QUIT** ends; **SCORE** shows how you are
-  doing.
-- **VERBOSE** describes every room every time; **BRIEF** only the first.
-{chr(10).join('- ' + e for e in extras)}
-"""
