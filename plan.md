@@ -1188,6 +1188,32 @@ M6 part 10 done (2 November 2026), and with it M6.
   simulator's card answers DSK2 as well.  tests/m6_options_test.py.
 - Not done from the spec's I line: .PIC pictures (TI Artist only).
 
+Optimization pass 3 (2 November 2026), at Rebecca's request before M7:
+a Lamplight compile 32.8M -> 30.3M instructions (about 86 -> 79 s on a
+TI; the library had grown the count from 30.4M), the image unchanged.
+- OVSEL copies only the overlay's length (the build writes it, in 8-byte
+  groups, into each overlay bank's last word), four words a loop: it had
+  copied all 8K a word at a time on every switch.
+- LOADF reads a line straight from VRAM into its SAMS page when the line
+  and its line feed fit (almost always): a byte at a time through WPUT
+  had cost 1.2M.
+- The checksum is summed a page at a time (it went through IGETB a byte
+  at a time, with pushes and pops: 1M).
+- For room: the SAMS page test and its refusal moved to overlay 14
+  (OPLOAD runs at start-up before the menu); the resident part has about
+  260 bytes free.
+- Left: the tree reader (XB, XW, XSKIP: about 14%) would need XOF to
+  become a pointer, but XOF is saved and restored as an offset in dozens
+  of places (GOF, TSOF, IOF, the declaration index): not worth the risk
+  for about 1%.
+- The engine (tools/engprof.py: Lamplight's walkthrough): a median of
+  0.19M instructions a command, worst 0.37M.  The undo snapshot's
+  compare loop is four instructions a word now (six).  Scrolling is the
+  biggest cost and inherent to a CPU copy (its loops already unrolled);
+  the F18A's hardware scroll would need the status line on its own layer:
+  a redesign, not done.  The engine's kernel and start-up segments have 8
+  and 4 bytes left: space is its limit.
+
 ## Next
 
 1. A checkpoint for Rebecca's js99er tests (the plan's 7f with I, S, O).

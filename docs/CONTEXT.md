@@ -112,6 +112,7 @@ owns it; Claude builds it. The engine comes first; the story later.
 | `tests/m6_record_test.py` | RECORD and REPLAY in a built game; the script file's records |
 | `src/script.a99` | the engine's RECORD/REPLAY helpers (kernel segment) |
 | `tests/m6_debug_test.py` | the debug verbs under test-play, refused in a built game |
+| `tools/engprof.py` | profiles the TI engine over Lamplight's walkthrough: instructions by routine and per command |
 | `tools/wbprof.py` | profiles a Lamplight compile on the workbench: instructions by overlay and routine |
 | `tests/m6_testplay_test.py` | test-play: T plays from SAMS (engine STMODE 2); FCTN = back to the workbench |
 | `tests/m5_sema_test.py` | the workbench against sema.py and codegen.py: decls, meaning, code, link (the whole image), errors |
