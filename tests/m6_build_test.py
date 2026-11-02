@@ -2,7 +2,7 @@
 """m6_build_test.py - Build (M6 part 3): the workbench writes a whole game.
 
   - B on the simulated TI compiles the project and writes the engine's
-    files, LAMPLI1 .. LAMPLI5: the same bytes as the PC game writer's for
+    files, LAMPLI1 ..: the same bytes as the PC game writer's for
     the prefix LAMPLI (the generic engine, its story name patched in);
   - its story files equal the PC's but for the build date;
   - the game the TI built (its engine and story, the PC's picture and
@@ -98,7 +98,8 @@ d, ppath = g['stage'](open('samples/lamplight.txa').read(), 'lamplight', g['LIB'
 m, steps = run_keys(d, [P, 'dsk1.lamplight', '', 'lampli', B])
 scr = g['R'].screen(m).splitlines()
 eng = sorted(n for n in os.listdir(os.path.join(d, 'DSK1')) if n.startswith('LAMPLI') and n[6:].isdigit())
-check(f'B compiled the project and wrote the engine\'s files: {eng} ({steps / 1e6:.0f}M instructions)', len(eng) == 5, eng)
+neng = len(build.generic_engine_files())         # (as many as the engine's size needs: 6 since pass 3)
+check(f'B compiled the project and wrote the engine\'s files: {eng} ({steps / 1e6:.0f}M instructions)', len(eng) == neng, (eng, neng))
 check('the screen says how to load it', 'The game is built: load DSK1.LAMPLI1' in scr[8], scr[4:11])
 outC = tempfile.mkdtemp()
 fc = txa_game.write_game('samples/lamplight.txa', 'LAMPLI', 'LAMPLIGHT', out=outC, quiet=True)
