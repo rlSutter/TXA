@@ -60,9 +60,9 @@ lines) takes a little over a minute. When it is done the screen says
 what it read and made:
 
 ```
-Read 9 files, 3770 lines.
-419 declarations, 380 symbols, 48 objects.
-Story: 33856 bytes in 9 files on disk.
+Read 9 files, 3752 lines.
+... declarations, ... symbols, 48 objects.
+Story: 34068 bytes in 9 files on disk.
 ```
 
 and the story's files are on the source disk (`PREFIXS01`, `S02` ...).
@@ -130,11 +130,11 @@ room is left in each part of it:
 
 ```
 Statistics of the last compile:
- Objects: 48.  Dictionary words: 285.  Routines: 186.  Strings: 348.
- Story image: 33856 bytes of 262144 (228288 free).
+ Objects: 48.  Dictionary words: 285.  Routines: 187.  Strings: 350.
+ Story image: 34068 bytes of 262144 (228076 free).
  Dynamic area: 7304 bytes of 16384 (9080 free).
- Tables (to the routines): 12628 bytes of 65536 (52908 free).
- Routines and strings: 21228 bytes.
+ Tables (to the routines): 12630 bytes of 65536 (52906 free).
+ Routines and strings: 21438 bytes.
 ```
 
 Watch the **dynamic area**: it holds every object, property, global and
