@@ -1163,158 +1163,32 @@ found it an ill fit for TXA as a platform:
   images: worth doing when they are to hand).
 - tests/tipi_test.py; m4_picture_test checks RECORD with a picture.
 
+M6 part 9 finished (2 November 2026): the I key.  The name typed (offered
+as the source's device), the picture loaded and all 192 rows cropped once,
+then shown on the bitmap layer as a game shows it; FCTN E/X move the band
+(a copy only), S converts and shows the squeeze, ENTER writes NAME_T, FCTN
+9 leaves.  WKEY now reports FCTN E, X, 9 (11, 12, 15).  Found: a key let go
+while the preview was busy made the same key, pressed again, look held
+(TIREL).  tests/m6_preview_test.py.
+
+M6 part 10 done (2 November 2026), and with it M6.
+- S, statistics (overlay 13): object, dictionary word, routine and string
+  counts; the image and each section against its limit (dynamic area
+  16384, tables 64K, image 256K) with what is free.  The text is
+  tools/txc/stats.py's, from the Python compiler's image and counts
+  (link() now reports routines, strings and the tables' end); the TI's
+  linker keeps the tables' end and the image's page (LKTEND, LKIPG).
+  tests/m6_stats_test.py.
+- O, options (overlay 14), as Rebecca approved: colours (five schemes for
+  the workbench's own text and ground: palette 14 and 1), font (normal or
+  bold: WBOLD, after every font load), library devices (LFLIB in LOADF: an
+  INCLUDE's file looked for on them when its own device lacks it).  Kept
+  in DSK1.TXAOPT (DV80 lines "colours N", "font bold", "library DSK2.")
+  and read at start-up (overlay 14's second entry, before the menu).  The
+  simulator's card answers DSK2 as well.  tests/m6_options_test.py.
+- Not done from the spec's I line: .PIC pictures (TI Artist only).
+
 ## Next
 
-1. M6 part 9: picture import (needs a sample TI Artist picture), then
-   part 10, statistics and options. the debug verbs (D5): TREE, GOTO, PURLOIN, SCOPE, ACTIONS
-   ON, TRACE, in the library, live only when the header's flags mark a
-   test-play run.
-
-The reference used for part 6's disk writes:
-   (part 6) libre99's clean-room TI disk controller DSR and its notes,
-   https://github.com/joelodom/libre99/tree/main/original-content/system-roms/disk-dsr
-   (README, RECON.md, SURFACE-MAP.md: what the real DSR accepts for each
-   PAB operation and mode, its errors, the on-disk file format).  Read
-   them only: libre99 is under a Modified MIT License with the Commons
-   Clause, so none of its code or binaries go into this repository.
-   What its notes say that matters here (the workbench writes the story
-   as 4K PROGRAM files with SAVE, opcode 6, through the kernel's DSKCAL,
-   as the game writer's LAMPS01.. files are):
-   - SAVE needs no OPEN and takes the byte count in PAB+6/7; LOAD gives
-     the bytes back to VRAM at PAB+2 and leaves PAB+6/7 alone.
-   - SAVE writes the last, partial sector whole, straight from VRAM: the
-     bytes past the file's length are whatever follows it in VRAM, never
-     zeros.  So the test compares each file's first n bytes (n its
-     length), not disk sectors; and the workbench should not rely on what
-     the tail holds.
-   - Error bits in PAB+1 (bits 5-7) are sticky: the DSR never clears
-     them.  DSKCAL builds a fresh PAB each call, so this is safe; any new
-     code must do the same.
-   - A protected file refuses DELETE and write-mode OPEN with error 1, so
-     a SAVE over a protected story file must be reported, not ignored;
-     an unreadable drive gives error 6.  The workbench should show the
-     DSR's error with the file's name.
-   - STATUS (opcode 9) also needs no OPEN: PAB+8 gets >08 for an existing
-     PROGRAM file, >80 for none.  A way to ask before overwriting, if the
-     front end wants one.
-   - The controller keeps its buffers from >37D8 up (it lowers >8370 to
-     >37D7); our PAB at >37A0 sits below them, as it must.
-
-## Later: a stock-TI engine (candidate, to be decided once M6 is done)
-
-Rebecca's idea (22 October 2026): the workbench compiling a small story
-to something that runs on a TI-99/4A with only the 32K expansion, no
-F18A and no SAMS.  Feasible with a second, smaller engine, in the way
-Infocom's interpreters ran on the stock TI; the story format and the
-compiler need no change.
-- The image already splits as such an engine needs: the dynamic area
-  first (at most 16K; Lamplight's is about 7K), which stays in RAM, then
-  the routines and strings, read-only, which can be paged from disk
-  through a cache in spare RAM and in VRAM (the 9918A's 16K, of which
-  40-column text mode uses 1-2K).
-- Memory: 8K at >2000 and 24K at >A000.  Today's engine is about 17K,
-  much of it F18A, SAMS, the bitmap layer and scrollback; a stripped VM
-  with 40-column text, keyboard, disk and sound might be 6-8K (an
-  estimate, not measured).  A very small story could fit whole without
-  paging, but the standard library alone makes images of about 24-26K,
-  so most real games would page.
-- What a stock machine loses: 80 columns (the 9918A's text mode is 40:
-  check whether the library, the status line say, assumes 80);
-  pictures as they work now (the F18A's bitmap layer under the text; a
-  full-screen 9918A picture between screens of text could come later);
-  scrollback, and probably undo (RAM).  Sound and music carry over:
-  they use the console's own sound chip.
-- The workbench itself still needs the F18A and SAMS, but its output
-  could target either engine: the cartridge could carry the stock engine
-  and write it to disk as E/A 5 files beside the story.  It builds on
-  M6's decision (2): an engine that reads the story's length from the
-  story header is what a separately distributed engine needs.
-- The work: the stripped engine with disk paging and a cache, and
-  40-column output; tested in the simulator with the F18A off and on
-  js99er / Classic99 without an F18A or SAMS.  A milestone of its own.
-
-## Later: a more faithful disk test (candidate)
-
-tools/sim9900.py fakes DSK1 with a trap that does each PAB operation on
-host files, which is forgiving where a real controller is not (a PAB the
-DSR rejects, a VDP buffer the DSR overwrites, sector-level file layout).
-A candidate for M6 or after: model the FD1771 and sector-level .dsk
-images in the simulator and run a real DSR on them, such as libre99's
-clean-room one (verified against the genuine TI DSR in 24 differential
-tests; libre99 itself emulates neither the F18A nor SAMS, so it cannot
-run TXA).  The DSR would be fetched at test time, as xdt99 is, never
-committed: its licence (Commons Clause) differs from TXA's.
-
-## (was) M5 (waiting on D1-D4): the native compiler (the workbench cartridge: source loading,
-   three passes, the precompiled library, error list; done when the TI
-   produces images byte-identical to the Python compiler for the whole
-   corpus).  Start with its design.
-
-## (was) M4 part 5 (sound and music): MUSIC/SOUND declarations, MML notation
-   for Rebecca's review, MIDI import, the TI player (frame-flag ticks in
-   key waits and calls), room MUSIC, Lamplight music.
-
-## (was) Next
-1. M4: saving, restoring and UNDO (platform-independent save format;
-   GSYNC/GLOAD around them; the scratchpad block after disk calls);
-   loading stories from disk; pictures and sound (MUSIC/SOUND, silent
-   where unsupported); the standalone game writer (EA5 + data files).
-2. Rebecca's play-test and timing of lamplight8.bin.
-
-## (done) M3 part 3: the verb set.  Part 4: the sample game.
-3. Rebecca's timing of txa-m2demo8.bin when she can.
-
-## (was) Next before M3
-
-1. Rebecca's js99er (and console) check of txa-m2demo8.bin, and timing.
-2. M3: the world model and full standard library (light, doors,
-   containers in depth, characters, daemons and timers, scoring, the
-   Infocom verb set, the sample game).
-
-## (old heading) M1 remaining
-
-Python cross-compiler's semantic pass and code generation; the VM,
-text output, word wrap and [MORE]; bold and underline glyph sets.
-
-## Decisions
-
-| Date | Decision |
-| --- | --- |
-| 2026-10-18 | Engine first, then an original story developed together |
-| 2026-10-18 | Custom engine on the Lantern Coast kernel, not a Z-machine |
-| 2026-10-18 | Text plus occasional illustrations; import now, editor later |
-| 2026-10-18 | Native workbench delivered and documented separately |
-| 2026-10-18 | Full spec as a Claude Doc before coding |
-| 2026-10-19 | M0 started from The Lantern Coast 1.13 bundle |
-| 2026-10-19 | Authoring language approved as proposed: uppercase keywords, terse property names, BEFORE ... END rule blocks, name TXA |
-| 2026-10-19 | Sound (M4): background music by location and sound effects, by number like pictures; MUSIC and SOUND opcodes (silent where unsupported); a room MUSIC property the library follows; sources in a text notation (MML-based, designed by Claude for Rebecca's review) and imported from MIDI |
-| 2026-10-19 | Portability is an explicit goal: the spec's "Portability rules" (eight rules) are checked for every later decision |
-| 2026-10-19 | The parser lives in the TXA standard library; the engine supplies READ and TOKENIZE in assembly |
-| 2026-10-19 | Every ROOM gets all twelve exits automatically (NOTHING where not given), so any exit can be changed while the game runs |
-| 2026-10-19 | Approved: the built-in functions (reserved names) and -32768 only with its minus sign |
-| 2026-10-19 | Approved: `(string) x`; `obj.prop()` as print-or-run; `##Name` for action numbers; Inform's return defaults (ROUTINE TRUE, property routines and rule cases FALSE); INSIDE and OUTSIDE as the in/out direction properties |
-
-## History
-
-- 2026-10-21 M5 part 3: the parser on the TI, trees identical to Python for the corpus.
-- 2026-10-21 M5 part 2: the lexer on the TI, identical to Python for the corpus.
-- 2026-10-21 M5 part 1: D1, txa_wrap, DV80 record reading, the workbench skeleton, the token dump.
-- 2026-10-21 M4 complete: scrollback; startup code moved to the startup segment.
-- 2026-10-21 M4 part 5: sound and music (notation, sound area, TI player identical to the reference, library, Lamplight's tunes and effects).
-- 2026-10-21 M4 part 4: pictures (converter, picture area, pane, library, Lamplight's three pictures).
-- 2026-10-20 M2 follow-ups: command history (FCTN E/X) and the two-row, 160-character input line.
-- 2026-10-19 M3 complete: part 4, the sample game Lamplight; light-change descriptions; final score; parser speed with the full verb set.
-- 2026-10-19 M3 part 3: the verb set (73 verbs), QUIT/RESTART confirmation, REPLACE and EXTEND.
-- 2026-10-19 M3 part 2: doors, floating objects, locks and keys, containers in depth, inventory contents, EMPTY, ENTER/EXIT.
-- 2026-10-19 M3 part 1: action sequence and hooks, end of turn (daemons, timers, EACH_TURN, score notification), light, room descriptions and modes, status line in the engine.
-- 2026-10-19 Engine speed work: scratchpad block, globals in RAM, unrolled VDP reads, LOAD/STORE paths: 8.13M -> 5.50M instructions on the script.
-- 2026-10-19 M2: the TI side (line editor, READ, TOKENIZE, ISNAME, FILTERN), engine plays the parser script identically; checkpoint-m2.
-- 2026-10-19 M2 begun: the standard library's parser in TXA, with the compiler and Python VM support it needs.
-- 2026-10-19 M1 complete: text styles (bold, underline, reverse) through position attributes and an underlined glyph set.
-- 2026-10-19 M1: the assembly VM, cross-checked against the Python VM; the demo cartridge.
-- 2026-10-19 M1: semantic pass, opcodes, code generation and linking, Python reference VM.
-- 2026-10-19 M1 begun: the TXA lexer and parser (`tools/txc/`), 31-check test.
-- 2026-10-19 M0: repository, kernel ported (VDP, F18A, SAMS, keyboard),
-  80-column text layer, RLE picture decoder, SAMS page counting, the
-  probe, cartridge loader, build (EA5 + disk image + cartridge),
-  simulator extended for T80 and the bitmap layer, 25-check test.
+1. A checkpoint for Rebecca's js99er tests (the plan's 7f with I, S, O).
+2. The manuals (stubs in a Claude Doc), then M7 as the spec has it.

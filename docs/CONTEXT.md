@@ -11,11 +11,12 @@ keep it current when the language changes.  The six manuals still to
 write are stubbed in the Claude Doc
 https://claude.ai/artifact/VqqmmXaB3E5RBxdTcfBtU2 (one tab each).
 
-**State (28 October 2026):** M6 parts 1-8 done: the generic engine, the
-main menu (overlays in the cartridge), Build, Run, test-play, errors in
-plain words (E shows the last), the debug verbs, RECORD and REPLAY.
-TXA music notation 1.0 (.txm, docs/MUSIC.md) is in.  Next: part 9,
-picture import (needs a sample TI Artist picture), then part 10.  M5 is done: the workbench loads every
+**State (2 November 2026):** M6 is complete: the generic engine, the main
+menu (overlays in the cartridge), Build, Run, test-play, errors in plain
+words (E), the debug verbs, RECORD and REPLAY, TI Artist pictures (Build
+converts them; I previews and chooses the fitting), statistics (S) and
+options (O, DSK1.TXAOPT).  TXA music notation 1.0 (.txm, docs/MUSIC.md)
+is in; some lessons from the SAMS Kernel are borrowed (plan.md).  M5 is done: the workbench loads every
 file, lexes, parses, checks the meaning, generates the code and links
 the story image, identical to Python byte for byte on the corpus, and
 writes it to disk as 4K PROGRAM files (asking for the build date: the
@@ -104,6 +105,10 @@ owns it; Claude builds it. The engine comes first; the story later.
 | `tests/txm_test.py` | .txm through the player: the compiler's state at every tick |
 | `src/tipi.a99` | TIPISC: a TIPI found at start-up, so DSRLNK never runs its power-up (from the SAMS Kernel) |
 | `tests/tipi_test.py` | no power-up for a TIPI; the workbench's SAMS page test refusing a 256K card |
+| `src/wtiart.a99` | overlay 12: TI Artist pictures: the converter, Build's pictures, the I key's preview |
+| `src/wstat.a99`, `tools/txc/stats.py` | overlay 13: the statistics (S), and their reference text |
+| `src/wopts.a99` | overlay 14: the options (O) and DSK1.TXAOPT |
+| `tests/m6_preview_test.py`, `m6_stats_test.py`, `m6_options_test.py` | the I key, S and O |
 | `tests/m6_record_test.py` | RECORD and REPLAY in a built game; the script file's records |
 | `src/script.a99` | the engine's RECORD/REPLAY helpers (kernel segment) |
 | `tests/m6_debug_test.py` | the debug verbs under test-play, refused in a built game |
