@@ -702,25 +702,47 @@ JH3    MOV  R8,R3
        LI   R1,QPLUR
        LI   R6,H.ATTR_PLURAL
        BL   @JATTR
-       CLR  @JSUM              the checksum: every byte after the header
-       CLR  R2
-       LI   R3,H.SIZE
-JH4    C    R2,@JLENH
-       JL   JH5
-       JH   JH6
-       C    R3,@JLENL
-       JHE  JH6
-JH5    .push R2
-       .push R3
-       BL   @IGETB
-       .pop R3
-       .pop R2
-       A    R0,@JSUM
-       INC  R3
-       JNC  JH4
+       CLR  R4                 the checksum: every byte after the header, a
+       CLR  R2                 page at a time (the optimization pass: through
+       LI   R3,H.SIZE          IGETB a byte at a time cost 1M a compile)
+JH4    MOV  @JLENL,R6          what is left: R7:R6 = the length - R2:R3
+       MOV  @JLENH,R7
+       S    R3,R6
+       JOC  JH4A               (no borrow)
+       DEC  R7
+JH4A   S    R2,R7
+       JLT  JH6
+       MOV  R7,R0
+       SOC  R6,R0
+       JEQ  JH6                nothing left
+       MOV  R3,R1              this page: as IGETB finds it
+       SRL  R1,12
+       MOV  R2,R0
+       SLA  R0,4
+       A    R1,R0
+       A    @IMGPG,R0
+       BL   @DMAP
+       MOV  R3,R1
+       ANDI R1,>0FFF
+       LI   R5,4096            the bytes to its end, or what is left
+       S    R1,R5
+       MOV  R7,R7
+       JNE  JH4B
+       C    R6,R5
+       JHE  JH4B
+       MOV  R6,R5
+JH4B   AI   R1,>D000
+       A    R5,R3              (the place moved on now)
+       JNC  JH4C
        INC  R2
+JH4C   MOVB *R1+,R0
+       SRL  R0,8
+       A    R0,R4
+       DEC  R5
+       JNE  JH4C
        JMP  JH4
-JH6    LI   R0,H.CHECKSUM
+JH6    MOV  R4,@JSUM
+       LI   R0,H.CHECKSUM
        MOV  @JSUM,R2
        BL   @JHDRW
        .leave

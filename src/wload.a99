@@ -221,7 +221,30 @@ LF2    BL   @DVREAD            a record, then a line feed
        MOV  R0,R0
        JLT  LF5
        MOV  R0,R15             its length
+       MOV  @WBOFF,R1          the line and its line feed fit the page: VRAM
+       A    R15,R1             straight into it (the optimization pass: a
+       CI   R1,4094            byte at a time cost 1.2M a compile)
+       JH   LFSLO
+       MOV  R15,R2
+       JEQ  LFF1
        LI   R0,FBUF
+       MOV  @WBOFF,R1
+       AI   R1,>E000
+       BL   @VMBR
+LFF1   MOV  @WBOFF,R1
+       A    R15,R1
+       LI   R0,>0A00
+       MOVB R0,@>E000(R1)
+       INC  R1
+       MOV  R1,@WBOFF
+       INC  R15
+       A    R15,@WBLENL
+       JNC  LFF2
+       INC  @WBLENH
+LFF2   INC  @WBLNS
+       INC  @WBLTOT
+       JMP  LF2
+LFSLO  LI   R0,FBUF            (else a byte at a time, as before)
        LI   R1,ROWBUF
        MOV  R15,R2
        JEQ  LF3

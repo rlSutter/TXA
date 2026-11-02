@@ -338,9 +338,11 @@ def workbench_cart(name='TXA WORKBENCH'):
                 sys.exit(f'overlays 1-4 take {pos} bytes, past their staging room (>4000->9FFF)')
             staged, pos = staged2, 0          # overlays 5 on: the second assembly's
         size = sy[f'OV{n}END'] - 0xB000
-        if size > 0x2000:
-            sys.exit(f'workbench overlay {n} is {size} bytes, more than 8K')
-        banks.append(bytes(staged[pos:pos + size]))
+        if size > 0x1FFE:
+            sys.exit(f'workbench overlay {n} is {size} bytes, more than 8K less a word')
+        bank = bytearray(staged[pos:pos + size]) + bytes(0x2000 - size)
+        bank[0x1FFE:0x2000] = ((size + 7) // 8).to_bytes(2, 'big')   # its length in 8-byte groups: OVSEL copies only that
+        banks.append(bytes(bank))
         pos += size; n += 1
     # the generic engine (M6 part 3), in the banks after the overlays, for
     # Build: its files one after another; overlay 9's ENGTAB says where

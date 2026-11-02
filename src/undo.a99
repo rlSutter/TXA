@@ -186,14 +186,18 @@ USP1A  MOV  @UPOS,R2           map the page in A and B
 USP1B  SRL  R15,1
        LI   R14,WINA
        LI   R13,WINB
-USP2   C    *R14,*R13          the tight loop: unchanged words
-       JNE  USP4
-       INCT R9
-       INCT R14
-       INCT R13
+USP2   MOV  R14,@USTRT         the tight loop: unchanged words (the skip count
+USP2A  C    *R14+,*R13+        from how far R14 went: the optimization pass,
+       JNE  USP3               four instructions a word, not six)
        DEC  R15
-       JNE  USP2
+       JNE  USP2A
+       A    R14,R9
+       S    @USTRT,R9          (in memory: the VM keeps R5 and others)
        JMP  USP8
+USP3   DECT R14                (back to the changed word)
+       DECT R13
+       A    R14,R9
+       S    @USTRT,R9
 USP4   MOV  R9,@UZRUN          a changed word: its two bytes
        BL   @UBYTE
        INC  R14
@@ -225,6 +229,8 @@ USV9   MOV  R9,@UZRUN          the rest, and the end
        LI   R0,1
        MOV  R0,*R6+
        B    @NEXT
+
+USTRT  DATA 0
 
 * UBYTE - the byte at R14 (now) against R13 (LAST): LAST brought up to
 * date; an unchanged byte counted in UZRUN (literals out first), a
