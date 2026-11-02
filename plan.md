@@ -1137,6 +1137,32 @@ M6 part 8 done (28 October 2026): RECORD and REPLAY.
   WRITE).  tests/m6_record_test.py: the sequence in a built game as the
   Python VM plays it; the file holds exactly the two commands.
 
+Borrowed from the SAMS Kernel (2 November 2026), after an evaluation
+found it an ill fit for TXA as a platform:
+- DSRLNK never runs a TIPI's power-up.  The kernel found, from the TIPI's
+  DSR ROM, that its power-up only pulses the Pi's RESET line; TXA ran the
+  owning card's power-up on almost every call, so on a TIPI each OPEN,
+  SAVE and LOAD would have restarted the Pi.  TIPISC (tipi.a99) finds a
+  card whose first device is TIPI at start-up (engine and workbench);
+  DSRLNK compares R12 with TIPCRU (6 bytes in the engine's full kernel
+  segment).  The kernel's wider rule, power every card once, cannot be
+  taken: the engine's picture (VRAM >2800-3FFF) overwrites the TI
+  controller's buffers, which the power-up rebuilds.
+- Found on the way: for the same reason a RECORD or REPLAY script open
+  while a picture shows would have its buffers overwritten.  Pictures are
+  now off while a script is open (SCRFLG; OPPIC shows none; the picture
+  in view is turned off when a script opens and drawn again on the first
+  PICTURE after it closes).
+- The workbench tests every SAMS page it uses (16-127) at start-up
+  (WPTEST, from the kernel's AMSTST), and refuses with a screen naming
+  the page: a faulty card, one under 512K (pages alias) or none.  The
+  engine has no room for it (its start-up segment ends at >37FC).
+- Not taken: the kernel's file-exists check by STATUS (useful for Build's
+  messages; later), its key polling after DSR calls (no room in the
+  engine), and its real-controller models for the tests (they need ROM
+  images: worth doing when they are to hand).
+- tests/tipi_test.py; m4_picture_test checks RECORD with a picture.
+
 ## Next
 
 1. M6 part 9: picture import (needs a sample TI Artist picture), then
