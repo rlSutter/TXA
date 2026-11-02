@@ -1,24 +1,41 @@
-# TXA: an Infocom-style text adventure engine and workbench for the TI-99/4A
+# TXA: text adventures for the TI-99/4A
 
-TXA (a working name) is a story virtual machine with an Infocom-grade
-parser for the TI-99/4A with an F18A (or PICO9918) and a SAMS card of
-512K or more, plus a native **workbench** that compiles games on the TI
-itself. Built on The Lantern Coast's kernel. Designed by Rebecca Sutter,
-built with Claude.
+TXA is an Infocom-style text adventure system for the TI-99/4A with an
+F18A (or PICO9918) and a SAMS card of 512K or more:
 
-The specification is a Claude Doc:
-https://claude.ai/code/artifact/43a54522-f42d-42ed-b2c7-bf348e97a95d
+- a **story language** with a world model, a standard library and a
+  parser that understands commands like "put the lantern on the table";
+- an **engine** that plays the compiled stories, with 80-column text,
+  pictures on the F18A's bitmap layer, music and sound effects, UNDO,
+  saved games and scrollback;
+- the **TXA Workbench**, a cartridge that edits nothing but does
+  everything else on the TI itself: compiles a story (byte for byte as
+  the PC compiler does), test-plays it with debugging verbs, and builds
+  the finished game's disk, TI Artist pictures included;
+- **PC tools** in Python: the compiler, a reference VM, the game writer,
+  the picture and music converters (TXA music notation, MIDI import).
 
-**Status (22 October 2026):** the engine is 1.0 beta (M0-M4: the VM,
-the parser, the world model and library, saving, pictures, sound,
-scrollback), with the sample game Lamplight. M5, the native compiler on
-the TI (the workbench cartridge), is done: it reads a program's files
-from disk following its INCLUDEs, lexes, parses, checks its meaning,
-generates its code and links the story image, every step identical to
-the Python compiler (tools/txc) on the whole test corpus, and writes the
-story to disk. M6, the workbench tools, is under way: one engine now
-serves every game, the workbench has a main menu, and its Build key
-writes a whole game (engine and story) that plays. See `plan.md`.
+The sample game, *Lamplight*, shows most of it. Designed by Rebecca
+Sutter, built with Claude; on The Lantern Coast's kernel.
+
+**Status:** the engine and workbench are complete (milestones M0-M6);
+the manuals are being written (M7), after which this is 1.0. See
+`plan.md` for the history and decisions, and `docs/` for the Technical
+Reference (generated from the source) and the music notation.
+
+## Trying it
+
+Get the release's cartridge image (`txa-workbench8.bin`, for a
+FinalGROM 99) and disk images, or build them as below. In js99er, use
+the "Generic Disk" controller setting. Put `lamplight-workbench.dsk` in
+DSK1, start the workbench, and press P (the project), C (compile), T
+(test-play) or B (build) then R (run).
+
+## Licence and credits
+
+MIT (see LICENSE). The 80-column font is derived from X11 misc-fixed
+5x8 (public domain). The assembler, xdt99 (Ralph Benzinger), is used to
+build but not included.
 
 ## Building and testing
 
