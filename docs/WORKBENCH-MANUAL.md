@@ -53,7 +53,8 @@ P asks three things, one after another:
 
 ## C: compile
 
-C reads the source file and every file it INCLUDEs, then lexes, parses,
+C reads the source file and every file it INCLUDEs (up to 12 files, the
+library's 8 among them), then lexes, parses,
 checks the meaning, generates the code and links the story, showing each
 stage on a progress bar. A Lamplight-sized story (9 files, about 3,800
 lines) takes a little over a minute. When it is done the screen says
@@ -110,10 +111,14 @@ the PC are left as they are. When it is done:
 The game is built: load DSK1.LAMPLI1 (E/A 5, FinalGROM, TIPI).
 ```
 
-**R** runs the game just built, as a player would see it. A built game
-loads with Editor/Assembler option 5 (`DSK1.LAMPLI1`), or from a
+**R** runs the game as a player would see it. If the game has not been
+built since the last compile (or since P chose a project), R compiles and
+builds it first, so C then R, or R alone, is enough. A built game loads
+with Editor/Assembler option 5 from its first engine file, the prefix and
+`1` (`DSK1.LAMPLI1`; not `LAMPLIS01`, which is the story), or from a
 FinalGROM or TIPI, on any TI with an F18A and SAMS: it does not need the
-workbench.
+workbench. C alone writes only the story's files; B (or R) writes the
+engine's.
 
 **RECORD and REPLAY** work in every game, built or test-played: `RECORD`
 writes each command typed to a script file on the game's disk
