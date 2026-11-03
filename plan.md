@@ -1215,10 +1215,11 @@ TI; the library had grown the count from 30.4M), the image unchanged.
   and 4 bytes left: space is its limit.
 
 ## Next
-1. Finish the full regression after the library change (HeldFirst); then tag v1.0, rebuild
-   dist/txa-1.0.zip (tools/mkdist.py) and the GitHub bundle.
-2. Rebecca pushes the bundle to GitHub and attaches dist/txa-1.0.zip as the 1.0 release.
-3. Library candidate: a WordIs (topic word) routine, which Lamplight, the Tutorial and Prior each define.
+1. TXA 1.0 is tagged (v1.0, 3 November 2026; full regression passing).  Rebecca pushes
+   txa-github.bundle to GitHub (docs/RELEASE.md) and attaches dist/txa-1.0.zip to the 1.0 release.
+2. Library candidate for 1.1: a WordIs (topic word) routine, which Lamplight, the Tutorial and
+   Prior each define.
+3. Background jobs do not survive between conversation turns: run long regressions within a turn.
 
 ## M7 state (2 November 2026)
 All seven manuals in docs/ (LANGUAGE-REFERENCE, LIBRARY-REFERENCE, WORKBENCH-MANUAL, TUTORIAL,
