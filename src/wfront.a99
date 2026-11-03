@@ -40,12 +40,19 @@ MN2    CI   R0,'P'
        JEQ  MPROJ
        CI   R0,'C'
        JEQ  MCOMP
-       CI   R0,'R'             R: run the built game (overlay 10)
-       JNE  MN2R
+       CI   R0,'R'             R: run the built game (overlay 10); not built
+       JNE  MN2R               since the last compile: compile and build first
+       BL   @RES49             (the last results cleared)
+       MOV  @WBRDY,R0
+       JEQ  MNRB
        LI   R0,10              (OVGO: from an overlay, the switch must be made
        B    @OVGO              by the resident part, not return into this one)
+MNRB   LI   R0,3
+       MOV  R0,@WBBLD
+       JMP  MCOMP
 MN2R   CI   R0,'E'             E: the last compile's error again (overlay 11)
        JNE  MN2E
+       BL   @RES49             (the last results cleared; R1 is overlay 11's)
        MOV  @WBERR,R1
        JEQ  MN2N
        LI   R0,11
@@ -68,6 +75,7 @@ MN2A   CI   R0,'O'             O: the options (overlay 14)
        B    @OVGO
 MN2O   CI   R0,'S'             S: the last compile's statistics (overlay 13)
        JNE  MN2S
+       BL   @RES49
        LI   R0,13
        B    @OVGO
 MN2S   CI   R0,'I'             I: a TI Artist picture, previewed (overlay 12,
@@ -102,7 +110,8 @@ MN4    MOV  R1,R4
        JMP  MN1
 * P: the source file, then the build date and the game's prefix (the one-
 * file tests ask neither).  A new source file brings its default prefix.
-MPROJ  BL   @MNAME
+MPROJ  CLR  @WBRDY             a new project: nothing built for it yet
+       BL   @MNAME
        BL   @MPDEF
        MOV  @WBONLY,R0
        JEQ  MPRJ1

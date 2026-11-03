@@ -95,7 +95,15 @@ BDFIN  LI   R10,STACKT
        LI   R1,QBLT2
        CLR  R2
        BL   @TXSTR
-       B    @MENUGO
+       MOV  @WBRDY,R0          built; and if R asked for the build, run it
+       LI   R1,1
+       MOV  R1,@WBRDY
+       CI   R0,2
+       JNE  BDF9
+       BL   @RES49
+       LI   R0,10
+       B    @OVGO
+BDF9   B    @MENUGO
 
 * BNAME - FNBUF = the source file's device (up to its last '.'), the
 * prefix, and BFILE + 1 (one digit: an engine has at most 9 files).

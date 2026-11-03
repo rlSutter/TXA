@@ -74,6 +74,9 @@ for n in os.listdir(os.path.join(d, 'DSK1')):
 m3, sn3 = session(d, k('p') + keys_for('dsk1.lamplight') + ENTER + ENTER + k('c'))
 check(f'the library only on DSK2 ({len(moved)} files): the compile finds it there, without errors',
       m3.rw(sy['WBERR']) == 0 and os.path.exists(os.path.join(d, 'DSK1', 'LAMPLIS01')), (m3.rw(sy['WBERR']), sn3[-1]['screen'].splitlines()[4:10]))
+check('the settings survive a 9-file compile (the file table once ran over them): colours 1, font bold, library DSK2.',
+      m3.rw(sy['OPCOL']) == 1 and m3.rw(sy['OPFNT']) == 1 and bytes(m3.rb(sy['OPLSTR'] + 1 + i) for i in range(5)) == b'DSK2.',
+      (m3.rw(sy['OPCOL']), m3.rw(sy['OPFNT']), bytes(m3.rb(sy['OPLSTR'] + i) for i in range(8))))
 m4, sn4 = session(d, k('o') + k('c') + keys_for('\x0e')[:-1])
 s4 = sn4[-1]
 check('O, C (green on black), FCTN 9: the colours put back (white on dark blue), TXAOPT unchanged',

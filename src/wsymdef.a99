@@ -218,17 +218,18 @@ EFEND  EQU  >3748
 EFTMP  EQU  GLOBRM+>1C0        (EFNUM's word)
 EFRET  EQU  GLOBRM+>1C2        (EFNAMB's return)
 EFSAV  EQU  GLOBRM+>1C4        (EFNAMB: R1-R3, 6 bytes)
-WBBLD  EQU  GLOBRM+>74         after the compile: 1 Build (the engine's files), 2 test-play
-TINAME EQU  GLOBRM+>100        22 bytes: a TI Artist picture's name, a length
+WBBLD  EQU  GLOBRM+>74         after the compile: 1 Build (the engine's files), 2 test-play, 3 Build then Run (R)
+WBRDY  EQU  GLOBRM+>3E         the game built since the last compile: 0 no, 1 yes, 2 being built for R (runs at the end)
+TINAME EQU  GLOBRM+>170        22 bytes: a TI Artist picture's name, a length
 *                              byte first ("DSK1.BIRD": its files are DSK1.BIRD_P,
 *                              _C and _T; overlays 8 and 12); 0: none.  (GLOBRM
 *                              holds a story's globals only in the engine)
-LKTEND EQU  GLOBRM+>118        the statistics (S): the tables' end (where the
+LKTEND EQU  GLOBRM+>186        the statistics (S): the tables' end (where the
 *                              routines start), 0 until a compile links
-LKIPG  EQU  GLOBRM+>11A        ... and the image's first page
-OPCOL  EQU  GLOBRM+>11C        the options (O, overlay 14; DSK1.TXAOPT): the colour
+LKIPG  EQU  GLOBRM+>188        ... and the image's first page
+OPCOL  EQU  GLOBRM+>18A        the options (O, overlay 14; DSK1.TXAOPT): the colour
 *                              scheme, 0-4 (0 gray on black, as at first)
-OPFNT  EQU  GLOBRM+>11E        ... the font: 0 normal, 1 bold
-OPLSTR EQU  GLOBRM+>120        ... 22 bytes: the library devices, a length byte, then
+OPFNT  EQU  GLOBRM+>18C        ... the font: 0 normal, 1 bold
+OPLSTR EQU  GLOBRM+>18E        ... 22 bytes: the library devices, a length byte, then
 *                              up to 20 characters ("DSK2. DSK3."): where an INCLUDE's
 *                              file is looked for when its own device lacks it

@@ -240,12 +240,12 @@ WLOAD  MOV  @WBNLEN,R0         FNBUF = the name, with its length byte
 WL1    MOVB *R1+,*R2+
        DEC  R0
        JNE  WL1
-       LI   R14,4              rows 4-9 cleared: the last results
-WL1A   MOV  R14,R0
-       BL   @WCLR
-       INC  R14
-       CI   R14,10
-       JL   WL1A
+       BL   @RES49             rows 4-9 cleared: the last results
+       MOV  @WBBLD,R0          no build since this compile (unless R asked
+       CI   R0,3               for one: WL9 marks it)
+       JEQ  WL1B
+       CLR  @WBRDY
+WL1B
        LI   R0,EFN1            no error's fields yet
        CLR  R1
        LI   R2,EFEND-EFN1
@@ -341,7 +341,11 @@ WL9    MOV  @WBBLD,R1          a compile that worked, for B (1: the engine's
        LI   R0,10
        BL   @OVSEL
        B    @OVENT+4
-WL9B   BL   @OVSEL
+WL9B   CI   R1,3               R: build, then run (BDFIN runs it)
+       JNE  WL9C
+       LI   R1,2
+       MOV  R1,@WBRDY
+WL9C   BL   @OVSEL
        B    @OVENT
 WL9A   B    @MENUGO            the menu again (the results stay on rows 4-8)
 D4W    DATA 4
@@ -429,6 +433,16 @@ WKFTAB BYTE 'S',8,'E',11,'X',12,'9',15,0
        EVEN
 
 * WCLR - row R0 blank, in normal colours.  Uses R0-R2.
+* RES49 - rows 4-9 cleared: the last command's results, before the next
+* writes its own.  Uses R0-R2, R13, R14.
+RES49  MOV  R11,R13
+       LI   R14,4
+RS49A  MOV  R14,R0
+       BL   @WCLR
+       INC  R14
+       CI   R14,10
+       JL   RS49A
+       B    *R13
 WCLR   MOV  R11,@WBRET
        MPY  @D80W,R0           R1 = row * 80
        MOV  R1,R0

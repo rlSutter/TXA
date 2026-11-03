@@ -16,7 +16,8 @@
 *   +4 its file's number (byte; >80 added when REPLACE drops it)
 *   +5 its node type (dump.NODES, from 1)   +6 its line
 *======================================================================
-MAXF   EQU  16                 files in a program, at most
+MAXF   EQU  12                 files in a program, at most (FTAB ends at GLOBRM+>170:
+*                              TINAME and the settings are above it)
 DXPG   EQU  112                SAMS page where the declaration index starts
 DXMAX  EQU  2048               declarations, at most (4 pages)
 * variables (the resident part's, from GLOBRM; OVCUR in wbench)

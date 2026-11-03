@@ -155,10 +155,9 @@ check(f'R ran the game B built (its engine from LAMPLI1-5; the story, pictures a
       f'{why} at {i}: python {want[max(0, i - 80):i + 60]!r}\n  ti {got[max(0, i - 80):i + 60]!r}')
 check('the engine found the picture files (PICPG: the page after the story)', m.rw(esy['PICPG']) == (len(img) + 4095) // 4096, m.rw(esy['PICPG']))
 d2, _ = g['stage'](open('samples/lamplight.txa').read(), 'lamplight', g['LIB'])
-got2, m2, why2 = run_then_play(d2, [Rk], [])
-scr = g['R'].screen(m2).splitlines()
-check('R with no game built says which file: "Cannot load: DSK1.LAMPLI1 (B builds the game first)."',
-      why2 == 'menu' and 'Cannot load:' in scr[8] and 'DSK1.LAMPLI1' in scr[8] and 'B builds the game first' in scr[8], scr[7:11])
+got2, m2, why2 = run_then_play(d2, [Rk], [], max_steps=600_000_000)
+check('R with nothing built (Rebecca: it should not refuse): it compiles and builds the project, then runs it',
+      why2 == 'waiting' and 'beach to the south.' in got2, (why2, got2[-200:]))
 
 d3, _ = g['stage'](open('samples/lamplight.txa').read(), 'lamplight', g['LIB'])
 for n in fc['picture_files'] + fc['sound_files']:
@@ -171,6 +170,24 @@ except S.Halt as e:
     ok3, detail = False, str(e)
 check('QUIT in the game R started: the console restarts with the cartridge on bank 0, so the workbench is in its menu again '
       '(Rebecca found it gone)', ok3, detail)
+
+# Rebecca's findings (2 November 2026): R straight after a compile refused
+# ("B builds the game first"), and wrote its message over the compile's
+# results.  R now builds first when nothing is built since the last
+# compile, and every command clears rows 4-9 before writing its own.
+Ck, Sk = ('key', 'c'), ('key', 's')
+def bird_disk():
+    d, _ = g['stage'](open('tests/txa/bird/birdgame.txa').read(), 'birdgame', g['LIB'])
+    for n in ['BIRD_P', 'BIRD_C', 'BIRD_T']:
+        shutil.copy(os.path.join('tests/txa/bird', n), os.path.join(d, 'DSK1', n))
+    return d
+got4, m4, why4 = run_then_play(bird_disk(), [P, 'dsk1.birdgame', '', '', Ck, Rk], ['look'], max_steps=600_000_000)
+check('R straight after C (the default prefix BIRDGA): it builds the game, then runs it (title page, then LOOK)',
+      why4 == 'waiting' and 'BIRDS' in got4 and 'Flowers, and a hummingbird' in got4.split('>look')[-1], (why4, got4[-300:]))
+got5, m5, why5 = run_then_play(bird_disk(), [P, 'dsk1.birdgame', '', '', Ck, Sk], [], max_steps=400_000_000)
+scr5 = g['R'].screen(m5).splitlines()
+check('S after C: the statistics replace the compile\'s results (no "Read 9 files" left among them)',
+      any('Statistics' in l for l in scr5) and not any('Read 9 files' in l for l in scr5), scr5[:12])
 
 print('ALL PASS' if not fails else f'{fails} FAILED')
 sys.exit(1 if fails else 0)
