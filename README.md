@@ -18,18 +18,40 @@ F18A (or PICO9918) and a SAMS card of 512K or more:
 The sample game, *Lamplight*, shows most of it. Designed by Rebecca
 Sutter, built with Claude; on The Lantern Coast's kernel.
 
-**Status:** the engine and workbench are complete (milestones M0-M6);
-the manuals are being written (M7), after which this is 1.0. See
-`plan.md` for the history and decisions, and `docs/` for the Technical
-Reference (generated from the source) and the music notation.
+**Status:** 1.0 (3 November 2026). The engine, the workbench, the PC
+tools and the manuals are complete; the full regression suite passes.
+See `plan.md` for the history and decisions.
+
+## The manuals
+
+In `docs/`, as Markdown (the release has them as PDF too):
+
+- `LANGUAGE-REFERENCE.md`: the Authoring Language Reference.
+- `LIBRARY-REFERENCE.md`: the Standard Library Reference.
+- `WORKBENCH-MANUAL.md`: the Workbench Manual.
+- `TUTORIAL.md`: the Tutorial, a small game built in five chapters.
+- `ENGINE-GUIDE.md`: the Engine Implementation Guide, for other machines.
+- `TECHNICAL-REFERENCE.md`: the formats and the TI engine's memory.
+- `PLAYERS-CARD.md`: how a player plays (the game writer makes one per game).
+- `MUSIC.md`: TXA music notation.
+
+All but the Workbench Manual and the Language Reference are generated
+from the source (`tools/gendocs.py`), and `tests/docs_test.py` fails if
+any of them drifts from it.
 
 ## Trying it
 
-Get the release's cartridge image (`txa-workbench8.bin`, for a
-FinalGROM 99) and disk images, or build them as below. In js99er, use
-the "Generic Disk" controller setting. Put `lamplight-workbench.dsk` in
-DSK1, start the workbench, and press P (the project), C (compile), T
-(test-play) or B (build) then R (run).
+Get the release's `txa-1.0.zip`, or build it as below
+(`python3 tools/mkdist.py`). In js99er, use the "Generic Disk" controller
+setting with F18A and SAMS on.
+
+- **To play:** put `games/lamplight.dsk` in DSK1 and load `DSK1.LAMP1`
+  with Editor/Assembler option 5, or put `games/lamplight8.bin` on a
+  FinalGROM.
+- **To make games:** put `cartridge/txa-workbench8.bin` on a FinalGROM
+  and `workbench/lamplight-workbench.dsk` in DSK1. Start the workbench and
+  press P (the project), then C (compile), T (test-play) or R (run: it
+  builds the game first when needed).
 
 ## Licence and credits
 

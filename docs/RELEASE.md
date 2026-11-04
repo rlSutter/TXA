@@ -34,3 +34,7 @@ folder. On github.com, open the repository's Releases, "Draft a new
 release", choose the tag `v1.0`, and attach the distribution's files:
 the workbench cartridge, the sample disks, the manuals as PDF, and the
 zip of everything.
+
+
+The text for the 1.0 release page is in `docs/RELEASE-NOTES.md`: paste it
+into the release's description when attaching `txa-1.0.zip`.
