@@ -21,6 +21,8 @@ missing = [n for _, n, *_ in O.OPS if f'| `{n}` |' not in text]
 check(f'every opcode has its row ({len(O.OPS)})', not missing, missing)
 missing = [n for n in O.HDR if f'| `{n}` |' not in text]
 check(f'every header field has its row ({len(O.HDR)})', not missing, missing)
+if not os.path.exists(os.path.join(build.B, 'wbench.equ')):   # a fresh clone: assemble it first
+    build.workbench_cart()
 sy = build.symbols(os.path.join(build.B, 'wbench.equ'))
 n = 1
 while f'OV{n}END' in sy:

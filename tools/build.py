@@ -19,6 +19,15 @@ XAS = os.environ.get('XAS99', os.path.join(XDT, 'xas99.py'))
 XDM = os.environ.get('XDM99', os.path.join(XDT, 'xdm99.py'))
 B = os.path.join(ROOT, 'build')
 
+def ensure_generated():
+    """A fresh clone has neither build/ nor src/gen/ (both are ignored by
+    git), nor the generated font: make them, so any way of building works."""
+    os.makedirs(B, exist_ok=True)
+    os.makedirs(os.path.join(ROOT, 'src/gen'), exist_ok=True)
+    if not os.path.exists(os.path.join(ROOT, 'src/gen/font.a99')):
+        subprocess.run([sys.executable, 'tools/mkfont.py'], cwd=ROOT, check=True)
+ensure_generated()
+
 def run(cmd, cwd=None):
     r = subprocess.run(cmd, cwd=cwd, capture_output=True, text=True)
     out = (r.stdout + r.stderr)
