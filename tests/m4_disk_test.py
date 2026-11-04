@@ -44,12 +44,14 @@ for n in files['engine']:
     shutil.copy(os.path.join(out, n), os.path.join(build.B, n))
 segs = build.ea5_segments(files['engine'][0])
 cart, _ = build.cart_from_segments(segs, 'LAMP DISK')
-def run(dsk_files, cmds, max_steps=150_000_000):
+def run(dsk_files, cmds, max_steps=150_000_000, setup=None):
     d = tempfile.mkdtemp(); os.makedirs(os.path.join(d, 'DSK1'))
     for n in dsk_files:
         shutil.copy(os.path.join(out, n), os.path.join(d, 'DSK1', n))
     sy = build.symbols(os.path.join(build.B, 'engine.equ'))
     m = S.Machine(cart, f18a=True, pages=128); cpu = S.CPU(m); m.disk_dir = d
+    if setup:
+        setup(m)
     cpu.pc = m.rw(m.rw(0x6006) + 2)
     queue = [k for line in cmds for k in keys_for(line)]
     outp, steps, hold, free = [], 0, 0, 0
@@ -86,6 +88,34 @@ check(f'the story ({nfiles} files), pictures ({len(files["picture_files"])}) and
 got2, m2, why2 = run([n for n in allfiles if n != 'LAMPS03'], [])
 screen = R.screen(m2)
 check('a missing story file stops with its name', why2 == 'nofile' and 'Cannot read the story file DSK1.LAMPS03' in screen, screen[:400])
+
+# 1.0.1, from the SAMS Kernel's 1.28.0: a card that lists DSK1 but declines it (a
+# plain return, as a TIPI can for a device it is not set up for; a real TIPI's DSR
+# lists DSK names), at CRU >1000, ahead of the drive at >1100.  The search must go
+# on to the next name and card, as the console's DSRLNK does; TXA's once stopped
+# there with an error, so a console with a TIPI and a disk controller could not
+# load from the floppy.  (The kernel found it on real hardware: a TIPI and an
+# RS232 card hid PIO.)
+def decoy(m):
+    rom = bytearray(0x2000)
+    rom[0:4] = b'\xAA\x01\x00\x00'
+    rom[8:10] = (0x4010).to_bytes(2, 'big')                       # the DSR list
+    rom[0x10:0x12] = b'\x00\x00'; rom[0x12:0x14] = (0x4030).to_bytes(2, 'big'); rom[0x14:0x19] = b'\x04DSK1'
+    rom[0x30:0x32] = (0x045B).to_bytes(2, 'big')                  # B *R11: declines
+    st = {'on': False}
+    cw, rb = m.cru_write, m.rb
+    def cru_write(bit, v):
+        if bit == 0x800:                                          # CRU >1000
+            st['on'] = bool(v); return
+        cw(bit, v)
+    def rb2(addr):
+        if st['on'] and 0x4000 <= addr < 0x6000:
+            return rom[addr - 0x4000]
+        return rb(addr)
+    m.cru_write = cru_write; m.rb = rb2
+got_d, m_d, why_d = run(allfiles, walk, setup=decoy)
+check('a card at >1000 that lists DSK1 and declines it (a TIPI can): the search goes on to the drive at >1100, and the walkthrough\'s start plays as without it',
+      why_d == why and got_d == got, (why_d, got_d[-300:], R.screen(m_d)[:300]))
 
 print('ALL PASS' if not fails else f'{fails} FAILED')
 sys.exit(1 if fails else 0)

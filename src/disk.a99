@@ -121,6 +121,7 @@ DLN1   AI   R12,>0100
 DLGO2  MOV  *R2,R2
        JEQ  DLNEXT             end of list
        MOV  R2,@>83D2          remember the entry
+       MOV  R2,R8              (and here: a DSR may change >83D2)
        INCT R2
        MOV  *R2+,R9            entry address
        MOVB *R2+,R6
@@ -170,12 +171,14 @@ DLPU1  LWPI WS
 DLCALL MOV  R9,@DSRENT
        LWPI GPLWS
        BL   @DLGPL
-       JMP  DLER0              DSR came back to R11: not its device
+       JMP  DLER0              DSR came back to R11: not its device after all
        LWPI WS
        SETO R5                 skip return: it handled the call, but a missing
        JMP  DLRD               file is still an error, in the PAB's flag byte
-DLER0  LWPI WS
-       JMP  DLERR
+DLER0  LWPI WS                 a card that lists the device but declines it
+       MOV  R8,R2              (a TIPI can): on to the next name, then the next
+       JMP  DLGO2              card, as the console's DSRLNK does (1.0.1, from
+*                              the SAMS Kernel's 1.28.0: it once ended here)
 DLGO1  MOV  @>83D2,R2          next list entry
        JMP  DLGO2
 DLERR  CLR  R5
