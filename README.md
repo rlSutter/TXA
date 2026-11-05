@@ -18,8 +18,9 @@ F18A (or PICO9918) and a SAMS card of 512K or more:
 The sample game, *Lamplight*, shows most of it. Designed by Rebecca
 Sutter, built with Claude; on The Lantern Coast's kernel.
 
-**Status:** 1.0 (3 November 2026). The engine, the workbench, the PC
-tools and the manuals are complete; the full regression suite passes.
+**Status:** 1.0.1 (4 November 2026; 1.0 was 3 November). The engine, the
+workbench, the PC tools and the manuals are complete; the full regression
+suite passes. `docs/RELEASE-NOTES.md` says what changed.
 See `plan.md` for the history and decisions.
 
 ## The manuals
@@ -41,7 +42,7 @@ any of them drifts from it.
 
 ## Trying it
 
-Get the release's `txa-1.0.zip`, or build it as below
+Get the latest release's zip from GitHub, or build it as below
 (`python3 tools/mkdist.py`). In js99er, use the "Generic Disk" controller
 setting with F18A and SAMS on.
 

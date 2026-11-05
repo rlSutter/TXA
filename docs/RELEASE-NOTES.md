@@ -1,3 +1,23 @@
+# TXA 1.0.1
+
+*4 November 2026*
+
+A fix for consoles with a TIPI and a disk controller.
+
+- **Finding disk drives past another card.** When TXA looked for a device
+  such as `DSK1`, it stopped at the first card whose list named it, even
+  if that card then declined. A TIPI lists `DSK` names and sits at CRU
+  `>1000`, ahead of a disk controller at `>1100`, so on a console with
+  both, games and the workbench might not load from the floppy drive. The
+  search now goes on to the next card, as the console's own routine does.
+  The fix comes from the SAMS Kernel 1.28.0, where the same flaw was found
+  on real hardware. A new test plants such a card ahead of the drive.
+- **Building from a fresh copy.** The build now creates the folders and
+  the generated font it needs, so `python tools/mkdist.py` works on a new
+  clone (found building the release on Windows).
+
+Everything else is as in 1.0.
+
 # TXA 1.0
 
 *3 November 2026*

@@ -76,7 +76,7 @@ def pdf(md, title, out):
                        check=True, stderr=subprocess.DEVNULL)
 
 def main():
-    a = argparse.ArgumentParser(); a.add_argument('--version', default='1.0'); a.add_argument('--out', default=os.path.join(ROOT, 'dist'))
+    a = argparse.ArgumentParser(); a.add_argument('--version', default='1.0.1'); a.add_argument('--out', default=os.path.join(ROOT, 'dist'))
     args = a.parse_args()
     top = os.path.join(args.out, f'txa-{args.version}')
     shutil.rmtree(top, ignore_errors=True)
