@@ -7,9 +7,10 @@
 ## Starting
 
 You need a TI-99/4A with 32K memory expansion, an F18A (or PICO9918) and
-a SAMS card of 512K or more. Put the game's disk in DSK1, then load
-`DSK1.LAMP1` with Editor/Assembler option 5, or choose it from a
-FinalGROM or TIPI menu.
+a SAMS card of 512K or more. Put the game's disk in a drive and load
+`DSK1.LAMP1` with Editor/Assembler option 5 (in another drive,
+`DSK3.LAMP1` for DSK3, say: the game finds the rest of its files on
+whichever drive has them), or choose it from a FinalGROM or TIPI menu.
 
 ## Playing
 

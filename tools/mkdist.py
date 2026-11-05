@@ -40,9 +40,9 @@ Sutter, built with Claude.  MIT licence (LICENSE).
 
 To play
 -------
-games/lamplight.dsk is the sample game.  Put it in DSK1 and load
-DSK1.LAMP1 with Editor/Assembler option 5, or from a FinalGROM or TIPI
-menu; or put games/lamplight8.bin on a FinalGROM.  games/LAMP-CARD.md
+games/lamplight.dsk is the sample game.  Put it in a drive and load
+DSK1.LAMP1 (DSK3.LAMP1 from DSK3, and so on) with Editor/Assembler option
+5, or from a FinalGROM or TIPI menu; or put games/lamplight8.bin on a FinalGROM.  games/LAMP-CARD.md
 says how to play.  games/ferry.dsk is the tutorial's small game.
 
 To make games
@@ -76,7 +76,7 @@ def pdf(md, title, out):
                        check=True, stderr=subprocess.DEVNULL)
 
 def main():
-    a = argparse.ArgumentParser(); a.add_argument('--version', default='1.0.1'); a.add_argument('--out', default=os.path.join(ROOT, 'dist'))
+    a = argparse.ArgumentParser(); a.add_argument('--version', default='1.0.2'); a.add_argument('--out', default=os.path.join(ROOT, 'dist'))
     args = a.parse_args()
     top = os.path.join(args.out, f'txa-{args.version}')
     shutil.rmtree(top, ignore_errors=True)

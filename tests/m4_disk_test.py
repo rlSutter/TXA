@@ -44,10 +44,10 @@ for n in files['engine']:
     shutil.copy(os.path.join(out, n), os.path.join(build.B, n))
 segs = build.ea5_segments(files['engine'][0])
 cart, _ = build.cart_from_segments(segs, 'LAMP DISK')
-def run(dsk_files, cmds, max_steps=150_000_000, setup=None):
-    d = tempfile.mkdtemp(); os.makedirs(os.path.join(d, 'DSK1'))
+def run(dsk_files, cmds, max_steps=150_000_000, setup=None, drive='DSK1'):
+    d = tempfile.mkdtemp(); os.makedirs(os.path.join(d, drive))
     for n in dsk_files:
-        shutil.copy(os.path.join(out, n), os.path.join(d, 'DSK1', n))
+        shutil.copy(os.path.join(out, n), os.path.join(d, drive, n))
     sy = build.symbols(os.path.join(build.B, 'engine.equ'))
     m = S.Machine(cart, f18a=True, pages=128); cpu = S.CPU(m); m.disk_dir = d
     if setup:
@@ -87,7 +87,7 @@ check(f'the story ({nfiles} files), pictures ({len(files["picture_files"])}) and
       f'{why} at {i}: python {want[max(0,i-80):i+60]!r}\n  ti {got[max(0,i-80):i+60]!r}')
 got2, m2, why2 = run([n for n in allfiles if n != 'LAMPS03'], [])
 screen = R.screen(m2)
-check('a missing story file stops with its name', why2 == 'nofile' and 'Cannot read the story file DSK1.LAMPS03' in screen, screen[:400])
+check('a missing story file stops with its name', why2 == 'nofile' and 'Cannot find DSK1.LAMPS03' in screen, screen[:400])
 
 # 1.0.1, from the SAMS Kernel's 1.28.0: a card that lists DSK1 but declines it (a
 # plain return, as a TIPI can for a device it is not set up for; a real TIPI's DSR
@@ -116,6 +116,17 @@ def decoy(m):
 got_d, m_d, why_d = run(allfiles, walk, setup=decoy)
 check('a card at >1000 that lists DSK1 and declines it (a TIPI can): the search goes on to the drive at >1100, and the walkthrough\'s start plays as without it',
       why_d == why and got_d == got, (why_d, got_d[-300:], R.screen(m_d)[:300]))
+
+# 1.0.1 (Rebecca, in js99er): the game built for DSK1, its disk in DSK3.  The
+# engine tries the other drives for the first story file (DSK2: empty, DSK3:
+# there; DSK4-9 have no controller at all in the simulator) and keeps the one
+# that has it, for the rest of the story, the pictures and the music.
+got3, m3, why3 = run(allfiles, walk, drive='DSK3')
+check('the disk in DSK3, the game built for DSK1: the engine finds it there (the story, pictures and music), and the walkthrough\'s start plays the same',
+      why3 == why and got3 == got, (why3, got3[-300:], R.screen(m3)[:300]))
+got4, m4, why4 = run([], [])
+check('no story on any drive: it stops naming the file it was built for (the search came round to it)',
+      why4 == 'nofile' and 'Cannot find DSK1.LAMPS01' in R.screen(m4), R.screen(m4)[:300])
 
 print('ALL PASS' if not fails else f'{fails} FAILED')
 sys.exit(1 if fails else 0)

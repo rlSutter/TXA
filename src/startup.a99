@@ -151,7 +151,12 @@ LDS2   MOV  *R0+,*R1+
 * the pictures, STNAME P01 ..., and the music and sounds, STNAME M01 ...,
 * each set until a file is missing (none: no pictures, no music).  4K a
 * file, one SAMS story page each, from story page 0; PICPG and SNDPG are
-* where those sets begin (0: none).
+* where those sets begin (0: none).  1.0.1: if the first story file is not
+* on the drive the game was built for, the other drives are tried (DSK2 ..
+* DSK9, then DSK1 ..., round to the one it was built for): the one that has
+* it stays in STNAME, so the rest of the story, the pictures, the music,
+* saves and scripts come from it.  Only a numbered device (its 4th
+* character 1-9: DSKn, WDSn ...) is searched; TIPI.X. and the like are not.
 LOADDK .enter
        LI   R0,2
        LI   R1,2
@@ -164,7 +169,13 @@ LOADDK .enter
        JNE  LDK0               (the workbench put it there): past it to the
        BL   @LDTP              pictures and music
        JMP  LDK3
-LDK0   LI   R0,1               files wanted: 1 until the header is read
+LDK0   CLR  @VT5               VT5: the drive's digit, if STNAME is a numbered
+       MOVB @STNAME+4,R1       device (1-9); 0: no search
+       AI   R1,->3100
+       CI   R1,>08FF
+       JH   LDK0A
+       MOVB @STNAME+4,@VT5
+LDK0A  LI   R0,1               files wanted: 1 until the header is read
        MOV  R0,@VT1
        LI   R0,'S'
        MOV  R0,@VT3
@@ -172,7 +183,21 @@ LDK0   LI   R0,1               files wanted: 1 until the header is read
 LDK1   BL   @LDFIL             the story's files
        MOV  R0,R0
        JEQ  LDK1B
-       B    @LDK9
+       MOV  @VT4,R1            the first file missing: the next drive, round
+       JNE  LDK8               to the one it was built for
+       MOVB @VT5,R2
+       JEQ  LDK8
+       MOVB @STNAME+4,R1
+       AI   R1,>0100
+       CI   R1,>3A00
+       JL   LDK1C
+       LI   R1,>3100
+LDK1C  MOVB R1,@STNAME+4
+       CB   R1,R2
+       JNE  LDK1
+       CLR  @VT5               round to its own drive: once more there, unsearched,
+       JMP  LDK1               so that FNBUF names it for LDK9
+LDK8   B    @LDK9
 LDK1B
        MOV  @VT4,R0
        JNE  LDK2
@@ -221,7 +246,7 @@ SLOAD  BYTE SLOADX-SLOAD-1
        TEXT 'Loading'
 SLOADX
 SNOFIL BYTE SNOFLX-SNOFIL-1
-       TEXT 'Cannot read the story file '
+       TEXT 'Cannot find '
 SNOFLX
        EVEN
 
@@ -330,13 +355,13 @@ NOFREG DATA >8000,>81E0,>8200,>8300+(GM1COL/>40),>8400+(PATTAB/>800),>8500+(SPRA
 * QUIT - the hardware back as the console expects it, then its title.
 
 SNOSMS BYTE SNOSMSX-SNOSMS-1
-       TEXT 'TXA needs a SAMS card of 512K or more on this TI.'
+       TEXT 'TXA needs SAMS: 512K or more.'
 SNOSMSX
 SNOTST BYTE SNOTSTX-SNOTST-1
-       TEXT 'There is no TXA story in this cartridge.'
+       TEXT 'No TXA story in this cartridge.'
 SNOTSTX
 SBADCK BYTE SBADCKX-SBADCK-1
-       TEXT 'The story is damaged: its checksum does not match.'
+       TEXT 'The story is damaged.'
 SBADCKX
 SNOF18 BYTE SNOF18X-SNOF18-1
        TEXT 'TXA NEEDS AN F18A OR PICO9918'

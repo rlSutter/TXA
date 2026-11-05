@@ -45,9 +45,10 @@ def player_card(title, prefix, device='DSK1', pictures=False, music=False):
 ## Starting
 
 You need a TI-99/4A with 32K memory expansion, an F18A (or PICO9918) and
-a SAMS card of 512K or more. Put the game's disk in {device}, then load
-`{device}.{prefix}1` with Editor/Assembler option 5, or choose it from a
-FinalGROM or TIPI menu.
+a SAMS card of 512K or more. Put the game's disk in a drive and load
+`{device}.{prefix}1` with Editor/Assembler option 5 (in another drive,
+`DSK3.{prefix}1` for DSK3, say: the game finds the rest of its files on
+whichever drive has them), or choose it from a FinalGROM or TIPI menu.
 
 ## Playing
 

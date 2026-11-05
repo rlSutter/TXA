@@ -18,7 +18,7 @@ F18A (or PICO9918) and a SAMS card of 512K or more:
 The sample game, *Lamplight*, shows most of it. Designed by Rebecca
 Sutter, built with Claude; on The Lantern Coast's kernel.
 
-**Status:** 1.0.1 (4 November 2026; 1.0 was 3 November). The engine, the
+**Status:** 1.0.2 (5 November 2026; 1.0 was 3 November). The engine, the
 workbench, the PC tools and the manuals are complete; the full regression
 suite passes. `docs/RELEASE-NOTES.md` says what changed.
 See `plan.md` for the history and decisions.

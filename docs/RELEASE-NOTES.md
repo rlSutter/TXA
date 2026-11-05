@@ -1,3 +1,22 @@
+# TXA 1.0.2
+
+*5 November 2026*
+
+- **Games load from any drive.** A game's files were looked for only on
+  the drive it was built for (DSK1 for the release's games), so a disk in
+  DSK3 could not load. If the first story file is not there, the engine
+  now tries the other drives, DSK1 to DSK9, and uses the one that has it
+  for the rest of the story, the pictures, the music, saved games and
+  scripts. Load the first engine file from whichever drive holds the disk
+  (`DSK3.LAMP1`, say). A game built for a named device such as
+  `TIPI.GAMES.` looks only there. If no drive has the story, the message
+  names the file the game was built for: "Cannot find DSK1.LAMPS01".
+- Three start-up messages are shorter, to make room: "TXA needs SAMS:
+  512K or more.", "No TXA story in this cartridge.", "The story is
+  damaged."
+
+Everything else is as in 1.0.1.
+
 # TXA 1.0.1
 
 *4 November 2026*
